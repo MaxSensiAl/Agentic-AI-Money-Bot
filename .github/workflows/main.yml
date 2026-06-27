@@ -1,0 +1,26 @@
+name: Hourly Money Maker
+
+on:
+  schedule:
+    - cron: '0 * * * *' # यह हर 1 घंटे में खुद चलेगा
+  workflow_dispatch: # बटन दबाकर भी चला सकते हैं
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: |
+          pip install requests google-generativeai
+      - name: Execute Bot
+        env:
+          SHRINKME_API: ${{ secrets.SHRINKME_API }}
+          GEMINI_API: ${{ secrets.GEMINI_API }}
+          BLOGGER_API: ${{ secrets.BLOGGER_API }}
+          BLOG_ID: ${{ secrets.BLOG_ID }}
+        run: python bot.py
