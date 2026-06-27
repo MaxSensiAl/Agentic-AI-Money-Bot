@@ -1,41 +1,45 @@
-import os
-import smtplib
-import requests
+import os, smtplib, requests
 from email.message import EmailMessage
 import google.generativeai as genai
 
-# Secrets (पक्का करें कि ये GitHub Settings में सही भरे हैं)
-BLOGGER_EMAIL = os.getenv("BLOGGER_EMAIL")
-SENDER_EMAIL = os.getenv("SENDER_EMAIL")
-GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD") 
-GEMINI_KEY = os.getenv("GEMINI_API")
-SHRINK_API = os.getenv("SHRINKME_API")
+try:
+    # Secrets
+    B_EMAIL = os.getenv("BLOGGER_EMAIL")
+    S_EMAIL = os.getenv("SENDER_EMAIL")
+    PASS = os.getenv("GMAIL_APP_PASSWORD").replace(" ", "")
+    G_KEY = os.getenv("GEMINI_API")
+    S_KEY = os.getenv("SHRINKME_API")
 
-# 1. AI से कंटेंट लेना
-genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-pro')
-response = model.generate_content("Give me a trending tech news headline and 3 lines about it.")
-content = response.text
+    # 1. AI Content (Model changed to gemini-1.5-flash)
+    genai.configure(api_key=G_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    content = model.generate_content("Give me a trending Hollywood movie news headline and 3 lines about it with emojis.").text
 
-# 2. ShrinkMe लिंक बनाना
-long_url = "https://viralnewsai24.blogspot.com"
-short_res = requests.get(f"https://shrinkme.io/api?api={SHR_API}&url={long_url}").json()
-money_link = short_res.get("shortenedUrl", long_url)
+    # 2. Money Link
+    r = requests.get(f"https://shrinkme.io/api?api={S_KEY}&url=https://viralnewsai24.blogspot.com").json()
+    link = r.get("shortenedUrl", "https://viralnewsai24.blogspot.com")
 
-# 3. ईमेल तैयार करना
-msg = EmailMessage()
-msg['Subject'] = "Breaking AI Update"
-msg['From'] = SENDER_EMAIL
-msg['To'] = BLOGGER_EMAIL
+    # 3. Send Email
+    msg = EmailMessage()
+    msg['Subject'] = "Breaking AI Viral News"
+    msg['From'] = S_EMAIL
+    msg['To'] = B_EMAIL
+    
+    html_body = f"""
+    <div style="background:#000; color:#00f2ff; padding:20px; border:2px solid #00f2ff; border-radius:10px; font-family:sans-serif; text-align:center;">
+        <h2 style="color:#7000ff;">AGENTIC AI UPDATE</h2>
+        <p style="color:#ccc;">{content}</p>
+        <br>
+        <a href="{link}" style="background:#00f2ff; color:#000; padding:15px 30px; text-decoration:none; border-radius:50px; font-weight:bold; display:inline-block;">INITIALIZE DOWNLOAD</a>
+    </div>
+    """
+    msg.add_alternative(html_body, subtype='html')
 
-html_body = f"<h2>Robot Update</h2><p>{content}</p><br><a href='{money_link}'>CLICK HERE</a>"
-msg.add_alternative(html_body, subtype='html')
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        server.login(S_EMAIL, PASS)
+        server.send_message(msg)
+    print("✅ SUCCESS! Post sent to Blogger.")
 
-# 4. ईमेल भेजना (SSL के साथ)
-# यहाँ अगर पासवर्ड गलत होगा तो GitHub पर Error दिखेगा
-server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-server.login(SENDER_EMAIL, GMAIL_PASSWORD)
-server.send_message(msg)
-server.quit()
-
-print("✅ EMAIL SENT SUCCESSFULLY!")
+except Exception as e:
+    print(f"❌ ERROR: {e}")
+    raise e
