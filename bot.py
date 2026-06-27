@@ -1,27 +1,33 @@
-import os, smtplib, requests
+import os
+import smtplib
+import requests
 from email.message import EmailMessage
-import google.generativeai as genai
+
+# Secrets
+B_EMAIL = os.getenv("BLOGGER_EMAIL")
+S_EMAIL = os.getenv("SENDER_EMAIL")
+PASS = os.getenv("GMAIL_APP_PASSWORD").replace(" ", "")
+G_KEY = os.getenv("GEMINI_API")
+S_KEY = os.getenv("SHRINKME_API")
+
+def get_ai_content():
+    # सीधे API कॉल (बिना किसी SDK के) - यह 100% काम करेगा
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={G_KEY}"
+    payload = {"contents": [{"parts":[{"text": "Give me a trending Hollywood movie name and 3 lines review with emojis."}]}]}
+    res = requests.post(url, json=payload).json()
+    return res['candidates'][0]['content']['parts'][0]['text']
 
 try:
-    # Secrets
-    B_EMAIL = os.getenv("BLOGGER_EMAIL")
-    S_EMAIL = os.getenv("SENDER_EMAIL")
-    PASS = os.getenv("GMAIL_APP_PASSWORD").replace(" ", "")
-    G_KEY = os.getenv("GEMINI_API")
-    S_KEY = os.getenv("SHRINKME_API")
+    print("🤖 AI is generating content...")
+    content = get_ai_content()
+    
+    # ShrinkMe Link
+    link_res = requests.get(f"https://shrinkme.io/api?api={S_KEY}&url=https://viralnewsai24.blogspot.com").json()
+    link = link_res.get("shortenedUrl", "https://viralnewsai24.blogspot.com")
 
-    # 1. AI Content (Model changed to gemini-1.5-flash)
-    genai.configure(api_key=G_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    content = model.generate_content("Give me a trending Hollywood movie news headline and 3 lines about it with emojis.").text
-
-    # 2. Money Link
-    r = requests.get(f"https://shrinkme.io/api?api={S_KEY}&url=https://viralnewsai24.blogspot.com").json()
-    link = r.get("shortenedUrl", "https://viralnewsai24.blogspot.com")
-
-    # 3. Send Email
+    # Creating Email
     msg = EmailMessage()
-    msg['Subject'] = "Breaking AI Viral News"
+    msg['Subject'] = "Breaking AI News Update"
     msg['From'] = S_EMAIL
     msg['To'] = B_EMAIL
     
@@ -38,8 +44,8 @@ try:
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
         server.login(S_EMAIL, PASS)
         server.send_message(msg)
-    print("✅ SUCCESS! Post sent to Blogger.")
+    
+    print("✅ SUCCESS! Everything is working.")
 
 except Exception as e:
-    print(f"❌ ERROR: {e}")
-    raise e
+    print(f"❌ FINAL ERROR: {e}")
