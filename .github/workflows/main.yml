@@ -1,31 +1,7 @@
-name: Hourly Money Maker
-
-on:
-  schedule:
-    - cron: '0 * * * *' # हर घंटे अपने आप चलेगा
-  workflow_dispatch: # बटन दबाकर चलाने के लिए
-
-jobs:
-  run-bot:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install Dependencies
-        run: |
-          pip install requests feedparser
-
-      - name: Execute Bot
+- name: Execute Machine
         env:
-          BLOGGER_EMAIL: ${{ secrets.BLOGGER_EMAIL }}
-          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          BLOG_ID: ${{ secrets.BLOG_ID }}
           SHRINKME_API: ${{ secrets.SHRINKME_API }}
           GEMINI_API: ${{ secrets.GEMINI_API }}
         run: python bot.py
