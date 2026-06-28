@@ -1,66 +1,109 @@
 import os, smtplib, requests, feedparser, random
 from email.message import EmailMessage
 
-def run_viral_engine():
-    # Secrets
-    B_EMAIL = os.getenv("BLOGGER_EMAIL")
-    S_EMAIL = os.getenv("SENDER_EMAIL")
-    PASS = os.getenv("GMAIL_APP_PASSWORD", "").replace(" ", "")
-    S_KEY = os.getenv("SHRINKME_API")
+# --- CONFIG ---
+B_EMAIL = os.getenv("BLOGGER_EMAIL")
+S_EMAIL = os.getenv("SENDER_EMAIL")
+PASS = os.getenv("GMAIL_APP_PASSWORD", "").replace(" ", "")
+S_KEY = os.getenv("SHRINKME_API")
+G_KEY = os.getenv("GEMINI_API")
 
-    # 1. अलग-अलग टॉपिक्स की लिस्ट (ताकि हर बार कुछ नया मिले)
-    topics = ["bollywood+news", "hollywood+movies+leak", "new+tech+gadgets", "netflix+trending", "marvel+updates"]
-    query = random.choice(topics)
+def get_unique_ai_article(headline):
+    """AI को मजबूर करना कि वह खबर को बिल्कुल अलग और गहरी जानकारी के साथ लिखे"""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={G_KEY}"
     
-    # 2. खबर उठाना
-    print(f"📡 Fetching news for: {query}")
-    news_feed = feedparser.parse(f"https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en")
+    prompt = f"""Act as an Investigative Journalist. 
+    Write a DEEP and UNIQUE 400-word blog post about: "{headline}". 
+    Instructions:
+    1. Do not repeat old patterns. Find a fresh angle.
+    2. Add 'Hidden Facts' or 'Latest Rumors' section.
+    3. Include a 'Cast & Crew' or 'Technical Specs' deep-dive.
+    4. Provide a 'Public Reaction' section using emojis.
+    5. Use high-quality professional vocabulary.
+    6. Ensure the content is different even if the topic is same as before.
+    Format with HTML tags like <h3> and <b> for professional look."""
     
-    # टॉप 10 खबरों में से कोई एक रैंडम चुनना
-    if len(news_feed.entries) > 0:
-        entries = news_feed.entries[:10]
-        selected_news = random.choice(entries)
-        title = selected_news.title
-        news_link = selected_news.link
-    else:
-        return
-
-    # 3. फोटो (Dynamic Image based on topic)
-    image_url = f"https://loremflickr.com/800/450/{query.split('+')[0]},movie/all"
-
-    # 4. ShrinkMe लिंक
+    payload = {"contents": [{"parts":[{"text": prompt}]}]}
     try:
-        api_url = f"https://shrinkme.io/api?api={S_KEY}&url={news_link}"
-        money_link = requests.get(api_url).json().get("shortenedUrl", news_link)
+        res = requests.post(url, json=payload).json()
+        return res['candidates'][0]['content']['parts'][0]['text']
     except:
-        money_link = news_link
+        return f"<h3>Update on {headline}</h3><p>Detailed analysis is being processed. Stay tuned for the full investigation.</p>"
 
-    # 5. HTML डिज़ाइन (Orange-Black AI Style)
+def run_viral_engine():
+    # 1. सोर्सेस की बड़ी लिस्ट (RSS Feeds)
+    sources = [
+        "https://www.youtube.com/feeds/videos.xml?channel_id=UC3Izv8457G-N5_Tyz7T2v7w", # T-Series
+        "https://variety.com/feed/", 
+        "https://www.pinkvilla.com/feed",
+        "https://techcrunch.com/feed/",
+        "https://www.hollywoodreporter.com/feed/",
+        "https://deadline.com/feed/",
+        "https://www.gsmarena.com/rss-news-reviews.php3"
+    ]
+    
+    # रैंडम सोर्स चुनना
+    source_url = random.choice(sources)
+    news_feed = feedparser.parse(source_url)
+    
+    if not news_feed.entries: return
+    
+    # 2. टॉप 10 में से रैंडम खबर चुनना (ताकि हर बार अलग हो)
+    sample_size = min(len(news_feed.entries), 10)
+    top_news = random.choice(news_feed.entries[:sample_size])
+    title = top_news.title
+    original_link = top_news.link
+
+    print(f"📡 Selected News: {title}")
+
+    # 3. AI से यूनिक आर्टिकल लिखवाना
+    detailed_content = get_unique_ai_article(title)
+
+    # 4. फोटो (Dynamic & Fresh)
+    # रैंडम कीवर्ड और लॉक का इस्तेमाल ताकि फोटो रिपीट न हो
+    rand_id = random.randint(1, 9999)
+    image_url = f"https://loremflickr.com/800/450/cinema,tech,trending/all?lock={rand_id}"
+
+    # 5. ShrinkMe लिंक
+    try:
+        api_url = f"https://shrinkme.io/api?api={S_KEY}&url={original_link}"
+        money_link = requests.get(api_url).json().get("shortenedUrl", original_link)
+    except:
+        money_link = original_link
+
+    # 6. प्रीमियम कार्ड डिज़ाइन
     html_body = f"""
-    <div style="font-family:Arial; max-width:600px; margin:auto; background:#000; color:#fff; border-radius:15px; overflow:hidden; border:2px solid #ff6600;">
-        <img src="{image_url}" style="width:100%; height:auto; border-bottom:3px solid #ff6600;">
-        <div style="padding:20px;">
-            <span style="background:#ff6600; color:#000; padding:5px 10px; border-radius:5px; font-weight:bold; font-size:12px;">AGENTIC AI EXCLUSIVE</span>
-            <h1 style="color:#fff; font-size:22px; margin:15px 0;">{title}</h1>
-            <p style="color:#ccc; line-height:1.6;">Breaking news alert! We have detected a major update in the world of {query.replace('+', ' ')}. Get all the leaked details and official data below.</p>
-            <div style="text-align:center; margin-top:20px;">
-                <a href="{money_link}" style="background:#ff6600; color:#000; padding:12px 30px; text-decoration:none; border-radius:5px; font-weight:bold; display:inline-block;">🚀 ACCESS DATA NOW</a>
+    <div style="font-family: 'Helvetica', sans-serif; max-width: 750px; margin: auto; background: #ffffff; color: #111; border: 1px solid #ddd; border-radius: 12px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.1);">
+        <img src="{image_url}" style="width: 100%; height: auto; border-bottom: 5px solid #e50914;" alt="Breaking News">
+        <div style="padding: 35px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <span style="background: #e50914; color: #fff; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold;">SPECIAL REPORT</span>
+                <span style="color: #888; font-size: 12px;">Ref: #{rand_id}</span>
+            </div>
+            <h1 style="font-size: 32px; color: #000; margin-bottom: 25px; line-height: 1.2; font-weight: 800;">{title}</h1>
+            <div style="font-size: 16px; color: #333; line-height: 1.8; text-align: justify;">
+                {detailed_content}
+            </div>
+            <div style="margin-top: 45px; text-align: center; background: #f4f4f4; padding: 30px; border-radius: 15px;">
+                <h2 style="font-size: 22px; color: #000; margin-bottom: 20px;">Want to see the Official Video/Source?</h2>
+                <a href="{money_link}" style="background: #000; color: #fff; padding: 20px 50px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 22px; display: inline-block; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">🔓 UNLOCK CONTENT NOW</a>
+                <p style="font-size: 12px; color: #777; margin-top: 20px;">Safe & Secure Data Pipeline via Agentic AI Engine v9.0</p>
             </div>
         </div>
     </div>
     """
 
-    # 6. ईमेल भेजना
+    # 7. ईमेल भेजना
     msg = EmailMessage()
-    msg['Subject'] = "🔥 Breaking: " + title[:60]
-    msg['From'] = S_EMAIL
+    msg['Subject'] = f"💎 Exclusive Update: {title[:55]}..."
+    msg['From'] = SENDER_EMAIL
     msg['To'] = B_EMAIL
     msg.add_alternative(html_body, subtype='html')
 
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
         server.login(S_EMAIL, PASS)
         server.send_message(msg)
-    print("✅ SUCCESS! Fresh post sent.")
+    print(f"✅ SUCCESS! Unique Post Published: {title}")
 
 if __name__ == "__main__":
     run_viral_engine()
