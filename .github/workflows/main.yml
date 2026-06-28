@@ -1,23 +1,31 @@
 name: Super 30-Min Money Bot
+
 on:
   schedule:
-    - cron: '*/30 * * * *' # हर 30 मिनट में चलेगा
+    - cron: '*/30 * * * *'
   workflow_dispatch:
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
+
       - name: Install dependencies
-        run: pip install requests feedparser google-api-python-client google-auth
+        run: pip install -r requirements.txt
+
       - name: Execute
         env:
-          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+          BC_CLIENT_ID: ${{ secrets.BC_CLIENT_ID }}
+          BC_CLIENT_SECRET: ${{ secrets.BC_CLIENT_SECRET }}
+          BC_REFRESH_TOKEN: ${{ secrets.BC_REFRESH_TOKEN }}
           BLOG_ID: ${{ secrets.BLOG_ID }}
-          SHRINKME_API: ${{ secrets.SHRINKME_API }}
           GEMINI_API: ${{ secrets.GEMINI_API }}
+          SHRINKME_API: ${{ secrets.SHRINKME_API }}
         run: python bot.py
