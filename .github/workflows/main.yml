@@ -1,4 +1,4 @@
-name: Super 30-Min Money Bot
+name: World's Powerful Blogger Bot
 
 on:
   schedule:
@@ -18,12 +18,13 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install requests feedparser google-auth google-api-python-client
 
       - name: Execute Bot
         env:
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           BLOG_ID: ${{ secrets.BLOG_ID }}
-          GEMINI_API: ${{ secrets.GEMINI_API }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           SHRINKME_API: ${{ secrets.SHRINKME_API }}
+          GEMINI_API: ${{ secrets.GEMINI_API }}
         run: python bot.py
