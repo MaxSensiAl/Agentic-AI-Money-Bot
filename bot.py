@@ -1,189 +1,107 @@
-import os, requests, feedparser, random, json, sys, re, time
+import os, requests, feedparser, random, json, sys, re, smtplib, time
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # ==========================================
-# 1. AUTO-FIXER (Secrets की सफाई करने वाला सिस्टम)
+# 1. AI WRITER (HUMAN-STYLE, 1000 WORDS)
 # ==========================================
-def clean(val):
-    if not val: return ""
-    # फालतू स्पेस, न्यू लाइन और गलती से आए 'https://' को हटाना
-    return str(val).strip().replace("https://", "").replace("http://", "").replace("\n", "").replace("\r", "")
-
-# ==========================================
-# 2. GOOGLE OAUTH2 (Access Token Generator)
-# ==========================================
-def get_access_token():
-    url = "https://oauth2.googleapis.com/token"
-    cid = clean(os.getenv("BC_CLIENT_ID"))
-    csec = clean(os.getenv("BC_CLIENT_SECRET"))
-    rtoken = clean(os.getenv("BC_REFRESH_TOKEN"))
-
-    data = {
-        "client_id": cid,
-        "client_secret": csec,
-        "refresh_token": rtoken,
-        "grant_type": "refresh_token"
-    }
-    try:
-        res = requests.post(url, data=data)
-        if res.status_code != 200:
-            print(f"❌ AUTH FAILED: {res.text}")
-            return None
-        return res.json().get("access_token")
-    except Exception as e:
-        print(f"❌ Auth Connection Error: {e}")
-        return None
-
-# ==========================================
-# 3. AI जर्नलिस्ट (Human-Style, 1000 Words)
-# ==========================================
-def generate_human_article(headline, cat, g_key, mode="NEW"):
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={clean(g_key)}"
+def generate_human_article(headline, cat, g_key):
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={g_key.strip()}"
     
-    update_text = "This is a LATEST LIVE UPDATE to a trending story." if mode == "UPDATE" else "This is a fresh BREAKING NEWS story."
-
     prompt = f"""
-    Act as a Professional Indian News Blogger & SEO Specialist. 
-    Topic: '{headline}' (Category: {cat}).
-    Mode: {update_text}.
-
-    INSTRUCTIONS:
-    1. LENGTH: Write 800 to 1000 words. 
-    2. HUMAN STYLE: Write like a real person. Use direct, emotional language (I, Me, My). 
-    3. NO BOT WORDS: Strictly DO NOT use 'delve', 'moreover', 'comprehensive', 'furthermore'.
-    4. STRUCTURE: Catchy introduction, H2 and H3 subheadings every 200 words.
-    5. SEO: Include 5 'People Also Ask' FAQs with detailed answers.
-    6. META: Write a 150-char viral search description.
-    
-    FORMAT: Return ONLY a JSON object:
-    {{
-      "meta_desc": "string",
-      "article": "HTML content with h2, h3, b, p tags",
-      "faqs": [ {{"q": "...", "a": "..."}} ],
-      "tags": ["tag1", "tag2"]
-    }}
+    Act as a Professional Indian Blogger. Write a 1000-word deep-dive news story about: '{headline}'.
+    Category: {cat}.
+    RULES: 
+    1. Tone: Human-like, emotional, and engaging. 
+    2. Word Count: Minimum 800-1000 words. 
+    3. Structure: Use H2, H3 subheadings, bold text, and bullet points. 
+    4. NO AI WORDS: Avoid 'delve', 'moreover', 'comprehensive'.
+    5. SEO: Include 5 FAQs at the end.
+    Return ONLY a JSON object:
+    {{ "article": "HTML content" }}
     """
     try:
         res = requests.post(url, json={"contents": [{"parts":[{"text": prompt}]}]}, timeout=60).json()
-        raw_text = res['candidates'][0]['content']['parts'][0]['text']
-        clean_json = re.sub(r'```json|```', '', raw_text).strip()
+        raw = res['candidates'][0]['content']['parts'][0]['text']
+        clean_json = re.sub(r'```json|```', '', raw).strip()
         return json.loads(clean_json)
-    except Exception as e:
-        print(f"⚠️ Gemini Error: {e}")
-        return None
+    except: return None
 
 # ==========================================
-# 4. DUPLICATE & HISTORY CHECKER
+# 2. EMAIL SENDER (The Bridge to Blogger)
 # ==========================================
-def check_history(title, token, blog_id):
-    url = f"https://www.googleapis.com/blogger/v3/blogs/{blog_id}/posts"
-    headers = {"Authorization": f"Bearer {token}"}
+def send_to_blogger(title, content):
+    sender = os.getenv("SENDER_EMAIL").strip()
+    password = os.getenv("GMAIL_APP_PASSWORD").strip()
+    receiver = os.getenv("BLOGGER_EMAIL").strip()
+
+    msg = MIMEMultipart()
+    msg['From'] = sender
+    msg['To'] = receiver
+    msg['Subject'] = title # ईमेल का सब्जेक्ट ही ब्लॉग का टाइटल बनेगा
+    msg.attach(MIMEText(content, 'html'))
+
     try:
-        res = requests.get(url, headers=headers, params={"maxResults": 10}).json()
-        if 'items' in res:
-            for post in res['items']:
-                # अगर टाइटल का हिस्सा मैच हो, तो इसे 'Update' मोड में डालेंगे
-                if title.lower()[:20] in post['title'].lower(): return "UPDATE"
-        return "NEW"
-    except: return "NEW"
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender, password)
+        server.sendmail(sender, receiver, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"❌ Mail Error: {e}")
+        return False
 
 # ==========================================
-# 5. MAIN POSTING MACHINE (The Engine)
+# 3. MAIN AUTOMATIC ENGINE
 # ==========================================
-def run_ultimate_news_machine():
-    # Clean Secrets
-    BLOG_ID = clean(os.getenv("BLOG_ID"))
-    G_KEY = clean(os.getenv("GEMINI_API"))
-    S_KEY = clean(os.getenv("SHRINKME_API"))
-    
-    print("🚀 Starting Automatic News Machine...")
-    
-    token = get_access_token()
-    if not token: sys.exit(1)
+def run_automatic_portal():
+    G_KEY = os.getenv("GEMINI_API").strip()
+    S_KEY = os.getenv("SHRINKME_API").strip()
 
-    # 100% Real & Trending Sources
+    # ट्रेंडिंग सोर्स
     sources = [
+        ("Tech", "https://techcrunch.com/feed/"),
         ("Bollywood", "https://www.pinkvilla.com/feed"),
-        ("YouTube Viral", "https://news.google.com/rss/search?q=trending+youtube+india&hl=en-IN&gl=IN&ceid=IN:en"),
-        ("Google Trends", "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en"),
         ("Gaming", "https://www.ign.com/rss/articles/feed"),
-        ("Tech", "https://techcrunch.com/feed/")
+        ("India News", "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en")
     ]
     
     random.shuffle(sources)
-    for cat, rss_url in sources:
-        feed = feedparser.parse(rss_url)
-        if not feed.entries: continue
-        
-        entry = feed.entries[0] # ताज़ा खबर उठाना
-        mode = check_history(entry.title, token, BLOG_ID)
-        
-        print(f"🎯 News Found: {entry.title} | Mode: {mode}")
+    cat, rss = sources[0]
+    feed = feedparser.parse(rss)
+    entry = feed.entries[0]
 
-        # आर्टिकल जनरेट करना
-        data = generate_human_article(entry.title, cat, G_KEY, mode)
-        if not data: continue
+    print(f"📝 Writing Human Article: {entry.title}")
+    data = generate_human_article(entry.title, cat, G_KEY)
+    if not data: return
 
-        # इमेज एक्सट्रैक्शन + SEO Alt Tags
-        img_match = re.search(r'<img [^>]*src="([^"]+)"', getattr(entry, 'description', ''))
-        img_url = img_match.group(1) if img_match else "https://images.unsplash.com/photo-1504711434969-e33886168f5c?q=80&w=1200"
+    # Image Extraction
+    img_match = re.search(r'<img [^>]*src="([^"]+)"', getattr(entry, 'description', ''))
+    img_url = img_match.group(1) if img_match else "https://images.unsplash.com/photo-1504711434969-e33886168f5c?q=80&w=1200"
 
-        # ShrinkMe लिंक (Income)
-        try:
-            short_res = requests.get(f"https://shrinkme.io/api?api={S_KEY}&url={entry.link}", timeout=10).json()
-            money_link = short_res.get("shortenedUrl", entry.link)
-        except: money_link = entry.link
+    # ShrinkMe Link
+    try:
+        short_res = requests.get(f"https://shrinkme.io/api?api={S_KEY}&url={entry.link}").json()
+        money_link = short_res.get("shortenedUrl", entry.link)
+    except: money_link = entry.link
 
-        # FAQ Schema SEO Coding
-        schema_faq = ""
-        faq_html = "<div style='margin-top:30px; background:#f9f9f9; padding:20px; border-radius:10px;'><h3>Frequently Asked Questions</h3>"
-        for item in data['faqs']:
-            faq_html += f"<b>Q: {item['q']}</b><p>A: {item['a']}</p>"
-            schema_faq += f"{{\"@type\":\"Question\",\"name\":\"{item['q']}\",\"acceptedAnswer\":{{\"@type\":\"Answer\",\"text\":\"{item['a']}\"}}}},"
-
-        # प्रोफेशनल डिज़ाइन
-        prefix = "🚨 LIVE UPDATE: " if mode == "UPDATE" else "🔴 BREAKING: "
-        full_html = f"""
-        <div style='font-family:Arial, sans-serif; line-height:1.8; color:#111; font-size:18px;'>
-            <div style='background:red; color:white; padding:5px 15px; display:inline-block; border-radius:3px; font-weight:bold; margin-bottom:15px;'>{mode}</div>
-            <img src='{img_url}' alt='{entry.title}' title='{entry.title}' style='width:100%; border-radius:15px; box-shadow:0 8px 25px rgba(0,0,0,0.1);'/>
-            <p style='color:#777; font-size:14px; margin-top:10px;'>Verified News | {time.strftime("%B %d, %Y")}</p>
-            
-            <div class='main-article'>{data['article']}</div>
-            
-            {faq_html}</div>
-            
-            <script type="application/ld+json">
-            {{ "@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{schema_faq[:-1]}] }}
-            </script>
-
-            <div style='background:#1a1a1a; padding:35px; border-radius:15px; text-align:center; color:#fff; margin-top:45px; border: 2px solid #ff6600;'>
-                <h2 style='color:#ff6600; margin-top:0;'>📺 Watch Proof & Full Story</h2>
-                <p>Access the exclusive footage, raw data, and official reports below for our readers.</p>
-                <a href='{money_link}' rel='nofollow' style='background:#ff6600; color:#fff; padding:18px 45px; text-decoration:none; border-radius:50px; font-weight:bold; font-size:22px; display:inline-block; box-shadow:0 4px 15px rgba(255,102,0,0.4);'>👉 UNLOCK FULL DATA SOURCE</a>
-            </div>
+    # Full HTML Design
+    full_html = f"""
+    <div style='font-family:Arial; line-height:1.8; color:#111; font-size:18px;'>
+        <img src='{img_url}' style='width:100%; border-radius:15px; margin-bottom:20px;'/>
+        {data['article']}
+        <div style='background:#f9f9f9; padding:30px; border-radius:15px; text-align:center; margin-top:40px; border:2px solid #ff6600;'>
+            <h2 style='color:#ff6600;'>📺 Watch Proof & Full Story</h2>
+            <a href='{money_link}' style='background:#ff6600; color:#fff; padding:15px 40px; text-decoration:none; border-radius:50px; font-weight:bold; font-size:22px; display:inline-block;'>👉 UNLOCK FULL DATA</a>
         </div>
-        """
+    </div>
+    """
 
-        # ब्लॉगर पर पोस्ट पब्लिश करना
-        post_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts/"
-        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-        
-        payload = {
-            "kind": "blogger#post",
-            "title": prefix + entry.title,
-            "content": full_html,
-            "labels": [cat, "Trending News", "Live Updates"] + data.get('tags', []),
-            "searchDescription": data['meta_desc']
-        }
-        
-        res = requests.post(post_url, headers=headers, json=payload, params={"isDraft": False})
-        if res.status_code == 200:
-            print(f"✅ SUCCESS! Live: {prefix + entry.title}")
-            return # हर 30 मिनट में सिर्फ एक शानदार पोस्ट
-        else:
-            print(f"❌ Blogger Error: {res.text}")
-            sys.exit(1)
+    if send_to_blogger("🔴 BREAKING: " + entry.title, full_html):
+        print("✅ SUCCESS! Article sent to Blogger via Email.")
+    else:
+        print("❌ FAILED to send.")
 
-# ऐप चालू करना
 if __name__ == "__main__":
-    run_ultimate_news_machine()
+    run_automatic_portal()
