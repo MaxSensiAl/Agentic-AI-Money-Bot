@@ -3,140 +3,105 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 # ==========================================
-# 1. AI जर्नलिस्ट (OpenRouter Llama 3.1 - No Blocks)
+# 1. AI जर्नलिस्ट (Multi-Model Unstoppable Logic)
 # ==========================================
-def generate_llama_article(headline, cat, or_key):
+def generate_viral_article(headline, cat, or_key):
     url = "https://openrouter.ai/api/v1/chat/completions"
+    
+    # OpenRouter को ये Headers देना बहुत ज़रूरी है वरना वो ब्लॉक कर देता है
     headers = {
         "Authorization": f"Bearer {or_key.strip()}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/MaxSensial", # आपकी पहचान
+        "X-Title": "ViralBot Pro"
     }
     
-    # AI को 'इंसानी' बनाने का सबसे तगड़ा निर्देश
-    prompt = f"""
-    Act as India's #1 Viral News Blogger. Write a 1200-word EXPLOSIVE news article on: '{headline}'.
-    Category: {cat}.
-    
-    STRICT BLOGGER RULES:
-    1. STYLE: Fast-paced, emotional, and direct. Use "I am shocked," "The truth is finally out."
-    2. WORD COUNT: MINIMUM 1000-1200 words of deep information.
-    3. NO BOT WORDS: Strictly DO NOT use 'delve', 'moreover', 'comprehensive', 'era', 'shaping'.
-    4. STRUCTURE: Use one H1, four H2, and six H3 subheadings. Use short paragraphs.
-    5. SEO: Include 5 'People Also Ask' FAQs with long answers.
-    6. META: Write a 150-char viral search description.
-    
-    FORMAT: Return ONLY a JSON object (strictly no markdown code blocks):
-    {{
-      "meta": "viral description",
-      "article": "Full HTML content with subheadings",
-      "faq": [ {{"q":"?","a":".."}} ],
-      "tags": "trending, news, viral"
-    }}
-    """
-    
-    data = {
-        "model": "meta-llama/llama-3.1-8b-instruct:free",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7
-    }
-
-    try:
-        res = requests.post(url, headers=headers, json=data, timeout=120).json()
-        raw_text = res['choices'][0]['message']['content'].strip()
-        # JSON Repair Logic
-        json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group(0))
-        return None
-    except Exception as e:
-        print(f"⚠️ AI Error: {e}")
-        return None
-
-# ==========================================
-# 2. न्यूज़ हंटर (Trends Finder)
-# ==========================================
-def get_viral_news():
-    sources = [
-        ("Bollywood", "https://www.pinkvilla.com/feed"),
-        ("YouTube Viral", "https://news.google.com/rss/search?q=trending+youtube+india&hl=en-IN&gl=IN&ceid=IN:en"),
-        ("Gaming", "https://www.ign.com/rss/articles/feed"),
-        ("Tech & Gadgets", "https://techcrunch.com/feed/"),
-        ("Breaking News", "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en")
+    # अगर एक मॉडल फेल हो, तो दूसरा ट्राई करने के लिए लिस्ट
+    models = [
+        "meta-llama/llama-3.1-8b-instruct:free", 
+        "mistralai/mistral-7b-instruct:free",
+        "google/gemma-2-9b-it:free"
     ]
-    random.shuffle(sources)
-    for cat, rss in sources:
+
+    prompt = f"Act as a professional viral news blogger. Write a 1200-word highly engaging news article in HTML about: '{headline}'. Category: {cat}. Use H2, H3, b tags. Return ONLY HTML."
+
+    for model in models:
+        print(f"🤖 Trying AI Model: {model}...")
+        data = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7
+        }
         try:
-            feed = feedparser.parse(rss)
-            if feed.entries: return feed.entries, cat
-        except: continue
-    return None, None
+            res = requests.post(url, headers=headers, json=data, timeout=100).json()
+            if 'choices' in res:
+                return res['choices'][0]['message']['content'].strip()
+            else:
+                print(f"⚠️ Model {model} busy: {res.get('error', {}).get('message', 'Unknown Error')}")
+                continue # अगले मॉडल पर जाओ
+        except:
+            continue
+    return None
 
 # ==========================================
-# 3. कमाई इंजन (ShrinkMe API)
-# ==========================================
-def get_money_link(url, s_key):
-    try:
-        api = f"https://shrinkme.io/api?api={s_key.strip()}&url={url}"
-        res = requests.get(api, timeout=10).json()
-        return res.get("shortenedUrl", url)
-    except: return url
-
-# ==========================================
-# 4. मुख्य इंजन (The Unstoppable Machine)
+# 2. मुख्य इंजन (The Master Orchestrator)
 # ==========================================
 def run_power_bot():
-    print("🔋 BOOTING UNSTOPPABLE LLAMA-3.1 ENGINE...")
+    print("🔋 BOOTING GOD-MODE NEWS ENGINE (V210)...")
     try:
-        # Load Secrets
-        service_info = json.loads(os.getenv("SERVICE_ACCOUNT_JSON"))
-        BLOG_ID = os.getenv("BLOG_ID").strip()
-        OR_KEY = os.getenv("OPENROUTER_API_KEY").strip()
-        S_KEY = os.getenv("SHRINKME_API").strip()
+        # Secrets Loading
+        def get_sec(name):
+            val = os.getenv(name)
+            if not val:
+                print(f"❌ Missing Secret: {name}"); sys.exit(1)
+            return val.strip()
+
+        service_json = get_sec("SERVICE_ACCOUNT_JSON")
+        service_info = json.loads(service_json)
+        BLOG_ID = get_sec("BLOG_ID")
+        OR_KEY = get_sec("OPENROUTER_API_KEY")
+        S_KEY = get_sec("SHRINKME_API")
 
         # Blogger Auth
         scopes = ['https://www.googleapis.com/auth/blogger']
         creds = service_account.Credentials.from_service_account_info(service_info, scopes=scopes)
         service = build('blogger', 'v3', credentials=creds)
 
-        entries, category = get_viral_news()
-        if not entries: return
+        # ताज़ा न्यूज़ हंटर
+        rss_url = "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en"
+        feed = feedparser.parse(rss_url)
+        if not feed.entries: return
 
         posted = False
-        for entry in entries[:20]: # 20 खबरों को चेक करेगा
-            print(f"🎯 Analyzing: {entry.title}")
+        for entry in feed.entries[:15]:
+            print(f"🎯 Checking News: {entry.title}")
             
-            # AI आर्टिकल (Llama 3.1 never blocks!)
-            data = generate_llama_article(entry.title, category, OR_KEY)
-            if not data: continue
+            # AI से लेख लिखवाना (Multi-Model Support)
+            article_body = generate_viral_article(entry.title, "Trending News", OR_KEY)
+            
+            if not article_body or len(article_body) < 400:
+                print("⏭️ AI failed this news. Trying next..."); continue
 
             # Earning Link
-            money_link = get_money_link(entry.link, S_KEY)
+            try:
+                m_res = requests.get(f"https://shrinkme.io/api?api={S_KEY}&url={entry.link}", timeout=10).json()
+                money_link = m_res.get("shortenedUrl", entry.link)
+            except: money_link = entry.link
+
             img_url = f"https://images.unsplash.com/photo-1504711434969-e33886168f5c?q=80&w=1200"
 
-            # FAQ Schema Design
-            faq_html = "".join([f"<b>Q: {f['q']}</b><p>A: {f['a']}</p>" for f in data.get('faq', [])])
-            schema_faq = "".join([f'{{"@type":"Question","name":"{f["q"]}","acceptedAnswer":{{"@type":"Answer","text":"{f["a"]}"}}}},' for f in data.get('faq', [])])
-
-            # Premium Design (High Conversion)
+            # Premium Design
             full_html = f"""
-            <div style='font-family:Arial, sans-serif; line-height:1.9; color:#111; max-width:800px; margin:auto;'>
-                <img src='{img_url}' alt='{entry.title}' style='width:100%; border-radius:20px; box-shadow:0 15px 40px rgba(0,0,0,0.2);'/>
-                <h1 style='color:#000; font-size:35px;'>{entry.title}</h1>
-                <div class='main-article' style='font-size:18px;'>{data['article']}</div>
-                
-                <div style='background:#f4f4f4; padding:25px; border-radius:15px; margin-top:40px;'>
-                    <h3>Essential Insights & FAQ</h3>{faq_html}
-                </div>
-
+            <div style='font-family:Arial; line-height:1.9; color:#111; max-width:800px; margin:auto;'>
+                <img src='{img_url}' style='width:100%; border-radius:20px; box-shadow:0 10px 40px rgba(0,0,0,0.2);'/>
+                <h1 style='color:#000;'>{entry.title}</h1>
+                <div style='font-size:18px;'>{article_body}</div>
                 <div style='background:#1a1a1a; padding:45px; border-radius:25px; text-align:center; color:#fff; margin-top:50px; border:3px solid #ff6600;'>
-                    <h2 style='color:#ff6600; margin-top:0;'>📢 WATCH EXCLUSIVE FOOTAGE</h2>
-                    <p style='font-size:18px;'>Verified documents and unedited leaked video for this story are available below. Access the private server now.</p>
-                    <a href='{money_link}' rel='nofollow' style='background:#ff6600; color:#fff; padding:18px 50px; text-decoration:none; border-radius:100px; font-weight:bold; font-size:24px; display:inline-block; box-shadow:0 5px 25px rgba(255,102,0,0.5);'>🚀 UNLOCK FULL DATA</a>
-                    <p style='font-size:11px; margin-top:15px; color:#666;'>Verification: {random.randint(1000,9999)} | Secure Link</p>
+                    <h2 style='color:#ff6600;'>📢 WATCH EXCLUSIVE FOOTAGE</h2>
+                    <p style='font-size:18px;'>The original unedited video and full report are available below.</p>
+                    <a href='{money_link}' rel='nofollow' style='background:#ff6600; color:#fff; padding:18px 45px; text-decoration:none; border-radius:100px; font-weight:bold; font-size:24px; display:inline-block; box-shadow:0 10px 20px rgba(255,102,0,0.5);'>🚀 UNLOCK FULL DATA</a>
+                    <p style='font-size:11px; margin-top:15px; color:#666;'>Verification: {random.randint(1000,9999)} | Protected</p>
                 </div>
-                <script type="application/ld+json">
-                {{ "@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{schema_faq[:-1]}] }}
-                </script>
             </div>
             """
 
@@ -145,17 +110,16 @@ def run_power_bot():
                 service.posts().insert(blogId=BLOG_ID, body={
                     "title": "🔴 BREAKING: " + entry.title,
                     "content": full_html,
-                    "labels": [category, "Trending", "Viral"],
-                    "searchDescription": data['meta']
+                    "labels": ["Latest News", "Trending", "Viral"]
                 }, isDraft=False).execute()
                 
-                print(f"✅ MISSION SUCCESS! Post is LIVE: {entry.title}")
+                print(f"✅ SUCCESS! Post is LIVE via Model Switcher.")
                 posted = True; break
             except Exception as e:
                 print(f"❌ Blogger Fail: {e}"); continue
 
         if not posted:
-            print("❌ All attempts failed. Check API Keys."); sys.exit(1)
+            print("❌ All models failed or busy. Retrying next cycle."); sys.exit(1)
 
     except Exception as e:
         print(f"❌ CRITICAL ERROR: {e}"); sys.exit(1)
