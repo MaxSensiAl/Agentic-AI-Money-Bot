@@ -20,11 +20,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Execute
+      - name: Execute Bot
         env:
-          BC_CLIENT_ID: ${{ secrets.BC_CLIENT_ID }}
-          BC_CLIENT_SECRET: ${{ secrets.BC_CLIENT_SECRET }}
-          BC_REFRESH_TOKEN: ${{ secrets.BC_REFRESH_TOKEN }}
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           BLOG_ID: ${{ secrets.BLOG_ID }}
           GEMINI_API: ${{ secrets.GEMINI_API }}
           SHRINKME_API: ${{ secrets.SHRINKME_API }}
