@@ -3,123 +3,149 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 # ==========================================
-# 1. AI जर्नलिस्ट (Human-Style 1000+ Words)
+# 1. BRAIN: TRENDING TOPIC FINDER (Interent Tracker)
 # ==========================================
-def generate_human_seo_content(headline, cat, g_key):
+def get_most_viral_topic():
+    """यह फंक्शन इंटरनेट पर सबसे ज़्यादा सर्च होने वाली चीज़ें ढूँढता है"""
+    search_queries = [
+        "trending news india", "bollywood leaked gossip", "breaking news today", 
+        "youtube trending india", "latest tech launch india", "gaming leaks"
+    ]
+    query = random.choice(search_queries)
+    # Google News RSS with Dynamic Search
+    rss_url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en"
+    
+    try:
+        feed = feedparser.parse(rss_url)
+        if feed.entries:
+            # टॉप 5 में से कोई एक ताज़ा खबर उठाना
+            return feed.entries[random.randint(0, 4)], query
+    except:
+        return None, None
+
+# ==========================================
+# 2. AI WRITER: THE HUMAN JOURNALIST (1200+ Words)
+# ==========================================
+def write_viral_article(headline, cat, g_key):
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={g_key.strip()}"
+    
     prompt = f"""
-    Act as a World-Class Viral Blogger. Write a 1200-word EXPLOSIVE article on: '{headline}' ({cat}).
-    - Tone: Spicy, Human-like, Emotional (Direct address: "You won't believe").
-    - Structure: H1 for title, 6 H2/H3 subheadings, Bullet points, Bolding.
-    - SEO: Include 5 FAQs and a 150-char meta description.
-    FORMAT: Return ONLY a valid JSON:
-    {{ "article": "HTML content", "meta": "description", "tags": "tag1, tag2", "faq": [{{"q":"?","a":".."}}] }}
+    Act as the World's #1 Viral News Blogger. Your goal is to rank #1 on Google.
+    Topic: '{headline}' (Category: {cat}).
+    
+    STRICT CONTENT ARCHITECTURE:
+    1. Hook: Start with a shocking revelation or emotional hook. (100 words)
+    2. Deep Dive: Write 1200 words of original analysis. Use first-person ("I found", "Our sources say").
+    3. NO BOT WORDS: Strictly DO NOT use 'delve', 'moreover', 'comprehensive', 'era', 'shaping'. 
+    4. Spice: Keep it fast-paced, direct, and slightly controversial (Indian style).
+    5. Hierarchy: Use one H1, four H2s, and six H3 subheadings.
+    6. Keywords: Injected high-volume SEO keywords naturally.
+    7. FAQ: 5 'People Also Ask' questions with long, helpful answers.
+    8. Meta: Write a 150-char viral meta description.
+    
+    FORMAT: Return ONLY a JSON object:
+    {{ "article": "HTML content", "meta": "description", "tags": "tag1, tag2", "faq_schema": [ {{"q":"?","a":".."}} ] }}
     """
     try:
-        res = requests.post(url, json={"contents": [{"parts":[{"text": prompt}]}]}, timeout=80).json()
+        res = requests.post(url, json={"contents": [{"parts":[{"text": prompt}]}]}, timeout=90).json()
         raw_text = res['candidates'][0]['content']['parts'][0]['text']
         clean_json = re.sub(r'```json|```', '', raw_text).strip()
         return json.loads(clean_json)
-    except Exception as e:
-        print(f"❌ AI Generation Failed: {e}")
-        return None
+    except: return None
 
 # ==========================================
-# 2. कमाई इंजन (Earnings & High CTR Design)
+# 3. EARNINGS: SHRINKME LINK INJECTOR
 # ==========================================
-def get_money_link(entry_link, s_key):
+def get_money_link(url, s_key):
     try:
-        res = requests.get(f"https://shrinkme.io/api?api={s_key.strip()}&url={entry_link}", timeout=15).json()
-        return res.get("shortenedUrl", entry_link) if res.get("status") == "success" else entry_link
-    except: return entry_link
+        res = requests.get(f"https://shrinkme.io/api?api={s_key.strip()}&url={url}", timeout=15).json()
+        return res.get("shortenedUrl", url)
+    except: return url
 
 # ==========================================
-# 3. MAIN MASTER ENGINE (Official API + Owner Logic)
+# 4. DUPLICATE CHECKER (Anti-Spam)
 # ==========================================
-def run_viral_machine():
-    print("🚀 System Diagnosis Starting...")
-    
-    # Secrets Loading
+def is_already_on_blog(title, service, blog_id):
+    posts = service.posts().list(blogId=blog_id, maxResults=15).execute()
+    if 'items' in posts:
+        for p in posts['items']:
+            if title.lower()[:30] in p['title'].lower(): return True
+    return False
+
+# ==========================================
+# 5. CORE ENGINE (The Orchestrator)
+# ==========================================
+def run_power_blogger():
+    print("🔋 Powering Up the World's Most Powerful Blogger Engine...")
     try:
+        # Secrets
         service_info = json.loads(os.getenv("SERVICE_ACCOUNT_JSON"))
         BLOG_ID = os.getenv("BLOG_ID").strip()
         G_KEY = os.getenv("GEMINI_API").strip()
         S_KEY = os.getenv("SHRINKME_API").strip()
-    except Exception as e:
-        print(f"❌ Secret Error: {e}"); sys.exit(1)
 
-    # Auth via Service Account
-    try:
+        # Auth
         scopes = ['https://www.googleapis.com/auth/blogger']
         creds = service_account.Credentials.from_service_account_info(service_info, scopes=scopes)
         service = build('blogger', 'v3', credentials=creds)
-    except Exception as e:
-        print(f"❌ Auth Engine Failed: {e}"); sys.exit(1)
 
-    # Trending Sources
-    sources = [
-        ("Bollywood", "https://www.pinkvilla.com/feed"),
-        ("Gaming", "https://www.ign.com/rss/articles/feed"),
-        ("YouTube Viral", "https://news.google.com/rss/search?q=trending+youtube+india&hl=en-IN&gl=IN&ceid=IN:en"),
-        ("India News", "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en")
-    ]
-    random.shuffle(sources)
-    cat, rss = sources[0]
-    feed = feedparser.parse(rss)
-    if not feed.entries: print("⏭️ Source empty"); return
-    entry = feed.entries[0]
-
-    print(f"🎯 News Target: {entry.title}")
-    
-    # AI Article & Money Link
-    data = generate_human_seo_content(entry.title, cat, G_KEY)
-    if not data: sys.exit(1)
-    money_link = get_money_link(entry.link, S_KEY)
-
-    # SEO Image & Schema
-    img_match = re.search(r'<img [^>]*src="([^"]+)"', getattr(entry, 'description', ''))
-    img_url = img_match.group(1) if img_match else f"https://source.unsplash.com/1200x675/?{cat},trending"
-    
-    faq_schema = "".join([f'{{"@type":"Question","name":"{f["q"]}","acceptedAnswer":{{"@type":"Answer","text":"{f["a"]}"}}}},' for f in data['faq']])
-
-    # Premium HTML Template (High Earnings)
-    final_html = f"""
-    <div style='font-family:Segoe UI, sans-serif; line-height:1.8; color:#111;'>
-        <img src='{img_url}' alt='{entry.title}' title='{entry.title}' style='width:100%; border-radius:20px; box-shadow:0 15px 35px rgba(0,0,0,0.2);'/>
-        <div style='margin-top:20px;'>{data['article']}</div>
+        # 1. वायरल टॉपिक ढूंढना
+        entry, cat_name = get_most_viral_topic()
+        if not entry: sys.exit(0)
         
-        <div style='background:#fff0f0; border:3px dashed #ff0000; padding:35px; border-radius:20px; text-align:center; margin-top:50px;'>
-            <h2 style='color:#ff0000; margin-top:0;'>🛑 BIG REVEAL & SOURCE DATA</h2>
-            <p style='font-size:18px;'>Access the original unedited leaked media and full official report below.</p>
-            <a href='{money_link}' rel='nofollow' style='background:#ff0000; color:#fff; padding:20px 50px; text-decoration:none; border-radius:100px; font-weight:bold; font-size:26px; display:inline-block; box-shadow:0 10px 25px rgba(255,0,0,0.4); animation: pulse 2s infinite;'>🚀 UNLOCK FULL DATA SOURCE</a>
-            <p style='font-size:12px; color:#999; margin-top:15px;'>Verification ID: {random.randint(1000,9999)} | Secure Link</p>
+        if is_already_on_blog(entry.title, service, BLOG_ID):
+            print(f"⏭️ Old news skipped: {entry.title}"); return
+
+        print(f"🔥 Trending Now: {entry.title}")
+
+        # 2. AI से 1200 शब्दों का मास्टर आर्टिकल लिखवाना
+        data = write_viral_article(entry.title, cat_name, G_KEY)
+        if not data: sys.exit(1)
+
+        # 3. कमाई और इमेज सेटअप
+        money_link = get_money_link(entry.link, S_KEY)
+        img_url = f"https://source.unsplash.com/1200x675/?{cat_name.replace(' ','')},viral,news"
+        
+        # 4. Google Rich Snippets (SEO Schema)
+        faq_html = "".join([f"<b>Q: {f['q']}</b><p>A: {f['a']}</p>" for f in data['faq_schema']])
+        schema_json = "".join([f'{{"@type":"Question","name":"{f["q"]}","acceptedAnswer":{{"@type":"Answer","text":"{f["a"]}"}}}},' for f in data['faq_schema']])
+
+        # 5. High-Conversion HTML Design
+        full_html = f"""
+        <div style='font-family:Arial; line-height:1.8; color:#111; max-width:800px; margin:auto;'>
+            <img src='{img_url}' alt='{entry.title}' style='width:100%; border-radius:20px; box-shadow:0 10px 40px rgba(0,0,0,0.2);'/>
+            <div style='margin-top:25px;'>{data['article']}</div>
+            
+            <div style='background:#f9f9f9; padding:30px; border-radius:15px; margin-top:40px;'>
+                <h3 style='color:#ff6600;'>People Also Ask (SEO)</h3>
+                {faq_html}
+            </div>
+
+            <div style='background:#1a1a1a; padding:40px; border-radius:20px; text-align:center; color:#fff; margin-top:50px; border:3px solid #ff6600;'>
+                <h2 style='color:#ff6600; margin-top:0;'>📢 WATCH EXCLUSIVE FOOTAGE & PROOF</h2>
+                <p style='font-size:18px;'>The full original documents and raw video for this report are linked below. Access our private server now.</p>
+                <a href='{money_link}' rel='nofollow' style='background:#ff6600; color:#fff; padding:20px 50px; text-decoration:none; border-radius:100px; font-weight:bold; font-size:26px; display:inline-block; box-shadow:0 5px 25px rgba(255,102,0,0.5);'>🚀 UNLOCK FULL DATA</a>
+            </div>
+
+            <script type="application/ld+json">
+            {{ "@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{schema_json[:-1]}] }}
+            </script>
         </div>
-        
-        <script type="application/ld+json">
-        {{ "@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{faq_schema[:-1]}] }}
-        </script>
-    </div>
-    """
+        """
 
-    # --- THE POSTING (The Fix) ---
-    try:
-        result = service.posts().insert(blogId=BLOG_ID, body={
+        # 6. पब्लिश करना (LIVE)
+        service.posts().insert(blogId=BLOG_ID, body={
             "kind": "blogger#post",
             "title": "🔴 BREAKING: " + entry.title,
-            "content": final_html,
-            "labels": [cat, "Trending", "Live"],
+            "content": full_html,
+            "labels": [cat_name, "Trending", "Live Update", "Viral"],
             "searchDescription": data['meta']
         }, isDraft=False).execute()
-        
-        if 'id' in result:
-            print(f"✅ MISSION ACCOMPLISHED! Article is LIVE: {result.get('url')}")
-        else:
-            print(f"❌ Rejection: {result}")
-            sys.exit(1)
+
+        print(f"✅ POWER POST PUBLISHED! Google Top Ranking Initiated.")
+
     except Exception as e:
-        print(f"❌ BLOGGER API ERROR: {e}")
-        print("💡 SOLUTION: Add the Service Account as OWNER in Google Search Console!")
-        sys.exit(1)
+        print(f"❌ SYSTEM ERROR: {e}"); sys.exit(1)
 
 if __name__ == "__main__":
-    run_viral_machine()
+    run_power_blogger()
