@@ -1,79 +1,81 @@
 import os, requests, feedparser, random, json, sys, re, time
-from duckduckgo_search import DDGS
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 # ==========================================
-# 1. THE AI AGENT (Human-Style & Real Data)
+# 1. THE UNSTOPPABLE AI AGENT (Pollinations)
 # ==========================================
-def ai_agent_write(headline, cat, update_mode=False):
-    """बिना किसी चाबी के न्यूज़ लिखने वाला मास्टर एजेंट"""
+def ai_agent_write(headline, cat, is_update=False):
+    """बिना किसी लिमिट के न्यूज़ लिखने वाला एजेंट"""
+    print(f"🤖 AI Agent is generating content for: {headline}...")
     
-    # अगर खबर पुरानी है लेकिन ट्रेंडिंग है, तो एंगल बदल जाएगा
-    angle = "Write it from a fresh perspective (like public reaction or hidden facts)" if update_mode else "Write it as an explosive breaking news story"
+    status_text = "LATEST UPDATE" if is_update else "BREAKING NEWS"
     
     prompt = f"""
-    Act as a World-Class investigative Journalist. Topic: '{headline}'. Category: {cat}.
-    Task: {angle}.
+    Act as a World-Class Viral Blogger. Write a 1500-word explosive news article on: '{headline}'. 
+    Category: {cat}. Status: {status_text}.
     
-    RULES:
-    1. LENGTH: Exactly 1200-1500 words. 
-    2. HUMAN TONE: Use spicy, emotional, and first-person language. No robotic intros.
-    3. STRUCTURE: H1 Title, H2 (The Deep Truth), H3 (Exclusive Leaks), H3 (Global Impact).
-    4. NO AI WORDS: Avoid 'delve', 'moreover', 'shaping', 'landmark', 'comprehensive'.
-    5. SEO: Include 5 'People Also Ask' FAQs and 10 viral tags.
-    6. REAL NEWS ONLY: Use verified facts. Return ONLY HTML content. No markdown.
+    STRICT RULES:
+    1. WORD COUNT: MINIMUM 1200-1500 words. Keep it very detailed.
+    2. STYLE: 100% Human-like, emotional, and spicy. Use "I discovered," "Insiders revealed."
+    3. NO BOT WORDS: Avoid 'delve', 'moreover', 'comprehensive', 'shaping'.
+    4. STRUCTURE: Use H1 for title, 6-7 H2/H3 subheadings, bullet points, and bold text.
+    5. SEO: Meta description (150 chars) and 5 viral FAQs.
+    6. FORMAT: Return ONLY HTML content. Do not include any intro or outro text.
     """
+
+    # Pollinations AI - Free & Reliable for GitHub
+    encoded_prompt = requests.utils.quote(prompt)
+    url = f"https://text.pollinations.ai/{encoded_prompt}?model=llama"
 
     for attempt in range(3):
         try:
-            with DDGS() as ddgs:
-                response = ddgs.chat(prompt, model='llama-3.1-70b')
-                if response and len(response) > 600: return response
-        except: time.sleep(5)
+            res = requests.get(url, timeout=120)
+            if res.status_code == 200 and len(res.text) > 800:
+                return res.text
+            print(f"🔄 Retry {attempt+1}: AI response too short.")
+            time.sleep(10)
+        except: time.sleep(10)
     return None
 
 # ==========================================
 # 2. 100+ CATEGORY TREND HUNTER
 # ==========================================
-def get_ultimate_trending_topic():
-    # 100+ कैटेगरी को कवर करने के लिए मास्टर लिस्ट
+def get_ultimate_viral_topic():
+    # 100+ केटेगरी की मास्टर लिस्ट (Tech, Sports, Celebs, Gaming, etc.)
     categories = [
-        "Bollywood Leaks", "IPL Cricket Controversy", "GTA 6 Leaks", "iPhone 17 Shocking",
-        "India Breaking News", "Space Discovery", "AI News Today", "Global Stock Market",
-        "Viral YouTube India", "Hollywood Gossip", "Automobile Launch", "Defense News India"
+        "GTA 6 Leaks Today", "IPL 2025 Shocking Update", "Bollywood Secret Gossip",
+        "iPhone 17 Pro Leaks", "Space Discovery NASA", "AI Robots Future", 
+        "Global Market Crash News", "Viral YouTube India Controversy", "Upcoming Movies 2025",
+        "Military Weapons Update India", "Smartphone Launch India", "Gold Price Shocking Trend"
     ]
     random.shuffle(categories)
     query = categories[0]
     
-    # Google News RSS (Top Search Logic)
     rss_url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en"
     
     try:
         feed = feedparser.parse(rss_url)
-        if feed.entries:
-            return feed.entries[0], query
+        if feed.entries: return feed.entries[0], query
     except: return None, None
 
 # ==========================================
 # 3. SMART UPDATE CHECKER
 # ==========================================
-def get_post_status(title, service, blog_id):
-    """चेक करना कि ये नया है या इसका अपडेट डालना है"""
+def get_post_mode(title, service, blog_id):
     try:
-        posts = service.posts().list(blogId=blog_id, maxResults=20).execute()
+        posts = service.posts().list(blogId=blog_id, maxResults=15).execute()
         if 'items' in posts:
             for p in posts['items']:
-                if title.lower()[:30] in p['title'].lower():
-                    return "UPDATE" # टाइटल मैच हुआ मतलब अपडेट मोड
+                if title.lower()[:25] in p['title'].lower(): return "UPDATE"
         return "NEW"
     except: return "NEW"
 
 # ==========================================
-# 4. MAIN ENGINE (Money Machine)
+# 4. MAIN MISSION ENGINE
 # ==========================================
 def run_power_bot():
-    print("🔋 BOOTING GOD-MODE NEWS AGENT v400...")
+    print("🔋 BOOTING UNSTOPPABLE NEWS ENGINE v600...")
     try:
         # Load Secrets
         service_info = json.loads(os.getenv("SERVICE_ACCOUNT_JSON"))
@@ -85,50 +87,54 @@ def run_power_bot():
         creds = service_account.Credentials.from_service_account_info(service_info, scopes=scopes)
         service = build('blogger', 'v3', credentials=creds)
 
-        # 1. 100 कैटेगरी में से ट्रेंडिंग खबर ढूंढना
-        entry, cat_name = get_ultimate_trending_topic()
+        # 1. वायरल खबर ढूँढना
+        entry, cat_name = get_ultimate_viral_topic()
         if not entry: return
 
         # 2. स्टेटस चेक करना (New or Update?)
-        status = get_post_status(entry.title, service, BLOG_ID)
-        print(f"🎯 News Found: {entry.title} | Status: {status}")
+        mode = get_post_mode(entry.title, service, BLOG_ID)
+        print(f"🎯 Target: {entry.title} | Mode: {mode}")
 
-        # 3. एजेंट से लिखवाना
-        article_html = ai_agent_write(entry.title, cat_name, update_mode=(status == "UPDATE"))
-        if not article_html: sys.exit(1)
+        # 3. एजेंट से लिखवाना (Pollinations AI)
+        article_html = ai_agent_write(entry.title, cat_name, is_update=(mode == "UPDATE"))
+        if not article_html:
+            print("❌ AI Agent Failure. Switching to backup topic..."); return
 
-        # 4. कमाई और इमेज (Unsplash HD)
-        money_link = requests.get(f"https://shrinkme.io/api?api={S_KEY}&url={entry.link}").json().get("shortenedUrl", entry.link)
+        # 4. कमाई और इमेज
+        try:
+            m_res = requests.get(f"https://shrinkme.io/api?api={S_KEY}&url={entry.link}", timeout=10).json()
+            money_link = m_res.get("shortenedUrl", entry.link)
+        except: money_link = entry.link
+        
         img_url = f"https://source.unsplash.com/1200x675/?{cat_name.replace(' ','')},viral"
 
         # 5. Final God-Mode Design
-        prefix = "🚨 LIVE UPDATE: " if status == "UPDATE" else "🔴 BREAKING: "
+        prefix = "🚨 LIVE UPDATE: " if mode == "UPDATE" else "🔴 BREAKING: "
         
         final_html = f"""
-        <div style='font-family:Arial; line-height:1.9; color:#111; max-width:850px; margin:auto;'>
-            <div style='background:red; color:white; padding:5px 15px; display:inline-block; border-radius:3px; font-weight:bold;'>{status}</div>
+        <div style='font-family:Arial, sans-serif; line-height:1.9; color:#111; max-width:850px; margin:auto;'>
+            <div style='background:red; color:white; padding:5px 15px; display:inline-block; border-radius:3px; font-weight:bold;'>{mode} STORY</div>
             <img src='{img_url}' style='width:100%; border-radius:20px; box-shadow:0 10px 30px rgba(0,0,0,0.2); margin-top:15px;'/>
             <h1 style='font-size:35px;'>{entry.title}</h1>
-            <p style='color:#777;'>Verified Source | {time.strftime("%B %d, %Y")}</p>
-            <div class='article-body' style='font-size:18px;'>{article_html}</div>
+            <div class='content' style='font-size:18px;'>{article_html}</div>
             
-            <div style='background:#1a1a1a; padding:45px; border-radius:25px; text-align:center; color:#fff; margin-top:50px; border:3px solid #ff6600;'>
-                <h2 style='color:#ff6600; margin-top:0;'>📢 WATCH EXCLUSIVE FOOTAGE & SOURCE</h2>
-                <p>The original unedited leaked video and official report for this story are available below. Access them before they are taken down.</p>
-                <a href='{money_link}' rel='nofollow' style='background:#ff6600; color:#fff; padding:20px 50px; text-decoration:none; border-radius:100px; font-weight:bold; font-size:24px; display:inline-block; box-shadow:0 5px 25px rgba(255,102,0,0.5);'>🚀 UNLOCK FULL DATA</a>
+            <div style='background:#1a1a1a; padding:45px; border-radius:25px; text-align:center; color:#fff; margin-top:60px; border:3px solid #ff6600;'>
+                <h2 style='color:#ff6600; margin-top:0;'>📢 WATCH EXCLUSIVE VIDEO & PROOF</h2>
+                <p style='font-size:18px;'>Full original leaked data and verified report are available below. Access now.</p>
+                <a href='{money_link}' rel='nofollow' style='background:#ff6600; color:#fff; padding:18px 50px; text-decoration:none; border-radius:100px; font-weight:bold; font-size:24px; display:inline-block; box-shadow:0 5px 25px rgba(255,102,0,0.5);'>🚀 UNLOCK FULL DATA</a>
             </div>
         </div>
         """
 
-        # 6. पब्लिश करना
+        # 6. पब्लिश करना (LIVE)
         service.posts().insert(blogId=BLOG_ID, body={
             "title": prefix + entry.title,
             "content": final_html,
-            "labels": [cat_name.title(), "Trending", "Viral"],
+            "labels": [cat_name.title(), "Viral", "Trending"],
             "searchDescription": entry.title[:150]
         }, isDraft=False).execute()
 
-        print(f"✅ SUCCESS! {status} Post is Live.")
+        print(f"✅ MISSION ACCOMPLISHED! Post is LIVE.")
 
     except Exception as e:
         print(f"❌ CRITICAL ERROR: {e}"); sys.exit(1)
