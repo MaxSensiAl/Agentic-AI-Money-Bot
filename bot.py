@@ -1,67 +1,47 @@
-import os, requests, feedparser, random, json, sys
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
+import os, smtplib, requests
+from email.message import EmailMessage
 
-def get_ai_content(headline, cat):
-    # तकनीक: OpenRouter (यह कभी 404 एरर नहीं देता)
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    
-    prompt = f"Write a 600-word professional news article about: '{headline}' for category {cat}. Use HTML tags (h2, h3, b, ul). Return ONLY HTML body."
-    
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    
-    data = {
-        "model": "meta-llama/llama-3-8b-instruct:free", # 100% फ्री मॉडल
-        "messages": [{"role": "user", "content": prompt}]
-    }
-    
+def run():
+    B_EMAIL = os.getenv("BLOGGER_EMAIL")
+    S_EMAIL = os.getenv("SENDER_EMAIL")
+    PASS = os.getenv("GMAIL_APP_PASSWORD").replace(" ", "")
+    G_KEY = os.getenv("GEMINI_API")
+    S_KEY = os.getenv("SHRINKME_API")
+
+    # 1. AI Content (With Error Handling)
+    content = "New trending Hollywood movie release with amazing action scenes. Check it out now!"
     try:
-        res = requests.post(url, headers=headers, json=data, timeout=30).json()
-        return res['choices'][0]['message']['content']
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={G_KEY}"
+        payload = {"contents": [{"parts":[{"text": "Write a viral 2-line movie news with emojis."}]}]}
+        res = requests.post(url, json=payload).json()
+        if 'candidates' in res:
+            content = res['candidates'][0]['content']['parts'][0]['text']
+        else:
+            print(f"⚠️ Gemini API Issue: {res}")
     except:
-        # बैकअप: Hugging Face
-        return f"<h2>Update: {headline}</h2><p>Latest verified reports for {cat} are emerging. Our team is tracking the full story.</p>"
+        print("Fallback to default content.")
 
-def run_viral_machine():
+    # 2. Money Link
+    link = f"https://shrinkme.io/api?api={S_KEY}&url=https://viralnewsai24.blogspot.com"
     try:
-        # 1. Secrets को लोड और चेक करना
-        service_json = os.getenv("SERVICE_ACCOUNT_JSON")
-        BLOG_ID = os.getenv("BLOG_ID", "").strip()
-        S_KEY = os.getenv("SHRINKME_API")
+        r = requests.get(link).json()
+        final_link = r.get("shortenedUrl", "https://viralnewsai24.blogspot.com")
+    except:
+        final_link = "https://viralnewsai24.blogspot.com"
 
-        print(f"📡 Using Blog ID: {BLOG_ID}")
+    # 3. Create Email
+    msg = EmailMessage()
+    msg['Subject'] = "Daily Viral News"
+    msg['From'] = S_EMAIL
+    msg['To'] = B_EMAIL
+    msg.add_alternative(f"<div style='background:#000; color:#00f2ff; padding:20px;'><h2>AI Update</h2><p>{content}</p><br><a href='{final_link}'>DOWNLOAD NOW</a></div>", subtype='html')
 
-        # 2. ताज़ा न्यूज़ (YouTube + Tech)
-        sources = ["https://variety.com/feed/", "https://techcrunch.com/feed/", "https://www.ign.com/rss/articles/feed"]
-        feed = feedparser.parse(random.choice(sources))
-        item = random.choice(feed.entries[:5])
-
-        # 3. AI Article & Money Link
-        article = get_ai_content(item.title, "Trending")
-        money_res = requests.get(f"https://shrinkme.io/api?api={S_KEY}&url={item.link}").json()
-        link = money_res.get("shortenedUrl", item.link)
-
-        # 4. Agentic AI डिज़ाइन
-        image_url = f"https://loremflickr.com/800/450/news?lock={random.randint(1,999)}"
-        html_body = f"""<div style='font-family:sans-serif; padding:30px; border:1px solid #eee; border-radius:15px;'><img src='{image_url}' style='width:100%; border-bottom:5px solid #ff6600;'><h1 style='color:#000;'>{item.title}</h1>{article}<div style='text-align:center; margin-top:40px;'><a href='{link}' style='background:#ff6600; color:#000; padding:15px 40px; text-decoration:none; border-radius:50px; font-weight:bold; font-size:22px; display:inline-block;'>🚀 UNLOCK FULL DATA</a></div></div>"""
-
-        # 5. Official Posting
-        service_info = json.loads(service_json)
-        creds = service_account.Credentials.from_service_account_info(service_info)
-        scoped_creds = creds.with_scopes(['https://www.googleapis.com/auth/blogger'])
-        service = build('blogger', 'v3', credentials=scoped_creds)
-        
-        # 'isDraft=True' करेंगे ताकि कम से कम पोस्ट ब्लॉगर के अंदर पहुँच जाए
-        service.posts().insert(blogId=BLOG_ID, body={"title": item.title, "content": html_body}, isDraft=True).execute()
-        print(f"✅ SUCCESS! Article saved in Drafts: {item.title}")
-
-    except Exception as e:
-        print(f"❌ ERROR: {e}")
-        sys.exit(1)
+    # 4. SEND
+    server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+    server.login(S_EMAIL, PASS)
+    server.send_message(msg)
+    server.quit()
+    print("✅ SUCCESS!")
 
 if __name__ == "__main__":
-    run_viral_machine()
+    run()
