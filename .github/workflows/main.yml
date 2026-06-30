@@ -22,9 +22,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # यहाँ ध्यान दें, GEMINI_API को जोड़ दिया गया है
       - name: Execute Bot
         env:
           SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
           BLOG_ID: ${{ secrets.BLOG_ID }}
           SHRINKME_API: ${{ secrets.SHRINKME_API }}
+          GEMINI_API: ${{ secrets.GEMINI_API }}
         run: python bot.py
