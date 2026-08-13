@@ -35,7 +35,7 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Gemini 1.5-Flash का उपयोग करके आर्टिकल लिखना (v1 API का उपयोग)"""
+    """Gemini 1.5-Flash का उपयोग करके आर्टिकल लिखना"""
     prompt = f"""
     Write a 800-word SEO optimized professional news article about: {title}.
     Use the following information as context: {source_text}.
@@ -48,7 +48,11 @@ def generate_ai_content(title, source_text):
     5. Write in English but keep the tone global.
     """
     
-    # यहाँ URL में v1beta की जगह v1 का उपयोग किया गया है
+    # अगर की (Key) मौजूद नहीं है तो रिक्वेस्ट न भेजें
+    if not GEMINI_API_KEY:
+        print("Error: GEMINI_API_KEY is empty. Cannot call Gemini API.")
+        return None
+
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {'Content-Type': 'application/json'}
     payload = {
@@ -63,7 +67,7 @@ def generate_ai_content(title, source_text):
         if 'candidates' in res_json:
             return res_json['candidates'][0]['content']['parts'][0]['text']
         else:
-            # अगर एरर है, तो पूरा रिस्पांस प्रिंट करें
+            # एरर होने पर पूरा एरर प्रिंट करें
             print("Gemini API Error Response:")
             print(json.dumps(res_json, indent=2))
             return None
@@ -98,13 +102,21 @@ def post_to_blogger(title, content):
 def main():
     print("Starting the Robot...")
     
-    # फ़ीड्स को रैंडम क्रम में मिक्स करना ताकि हर बार अलग फ़ीड पहले चेक हो
+    # --- क्रेडेंशियल डायग्नोस्टिक चेक (Secrets Verification) ---
+    print("\n--- Checking GitHub Secrets Status ---")
+    print(f"BLOG_ID: {'LOADED (OK)' if BLOG_ID else 'MISSING ❌'}")
+    print(f"GEMINI_API: {'LOADED (OK)' if GEMINI_API_KEY else 'MISSING ❌'}")
+    print(f"SHRINKME_API: {'LOADED (OK)' if SHRINKME_API else 'MISSING ❌'}")
+    print(f"SERVICE_ACCOUNT_JSON: {'LOADED (OK)' if SERVICE_ACCOUNT_JSON else 'MISSING ❌'}")
+    print("--------------------------------------\n")
+    
+    # फ़ीड्स को रैंडम क्रम में मिक्स करना
     random.shuffle(RSS_FEEDS)
     
     entry = None
     selected_feed_url = None
 
-    # असली ब्राउज़र जैसा हेडर (ताकि वेबसाइट्स ब्लॉक न करें)
+    # असली ब्राउज़र जैसा हेडर
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
@@ -113,7 +125,6 @@ def main():
     for feed_url in RSS_FEEDS:
         print(f"Checking feed: {feed_url}")
         try:
-            # यूजर-एजेंट के साथ रिक्वेस्ट भेजना
             response = requests.get(feed_url, headers=headers, timeout=15)
             
             if response.status_code == 200:
@@ -122,7 +133,7 @@ def main():
                     entry = random.choice(feed.entries)
                     selected_feed_url = feed_url
                     print(f"Success! Found news in: {feed_url}")
-                    break  # खबर मिल गई, अब लूप से बाहर निकलें
+                    break
                 else:
                     print(f"Feed parsed but no entries found in: {feed_url}")
             else:
@@ -131,7 +142,6 @@ def main():
         except Exception as e:
             print(f"Error checking {feed_url}: {e}")
 
-    # अगर किसी भी फ़ीड से खबर नहीं मिली
     if not entry:
         print("No news found in any of the RSS feeds!")
         return
@@ -149,7 +159,7 @@ def main():
     ai_article = generate_ai_content(original_title, summary)
     
     if ai_article:
-        # आर्टिकल के अंत में छोटा किया हुआ लिंक जोड़ना
+        # आर्टिकल के अंत में लिंक जोड़ना
         final_content = f"{ai_article} <br><br> <strong>Source:</strong> <a href='{short_link}'>Read Full Story here</a>"
         
         # 4. ब्लॉगर पर पब्लिश करना
