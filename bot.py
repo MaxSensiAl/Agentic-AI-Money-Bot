@@ -35,7 +35,7 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Gemini 1.5-Flash का उपयोग करके आर्टिकल लिखना"""
+    """Gemini 1.5-Flash का उपयोग करके आर्टिकल लिखना (v1 API का उपयोग)"""
     prompt = f"""
     Write a 800-word SEO optimized professional news article about: {title}.
     Use the following information as context: {source_text}.
@@ -48,7 +48,8 @@ def generate_ai_content(title, source_text):
     5. Write in English but keep the tone global.
     """
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # यहाँ URL में v1beta की जगह v1 का उपयोग किया गया है
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {'Content-Type': 'application/json'}
     payload = {
         "contents": [{"parts": [{"text": prompt}]}]
@@ -62,7 +63,7 @@ def generate_ai_content(title, source_text):
         if 'candidates' in res_json:
             return res_json['candidates'][0]['content']['parts'][0]['text']
         else:
-            # अगर एरर है, तो पूरा रिस्पांस प्रिंट करें ताकि हमें पता चले क्या गलत है
+            # अगर एरर है, तो पूरा रिस्पांस प्रिंट करें
             print("Gemini API Error Response:")
             print(json.dumps(res_json, indent=2))
             return None
