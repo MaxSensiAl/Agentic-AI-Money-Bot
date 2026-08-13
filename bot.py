@@ -8,10 +8,10 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 # --- CONFIGURATION (GitHub Secrets से डेटा उठाना) ---
-BLOG_ID = os.getenv('BLOG_ID')
-GEMINI_API_KEY = os.getenv('GEMINI_API')
-SHRINKME_API = os.getenv('SHRINKME_API')
-SERVICE_ACCOUNT_JSON = os.getenv('SERVICE_ACCOUNT_JSON')
+BLOG_ID = os.getenv('BLOG_ID').strip() if os.getenv('BLOG_ID') else None
+SHRINKME_API = os.getenv('SHRINKME_API').strip() if os.getenv('SHRINKME_API') else None
+SERVICE_ACCOUNT_JSON = os.getenv('SERVICE_ACCOUNT_JSON').strip() if os.getenv('SERVICE_ACCOUNT_JSON') else None
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY').strip() if os.getenv('OPENROUTER_API_KEY') else None
 
 # RSS Feeds की लिस्ट (प्रीमियम सोर्सेस)
 RSS_FEEDS = [
@@ -35,7 +35,11 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Gemini 1.5-Flash का उपयोग करके आर्टिकल लिखना"""
+    """OpenRouter API (Llama 3 FREE) का उपयोग करके आर्टिकल लिखना"""
+    if not OPENROUTER_API_KEY:
+        print("Error: OPENROUTER_API_KEY is empty. Cannot write article.")
+        return None
+
     prompt = f"""
     Write a 800-word SEO optimized professional news article about: {title}.
     Use the following information as context: {source_text}.
@@ -48,31 +52,35 @@ def generate_ai_content(title, source_text):
     5. Write in English but keep the tone global.
     """
     
-    # अगर की (Key) मौजूद नहीं है तो रिक्वेस्ट न भेजें
-    if not GEMINI_API_KEY:
-        print("Error: GEMINI_API_KEY is empty. Cannot call Gemini API.")
-        return None
-
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-    headers = {'Content-Type': 'application/json'}
+    # ओपनराउटर का एंडपॉइंट
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    # Llama 3 8B Instruct फ़्री मॉडल का उपयोग
     payload = {
-        "contents": [{"parts": [{"text": prompt}]}]
+        "model": "meta-llama/llama-3-8b-instruct:free",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ]
     }
     
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
         res_json = response.json()
         
-        # अगर 'candidates' मौजूद है, तो टेक्स्ट वापस करें
-        if 'candidates' in res_json:
-            return res_json['candidates'][0]['content']['parts'][0]['text']
+        # अगर रिस्पांस में 'choices' मौजूद है
+        if 'choices' in res_json:
+            return res_json['choices'][0]['message']['content']
         else:
-            # एरर होने पर पूरा एरर प्रिंट करें
-            print("Gemini API Error Response:")
+            print("OpenRouter API Error Response:")
             print(json.dumps(res_json, indent=2))
             return None
     except Exception as e:
-        print(f"Gemini Error: {e}")
+        print(f"OpenRouter Error: {e}")
         return None
 
 def post_to_blogger(title, content):
@@ -102,10 +110,10 @@ def post_to_blogger(title, content):
 def main():
     print("Starting the Robot...")
     
-    # --- क्रेडेंशियल डायग्नोस्टिक चेक (Secrets Verification) ---
+    # --- क्रेडेंशियल डायग्नोस्टिक चेक ---
     print("\n--- Checking GitHub Secrets Status ---")
     print(f"BLOG_ID: {'LOADED (OK)' if BLOG_ID else 'MISSING ❌'}")
-    print(f"GEMINI_API: {'LOADED (OK)' if GEMINI_API_KEY else 'MISSING ❌'}")
+    print(f"OPENROUTER_API_KEY: {'LOADED (OK)' if OPENROUTER_API_KEY else 'MISSING ❌'}")
     print(f"SHRINKME_API: {'LOADED (OK)' if SHRINKME_API else 'MISSING ❌'}")
     print(f"SERVICE_ACCOUNT_JSON: {'LOADED (OK)' if SERVICE_ACCOUNT_JSON else 'MISSING ❌'}")
     print("--------------------------------------\n")
