@@ -57,7 +57,15 @@ def generate_ai_content(title, source_text):
     try:
         response = requests.post(url, headers=headers, json=payload)
         res_json = response.json()
-        return res_json['candidates'][0]['content']['parts'][0]['text']
+        
+        # अगर 'candidates' मौजूद है, तो टेक्स्ट वापस करें
+        if 'candidates' in res_json:
+            return res_json['candidates'][0]['content']['parts'][0]['text']
+        else:
+            # अगर एरर है, तो पूरा रिस्पांस प्रिंट करें ताकि हमें पता चले क्या गलत है
+            print("Gemini API Error Response:")
+            print(json.dumps(res_json, indent=2))
+            return None
     except Exception as e:
         print(f"Gemini Error: {e}")
         return None
