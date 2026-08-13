@@ -89,15 +89,44 @@ def post_to_blogger(title, content):
 def main():
     print("Starting the Robot...")
     
-    # 1. किसी एक रैंडम फीड से खबर उठाना
-    feed_url = random.choice(RSS_FEEDS)
-    feed = feedparser.parse(feed_url)
+    # फ़ीड्स को रैंडम क्रम में मिक्स करना ताकि हर बार अलग फ़ीड पहले चेक हो
+    random.shuffle(RSS_FEEDS)
     
-    if not feed.entries:
-        print("No news found!")
+    entry = None
+    selected_feed_url = None
+
+    # असली ब्राउज़र जैसा हेडर (ताकि वेबसाइट्स ब्लॉक न करें)
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+
+    # सभी फ़ीड्स को एक-एक करके चेक करना
+    for feed_url in RSS_FEEDS:
+        print(f"Checking feed: {feed_url}")
+        try:
+            # यूजर-एजेंट के साथ रिक्वेस्ट भेजना
+            response = requests.get(feed_url, headers=headers, timeout=15)
+            
+            if response.status_code == 200:
+                feed = feedparser.parse(response.content)
+                if feed.entries:
+                    entry = random.choice(feed.entries)
+                    selected_feed_url = feed_url
+                    print(f"Success! Found news in: {feed_url}")
+                    break  # खबर मिल गई, अब लूप से बाहर निकलें
+                else:
+                    print(f"Feed parsed but no entries found in: {feed_url}")
+            else:
+                print(f"Failed to fetch {feed_url} - Status Code: {response.status_code}")
+                
+        except Exception as e:
+            print(f"Error checking {feed_url}: {e}")
+
+    # अगर किसी भी फ़ीड से खबर नहीं मिली
+    if not entry:
+        print("No news found in any of the RSS feeds!")
         return
 
-    entry = random.choice(feed.entries)
     original_title = entry.title
     original_link = entry.link
     summary = entry.get('summary', 'Latest news update')
