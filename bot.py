@@ -39,14 +39,13 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Hugging Face API (Qwen 2.5 72B) का उपयोग करके आर्टिकल लिखना"""
+    """Hugging Face API (Qwen 2.5 72B) का उपयोग करके आर्टिकल लिखना (मजबूत ऑटो-रिट्राय लॉजिक के साथ)"""
     if not HF_TOKEN:
         print("Error: HF_TOKEN is empty. Cannot write article.")
         return None
 
     prompt = f"Write a 800-word SEO optimized professional news article in English about: {title}. Context: {source_text}. Format requirements: 1. Use HTML tags like <h2>, <h3>, <p>, and <blockquote>. 2. Add a 'Key Highlights' section using <ul> <li>. 3. Make it human-like and engaging. 4. Include a disclaimer at the end."
     
-    # Qwen 2.5 72B - हगिंग फेस का सबसे शक्तिशाली फ्री मॉडल
     url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct"
     
     headers = {
@@ -62,25 +61,41 @@ def generate_ai_content(title, source_text):
         }
     }
     
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=40)
-        res_json = response.json()
+    # गिटहब के नेटवर्क ग्लिच (DNS Error) से बचने के लिए 5 बार ऑटो-रिट्राय लूप का जुगाड़
+    for attempt in range(5):
+        print(f"Hugging Face API Call - Attempt {attempt + 1}/5...")
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=40)
+            res_json = response.json()
+            
+            # यदि हगिंग फेस का मॉडल बैकग्राउंड में अभी लोड हो रहा हो
+            if isinstance(res_json, dict) and "error" in res_json and "loading" in res_json["error"].lower():
+                wait_time = res_json.get("estimated_time", 20.0)
+                print(f"Model is currently loading. Waiting for {wait_time} seconds before retrying...")
+                time.sleep(wait_time)
+                continue  # अगली कोशिश करें
+
+            # सफल रिस्पांस मिलने पर
+            if isinstance(res_json, list) and len(res_json) > 0 and 'generated_text' in res_json[0]:
+                raw_text = res_json[0]['generated_text']
+                if prompt in raw_text:
+                    raw_text = raw_text.replace(prompt, "")
+                return raw_text.strip()
+            elif isinstance(res_json, dict) and 'generated_text' in res_json:
+                return res_json['generated_text'].strip()
+            else:
+                print(f"Hugging Face response format mismatch: {res_json}")
+                
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed with error: {e}")
         
-        # हगिंग फेस का रिस्पांस फॉर्मेट संभालना
-        if isinstance(res_json, list) and len(res_json) > 0 and 'generated_text' in res_json[0]:
-            raw_text = res_json[0]['generated_text']
-            if prompt in raw_text:
-                raw_text = raw_text.replace(prompt, "")
-            return raw_text.strip()
-        elif isinstance(res_json, dict) and 'generated_text' in res_json:
-            return res_json['generated_text'].strip()
-        else:
-            print("Hugging Face API Error Response:")
-            print(res_json)
-            return None
-    except Exception as e:
-        print(f"Hugging Face Error: {e}")
-        return None
+        # हर असफल प्रयास के बाद गिटहब के नेटवर्क को संभलने के लिए 5 सेकंड का विराम दें
+        if attempt < 4:
+            print("Waiting 5 seconds before next attempt...")
+            time.sleep(5)
+            
+    print("All 5 attempts to reach Hugging Face failed due to persistent network/DNS issue.")
+    return None
 
 def post_to_blogger(title, content):
     """Service Account का उपयोग करके Blogger पर पोस्ट करना"""
