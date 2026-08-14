@@ -11,7 +11,11 @@ from googleapiclient.discovery import build
 BLOG_ID = os.getenv('BLOG_ID').strip() if os.getenv('BLOG_ID') else None
 SHRINKME_API = os.getenv('SHRINKME_API').strip() if os.getenv('SHRINKME_API') else None
 SERVICE_ACCOUNT_JSON = os.getenv('SERVICE_ACCOUNT_JSON').strip() if os.getenv('SERVICE_ACCOUNT_JSON') else None
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY').strip() if os.getenv('OPENROUTER_API_KEY') else None
+
+# स्मार्ट जुगाड़: ओपनराउटर की को हम GEMINI_API से उठाएंगे क्योंकि यह वर्कफ़्लो में पहले से मैप है
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY') or os.getenv('GEMINI_API')
+if OPENROUTER_API_KEY:
+    OPENROUTER_API_KEY = OPENROUTER_API_KEY.strip()
 
 # RSS Feeds की लिस्ट (प्रीमियम सोर्सेस)
 RSS_FEEDS = [
@@ -52,15 +56,11 @@ def generate_ai_content(title, source_text):
     5. Write in English but keep the tone global.
     """
     
-    # ओपनराउटर का एंडपॉइंट
     url = "https://openrouter.ai/api/v1/chat/completions"
-    
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json"
     }
-    
-    # Llama 3 8B Instruct फ़्री मॉडल का उपयोग
     payload = {
         "model": "meta-llama/llama-3-8b-instruct:free",
         "messages": [
@@ -72,7 +72,6 @@ def generate_ai_content(title, source_text):
         response = requests.post(url, headers=headers, json=payload, timeout=30)
         res_json = response.json()
         
-        # अगर रिस्पांस में 'choices' मौजूद है
         if 'choices' in res_json:
             return res_json['choices'][0]['message']['content']
         else:
@@ -86,7 +85,6 @@ def generate_ai_content(title, source_text):
 def post_to_blogger(title, content):
     """Service Account का उपयोग करके Blogger पर पोस्ट करना"""
     try:
-        # JSON स्ट्रिंग को डिक्शनरी में बदलना
         info = json.loads(SERVICE_ACCOUNT_JSON)
         creds = service_account.Credentials.from_service_account_info(
             info, scopes=['https://www.googleapis.com/auth/blogger']
@@ -99,7 +97,6 @@ def post_to_blogger(title, content):
             "content": content
         }
 
-        # isDraft=False मतलब पोस्ट सीधे LIVE होगी
         posts = service.posts().insert(blogId=BLOG_ID, body=body, isDraft=False).execute()
         print(f"Successfully Posted! URL: {posts.get('url')}")
     except Exception as e:
@@ -113,23 +110,20 @@ def main():
     # --- क्रेडेंशियल डायग्नोस्टिक चेक ---
     print("\n--- Checking GitHub Secrets Status ---")
     print(f"BLOG_ID: {'LOADED (OK)' if BLOG_ID else 'MISSING ❌'}")
-    print(f"OPENROUTER_API_KEY: {'LOADED (OK)' if OPENROUTER_API_KEY else 'MISSING ❌'}")
+    print(f"OPENROUTER_API_KEY (via GEMINI_API): {'LOADED (OK)' if OPENROUTER_API_KEY else 'MISSING ❌'}")
     print(f"SHRINKME_API: {'LOADED (OK)' if SHRINKME_API else 'MISSING ❌'}")
     print(f"SERVICE_ACCOUNT_JSON: {'LOADED (OK)' if SERVICE_ACCOUNT_JSON else 'MISSING ❌'}")
     print("--------------------------------------\n")
     
-    # फ़ीड्स को रैंडम क्रम में मिक्स करना
     random.shuffle(RSS_FEEDS)
     
     entry = None
     selected_feed_url = None
 
-    # असली ब्राउज़र जैसा हेडर
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
 
-    # सभी फ़ीड्स को एक-एक करके चेक करना
     for feed_url in RSS_FEEDS:
         print(f"Checking feed: {feed_url}")
         try:
@@ -160,17 +154,12 @@ def main():
 
     print(f"Processing: {original_title}")
 
-    # 2. लिंक छोटा करना
     short_link = get_short_url(original_link)
 
-    # 3. AI से आर्टिकल लिखवाना
     ai_article = generate_ai_content(original_title, summary)
     
     if ai_article:
-        # आर्टिकल के अंत में लिंक जोड़ना
         final_content = f"{ai_article} <br><br> <strong>Source:</strong> <a href='{short_link}'>Read Full Story here</a>"
-        
-        # 4. ब्लॉगर पर पब्लिश करना
         post_to_blogger(original_title, final_content)
     else:
         print("Content generation failed.")
