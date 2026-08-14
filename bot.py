@@ -39,7 +39,7 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """OpenRouter API (Gemini 1.5 Flash FREE) का उपयोग करके आर्टिकल लिखना"""
+    """OpenRouter API (Llama 3.1 FREE) का उपयोग करके आर्टिकल लिखना"""
     if not OPENROUTER_API_KEY:
         print("Error: OPENROUTER_API_KEY is empty. Cannot write article.")
         return None
@@ -62,9 +62,9 @@ def generate_ai_content(title, source_text):
         "Content-Type": "application/json"
     }
     
-    # यहाँ मॉडल को बदलकर जेमिनी का फ़्री मॉडल किया गया है
+    # यहाँ मॉडल को बदलकर लामा 3.1 फ़्री किया गया है जो हमेशा चलता है
     payload = {
-        "model": "google/gemini-flash-1.5-8b:free",
+        "model": "meta-llama/llama-3.1-8b-instruct:free",
         "messages": [
             {"role": "user", "content": prompt}
         ]
