@@ -47,11 +47,10 @@ def generate_ai_content(title, source_text):
 
     prompt = f"Write a 800-word SEO optimized professional news article in English about: {title}. Context: {source_text}. Format requirements: 1. Use HTML tags like <h2>, <h3>, <p>, and <blockquote>. 2. Add a 'Key Highlights' section using <ul> <li>. 3. Make it human-like and engaging. 4. Include a disclaimer at the end."
     
-    # यहाँ मॉडल का नाम बदलकर Qwen2.5-7B-Instruct (सुपर फ़ास्ट) किया गया है
-    url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct"
+    url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct"
     
-    # अमेज़न AWS सर्वर का लाइव और स्थिर IP एड्रेस
-    resolve_arg = "api-inference.huggingface.co:443:54.85.123.45"
+    # हगिंग फेस के अमेज़न (AWS) सर्वर का बिल्कुल ताज़ा और सुपर-एक्टिव IP एड्रेस (3.220.252.190)
+    resolve_arg = "api-inference.huggingface.co:443:3.220.252.190"
     
     payload = {
         "inputs": prompt,
@@ -67,7 +66,7 @@ def generate_ai_content(title, source_text):
     for attempt in range(3):
         print(f"Hugging Face API Call via cURL with AWS Resolve - Attempt {attempt + 1}/3...")
         try:
-            # cURL को सीधे अमेज़न AWS सर्वर के IP पर भेजने का निर्देश
+            # cURL को सीधे अमेज़न AWS सर्वर के नए IP पर भेजने का निर्देश
             cmd = [
                 "curl", "-sS", "-X", "POST",
                 "-H", f"Authorization: Bearer {HF_TOKEN}",
@@ -77,8 +76,8 @@ def generate_ai_content(title, source_text):
                 url
             ]
             
-            # कमांड रन करना
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            # कमांड रन करना (फास्ट मॉडल के लिए टाइमआउट घटाकर 25 सेकंड किया गया है)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
             response_text = result.stdout
             
             if not response_text:
