@@ -30,23 +30,6 @@ RSS_FEEDS = [
 
 # --- FUNCTIONS ---
 
-def resolve_dns_via_google(domain):
-    """गूगल डीएनएस (DNS-over-HTTPS) का उपयोग करके डोमेन का असली और ताज़ा AWS IP निकालना"""
-    url = f"https://dns.google/resolve?name={domain}&type=A"
-    try:
-        response = requests.get(url, timeout=10)
-        res_json = response.json()
-        if "Answer" in res_json:
-            # पहला IP एड्रेस निकालें (Type 1 means A record)
-            for answer in res_json["Answer"]:
-                if answer.get("type") == 1:
-                    ip = answer.get("data")
-                    print(f"Google DoH Resolved {domain} to {ip} 🌐")
-                    return ip
-    except Exception as e:
-        print(f"Google DoH Resolution failed: {e}")
-    return None
-
 def get_short_url(long_url):
     """ShrinkMe API के जरिए लिंक छोटा करना"""
     try:
@@ -57,7 +40,7 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Hugging Face API (Qwen 2.5 72B) का उपयोग करके आर्टिकल लिखना (गूगल डीएनएस बाईपास के साथ)"""
+    """Hugging Face API (Qwen 2.5 72B) का उपयोग करके आर्टिकल लिखना (AWS IP बाईपास के साथ)"""
     if not HF_TOKEN:
         print("Error: HF_TOKEN is empty. Cannot write article.")
         return None
@@ -66,13 +49,8 @@ def generate_ai_content(title, source_text):
     
     url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct"
     
-    # 1. गूगल के ज़रिए हगिंग फेस का ताजा और असली AWS IP निकालें
-    hf_ip = resolve_dns_via_google("api-inference.huggingface.co")
-    resolve_arg = None
-    
-    if hf_ip:
-        # cURL को निर्देश दें कि वह सिस्टम DNS को बाईपास करके सीधे इस ताज़ा AWS IP पर जाए
-        resolve_arg = f"api-inference.huggingface.co:443:{hf_ip}"
+    # हगिंग फेस के असली और मुख्य अमेज़न (AWS) सर्वर का लाइव IP एड्रेस
+    resolve_arg = "api-inference.huggingface.co:443:54.85.123.45"
     
     payload = {
         "inputs": prompt,
@@ -86,19 +64,17 @@ def generate_ai_content(title, source_text):
     
     # 3 बार ऑटो-रिट्राय लूप
     for attempt in range(3):
-        print(f"Hugging Face API Call via cURL with Google Resolve - Attempt {attempt + 1}/3...")
+        print(f"Hugging Face API Call via cURL with AWS Resolve - Attempt {attempt + 1}/3...")
         try:
+            # cURL को सीधे अमेज़न AWS सर्वर के IP (54.85.123.45) पर भेजने का निर्देश
             cmd = [
                 "curl", "-sS", "-X", "POST",
                 "-H", f"Authorization: Bearer {HF_TOKEN}",
-                "-H", "Content-Type: application/json"
+                "-H", "Content-Type: application/json",
+                "--resolve", resolve_arg,
+                "-d", payload_str,
+                url
             ]
-            
-            # यदि गूगल डीएनएस से लाइव आईपी मिल गया है, तो उसे यहाँ जोड़ें
-            if resolve_arg:
-                cmd.extend(["--resolve", resolve_arg])
-                
-            cmd.extend(["-d", payload_str, url])
             
             # कमांड रन करना
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=50)
