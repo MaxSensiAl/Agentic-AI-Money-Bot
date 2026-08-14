@@ -13,7 +13,7 @@ BLOG_ID = os.getenv('BLOG_ID').strip() if os.getenv('BLOG_ID') else None
 SHRINKME_API = os.getenv('SHRINKME_API').strip() if os.getenv('SHRINKME_API') else None
 SERVICE_ACCOUNT_JSON = os.getenv('SERVICE_ACCOUNT_JSON').strip() if os.getenv('SERVICE_ACCOUNT_JSON') else None
 
-# स्मार्ट जुगाड़: हगिंग फेस टोकन को हम GEMINI_API से उठाएंगे क्योंकि यह वर्कफ़्लो में पहले से मैप है
+# हगिंग फेस टोकन को हम GEMINI_API से उठाएंगे क्योंकि यह वर्कफ़्लो में पहले से मैप है
 HF_TOKEN = os.getenv('HF_TOKEN') or os.getenv('GEMINI_API')
 if HF_TOKEN:
     HF_TOKEN = HF_TOKEN.strip()
@@ -40,7 +40,7 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Hugging Face API (Qwen 2.5 72B) का उपयोग करके आर्टिकल लिखना (Native cURL बाईपास जुगाड़ के साथ)"""
+    """Hugging Face API (Qwen 2.5 72B) का उपयोग करके आर्टिकल लिखना (cURL --resolve बाईपास जुगाड़ के साथ)"""
     if not HF_TOKEN:
         print("Error: HF_TOKEN is empty. Cannot write article.")
         return None
@@ -61,13 +61,14 @@ def generate_ai_content(title, source_text):
     
     # 3 बार ऑटो-रिट्राय लूप
     for attempt in range(3):
-        print(f"Hugging Face API Call via cURL - Attempt {attempt + 1}/3...")
+        print(f"Hugging Face API Call via cURL with Resolve - Attempt {attempt + 1}/3...")
         try:
-            # क्लाउडफ्लेयर ब्लॉक को बाईपास करने के लिए सिस्टम के native cURL का उपयोग
+            # --resolve फ़्लैग का उपयोग करके गिटहब के DNS ब्लॉक और SSL एरर दोनों को एक साथ हल करना
             cmd = [
                 "curl", "-s", "-X", "POST",
                 "-H", f"Authorization: Bearer {HF_TOKEN}",
                 "-H", "Content-Type: application/json",
+                "--resolve", "api-inference.huggingface.co:443:104.18.23.19",
                 "-d", payload_str,
                 url
             ]
