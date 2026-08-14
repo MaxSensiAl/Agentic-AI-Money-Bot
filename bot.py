@@ -39,7 +39,7 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """OpenRouter API (Llama 3 FREE) का उपयोग करके आर्टिकल लिखना"""
+    """OpenRouter API (Gemini 1.5 Flash FREE) का उपयोग करके आर्टिकल लिखना"""
     if not OPENROUTER_API_KEY:
         print("Error: OPENROUTER_API_KEY is empty. Cannot write article.")
         return None
@@ -61,8 +61,10 @@ def generate_ai_content(title, source_text):
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json"
     }
+    
+    # यहाँ मॉडल को बदलकर जेमिनी का फ़्री मॉडल किया गया है
     payload = {
-        "model": "meta-llama/llama-3-8b-instruct:free",
+        "model": "google/gemini-flash-1.5-8b:free",
         "messages": [
             {"role": "user", "content": prompt}
         ]
@@ -72,6 +74,7 @@ def generate_ai_content(title, source_text):
         response = requests.post(url, headers=headers, json=payload, timeout=30)
         res_json = response.json()
         
+        # अगर रिस्पांस में 'choices' मौजूद है
         if 'choices' in res_json:
             return res_json['choices'][0]['message']['content']
         else:
@@ -97,6 +100,7 @@ def post_to_blogger(title, content):
             "content": content
         }
 
+        # isDraft=False मतलब पोस्ट सीधे LIVE होगी
         posts = service.posts().insert(blogId=BLOG_ID, body=body, isDraft=False).execute()
         print(f"Successfully Posted! URL: {posts.get('url')}")
     except Exception as e:
