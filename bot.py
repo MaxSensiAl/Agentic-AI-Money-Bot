@@ -39,7 +39,7 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """OpenRouter API (Gemma 2 FREE) का उपयोग करके आर्टिकल लिखना (सुरक्षा हेडर्स के साथ)"""
+    """OpenRouter API (Mistral 7B FREE) का उपयोग करके आर्टिकल लिखना (सुरक्षा हेडर्स के साथ)"""
     if not OPENROUTER_API_KEY:
         print("Error: OPENROUTER_API_KEY is empty. Cannot write article.")
         return None
@@ -58,7 +58,7 @@ def generate_ai_content(title, source_text):
     
     url = "https://openrouter.ai/api/v1/chat/completions"
     
-    # ओपनराउटर के नियमानुसार सुरक्षा हेडर्स जोड़े गए हैं
+    # ओपनराउटर के सुरक्षा हेडर्स
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
@@ -66,8 +66,9 @@ def generate_ai_content(title, source_text):
         "X-Title": "Agentic AI Money Bot"
     }
     
+    # Mistral 7B Instruct फ़्री मॉडल का उपयोग
     payload = {
-        "model": "google/gemma-2-9b-it:free",
+        "model": "mistralai/mistral-7b-instruct:free",
         "messages": [
             {"role": "user", "content": prompt}
         ]
