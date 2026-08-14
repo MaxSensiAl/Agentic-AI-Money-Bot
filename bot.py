@@ -13,7 +13,7 @@ BLOG_ID = os.getenv('BLOG_ID').strip() if os.getenv('BLOG_ID') else None
 SHRINKME_API = os.getenv('SHRINKME_API').strip() if os.getenv('SHRINKME_API') else None
 SERVICE_ACCOUNT_JSON = os.getenv('SERVICE_ACCOUNT_JSON').strip() if os.getenv('SERVICE_ACCOUNT_JSON') else None
 
-# हगिंग फेस टोकन को हम GEMINI_API से उठाएंगे क्योंकि यह वर्कफ़्लो में पहले से मैप है
+# स्मार्ट जुगाड़: हगिंग फेस टोकन को हम GEMINI_API से उठाएंगे क्योंकि यह वर्कफ़्लो में पहले से मैप है
 HF_TOKEN = os.getenv('HF_TOKEN') or os.getenv('GEMINI_API')
 if HF_TOKEN:
     HF_TOKEN = HF_TOKEN.strip()
@@ -63,12 +63,12 @@ def generate_ai_content(title, source_text):
     for attempt in range(3):
         print(f"Hugging Face API Call via cURL with Resolve - Attempt {attempt + 1}/3...")
         try:
-            # --resolve फ़्लैग का उपयोग करके गिटहब के DNS ब्लॉक और SSL एरर दोनों को एक साथ हल करना
+            # -sS का उपयोग करके एरर को स्क्रीन पर दिखाना और 104.18.22.19 IP का उपयोग करना
             cmd = [
-                "curl", "-s", "-X", "POST",
+                "curl", "-sS", "-X", "POST",
                 "-H", f"Authorization: Bearer {HF_TOKEN}",
                 "-H", "Content-Type: application/json",
-                "--resolve", "api-inference.huggingface.co:443:104.18.23.19",
+                "--resolve", "api-inference.huggingface.co:443:104.18.22.19",
                 "-d", payload_str,
                 url
             ]
@@ -83,7 +83,7 @@ def generate_ai_content(title, source_text):
                 
             res_json = json.loads(response_text)
             
-            # यदि हगिंग फेस का मॉडल बैकग्राउंड में अभी लोड हो रहा हो
+            # यदि हडिंग फेस का मॉडल बैकग्राउंड में अभी लोड हो रहा हो
             if isinstance(res_json, dict) and "error" in res_json and "loading" in res_json["error"].lower():
                 wait_time = res_json.get("estimated_time", 20.0)
                 print(f"Model is currently loading. Waiting for {wait_time} seconds before retrying...")
