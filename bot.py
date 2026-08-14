@@ -12,10 +12,10 @@ BLOG_ID = os.getenv('BLOG_ID').strip() if os.getenv('BLOG_ID') else None
 SHRINKME_API = os.getenv('SHRINKME_API').strip() if os.getenv('SHRINKME_API') else None
 SERVICE_ACCOUNT_JSON = os.getenv('SERVICE_ACCOUNT_JSON').strip() if os.getenv('SERVICE_ACCOUNT_JSON') else None
 
-# स्मार्ट जुगाड़: ओपनराउटर की को हम GEMINI_API से उठाएंगे क्योंकि यह वर्कफ़्लो में पहले से मैप है
-OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY') or os.getenv('GEMINI_API')
-if OPENROUTER_API_KEY:
-    OPENROUTER_API_KEY = OPENROUTER_API_KEY.strip()
+# स्मार्ट जुगाड़: हगिंग फेस टोकन को हम GEMINI_API से उठाएंगे क्योंकि यह वर्कफ़्लो में पहले से मैप है
+HF_TOKEN = os.getenv('HF_TOKEN') or os.getenv('GEMINI_API')
+if HF_TOKEN:
+    HF_TOKEN = HF_TOKEN.strip()
 
 # RSS Feeds की लिस्ट (प्रीमियम सोर्सेस)
 RSS_FEEDS = [
@@ -39,54 +39,47 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """OpenRouter API (Mistral 7B FREE) का उपयोग करके आर्टिकल लिखना (सुरक्षा हेडर्स के साथ)"""
-    if not OPENROUTER_API_KEY:
-        print("Error: OPENROUTER_API_KEY is empty. Cannot write article.")
+    """Hugging Face API (Qwen 2.5 72B) का उपयोग करके आर्टिकल लिखना"""
+    if not HF_TOKEN:
+        print("Error: HF_TOKEN is empty. Cannot write article.")
         return None
 
-    prompt = f"""
-    Write a 800-word SEO optimized professional news article about: {title}.
-    Use the following information as context: {source_text}.
+    prompt = f"Write a 800-word SEO optimized professional news article in English about: {title}. Context: {source_text}. Format requirements: 1. Use HTML tags like <h2>, <h3>, <p>, and <blockquote>. 2. Add a 'Key Highlights' section using <ul> <li>. 3. Make it human-like and engaging. 4. Include a disclaimer at the end."
     
-    Format requirements:
-    1. Use HTML tags like <h2>, <h3>, <p>, and <blockquote>.
-    2. Add a 'Key Highlights' section using <ul> <li>.
-    3. Make it human-like and engaging.
-    4. Include a disclaimer at the end.
-    5. Write in English but keep the tone global.
-    """
+    # Qwen 2.5 72B - हगिंग फेस का सबसे शक्तिशाली फ्री मॉडल
+    url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct"
     
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    
-    # ओपनराउटर के सुरक्षा हेडर्स
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/MaxSensAI/Agentic-AI-Money-Bot",
-        "X-Title": "Agentic AI Money Bot"
+        "Authorization": f"Bearer {HF_TOKEN}",
+        "Content-Type": "application/json"
     }
     
-    # Mistral 7B Instruct फ़्री मॉडल का उपयोग
     payload = {
-        "model": "mistralai/mistral-7b-instruct:free",
-        "messages": [
-            {"role": "user", "content": prompt}
-        ]
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 1024,
+            "temperature": 0.7
+        }
     }
     
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        response = requests.post(url, headers=headers, json=payload, timeout=40)
         res_json = response.json()
         
-        # अगर रिस्पांस में 'choices' मौजूद है
-        if 'choices' in res_json:
-            return res_json['choices'][0]['message']['content']
+        # हगिंग फेस का रिस्पांस फॉर्मेट संभालना
+        if isinstance(res_json, list) and len(res_json) > 0 and 'generated_text' in res_json[0]:
+            raw_text = res_json[0]['generated_text']
+            if prompt in raw_text:
+                raw_text = raw_text.replace(prompt, "")
+            return raw_text.strip()
+        elif isinstance(res_json, dict) and 'generated_text' in res_json:
+            return res_json['generated_text'].strip()
         else:
-            print("OpenRouter API Error Response:")
-            print(json.dumps(res_json, indent=2))
+            print("Hugging Face API Error Response:")
+            print(res_json)
             return None
     except Exception as e:
-        print(f"OpenRouter Error: {e}")
+        print(f"Hugging Face Error: {e}")
         return None
 
 def post_to_blogger(title, content):
@@ -104,7 +97,6 @@ def post_to_blogger(title, content):
             "content": content
         }
 
-        # isDraft=False मतलब पोस्ट सीधे LIVE होगी
         posts = service.posts().insert(blogId=BLOG_ID, body=body, isDraft=False).execute()
         print(f"Successfully Posted! URL: {posts.get('url')}")
     except Exception as e:
@@ -118,7 +110,7 @@ def main():
     # --- क्रेडेंशियल डायग्नोस्टिक चेक ---
     print("\n--- Checking GitHub Secrets Status ---")
     print(f"BLOG_ID: {'LOADED (OK)' if BLOG_ID else 'MISSING ❌'}")
-    print(f"OPENROUTER_API_KEY (via GEMINI_API): {'LOADED (OK)' if OPENROUTER_API_KEY else 'MISSING ❌'}")
+    print(f"HUGGING_FACE_TOKEN (via GEMINI_API): {'LOADED (OK)' if HF_TOKEN else 'MISSING ❌'}")
     print(f"SHRINKME_API: {'LOADED (OK)' if SHRINKME_API else 'MISSING ❌'}")
     print(f"SERVICE_ACCOUNT_JSON: {'LOADED (OK)' if SERVICE_ACCOUNT_JSON else 'MISSING ❌'}")
     print("--------------------------------------\n")
