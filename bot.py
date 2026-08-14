@@ -4,25 +4,9 @@ import random
 import time
 import requests
 import feedparser
-import socket
+import subprocess
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-
-# --- DNS INTERCEPTOR JUGAAD (पायथन के नेटवर्क सॉकेट को ओवरराइड करना) ---
-# यहाँ हगिंग फेस के असली और मुख्य IP (104.18.23.19) का उपयोग किया गया है
-try:
-    original_getaddrinfo = socket.getaddrinfo
-    def custom_getaddrinfo(*args):
-        host = args[0]
-        # यदि हगिंग फेस की एपीआई को कॉल किया जा रहा है
-        if host == "api-inference.huggingface.co":
-            # हगिंग फेस का असली और मुख्य क्लाउडफ्लेयर IP
-            return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('104.18.23.19', args[1]))]
-        return original_getaddrinfo(*args)
-    socket.getaddrinfo = custom_getaddrinfo
-    print("DNS Resolver patched successfully! 🛠️")
-except Exception as e:
-    print(f"Failed to patch DNS Resolver: {e}")
 
 # --- CONFIGURATION (GitHub Secrets से डेटा उठाना) ---
 BLOG_ID = os.getenv('BLOG_ID').strip() if os.getenv('BLOG_ID') else None
@@ -56,20 +40,14 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Hugging Face API (Qwen 2.5 72B) का उपयोग करके आर्टिकल लिखना"""
+    """Hugging Face API (Qwen 2.5 72B) का उपयोग करके आर्टिकल लिखना (Native cURL बाईपास जुगाड़ के साथ)"""
     if not HF_TOKEN:
         print("Error: HF_TOKEN is empty. Cannot write article.")
         return None
 
     prompt = f"Write a 800-word SEO optimized professional news article in English about: {title}. Context: {source_text}. Format requirements: 1. Use HTML tags like <h2>, <h3>, <p>, and <blockquote>. 2. Add a 'Key Highlights' section using <ul> <li>. 3. Make it human-like and engaging. 4. Include a disclaimer at the end."
     
-    # सामान्य URL (हमारा DNS इंटरसेप्टर इसे अपने आप सही IP से कनेक्ट कर देगा)
     url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct"
-    
-    headers = {
-        "Authorization": f"Bearer {HF_TOKEN}",
-        "Content-Type": "application/json"
-    }
     
     payload = {
         "inputs": prompt,
@@ -79,13 +57,30 @@ def generate_ai_content(title, source_text):
         }
     }
     
-    # मॉडल लोड होने के एरर से बचने के लिए 3 बार ऑटो-रिट्राय लूप
+    payload_str = json.dumps(payload)
+    
+    # 3 बार ऑटो-रिट्राय लूप
     for attempt in range(3):
-        print(f"Hugging Face API Call - Attempt {attempt + 1}/3...")
+        print(f"Hugging Face API Call via cURL - Attempt {attempt + 1}/3...")
         try:
-            # अब यह बिना किसी SSL एरर के सीधे और सुरक्षित तरीके से कनेक्ट होगा
-            response = requests.post(url, headers=headers, json=payload, timeout=40)
-            res_json = response.json()
+            # क्लाउडफ्लेयर ब्लॉक को बाईपास करने के लिए सिस्टम के native cURL का उपयोग
+            cmd = [
+                "curl", "-s", "-X", "POST",
+                "-H", f"Authorization: Bearer {HF_TOKEN}",
+                "-H", "Content-Type: application/json",
+                "-d", payload_str,
+                url
+            ]
+            
+            # कमांड रन करना
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=50)
+            response_text = result.stdout
+            
+            if not response_text:
+                print(f"Empty response from curl. stderr: {result.stderr}")
+                continue
+                
+            res_json = json.loads(response_text)
             
             # यदि हगिंग फेस का मॉडल बैकग्राउंड में अभी लोड हो रहा हो
             if isinstance(res_json, dict) and "error" in res_json and "loading" in res_json["error"].lower():
@@ -163,7 +158,7 @@ def main():
             response = requests.get(feed_url, headers=headers, timeout=15)
             
             if response.status_code == 200:
-                feed = parser = feedparser.parse(response.content)
+                feed = feedparser.parse(response.content)
                 if feed.entries:
                     entry = random.choice(feed.entries)
                     selected_feed_url = feed_url
