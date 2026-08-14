@@ -47,7 +47,7 @@ def generate_ai_content(title, source_text):
 
     prompt = f"Write a 800-word SEO optimized professional news article in English about: {title}. Context: {source_text}. Format requirements: 1. Use HTML tags like <h2>, <h3>, <p>, and <blockquote>. 2. Add a 'Key Highlights' section using <ul> <li>. 3. Make it human-like and engaging. 4. Include a disclaimer at the end."
     
-    # यहाँ URL में टाइपिंग एरर को सुधारकर Qwen2.5-7B-Instruct (सुपर फ़ास्ट) कर दिया गया है
+    # यहाँ मॉडल का नाम बिल्कुल सही (Qwen2.5-7B-Instruct) कर दिया गया है
     url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct"
     
     # अमेज़न AWS सर्वर का लाइव और स्थिर IP एड्रेस
