@@ -35,7 +35,7 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Google Gemini API (मल्टी-मॉडल बाईपास जुगाड़ के साथ)"""
+    """Google Gemini 1.5-Flash का उपयोग करके आर्टिकल लिखना (v1beta एंडपॉइंट के साथ)"""
     if not GEMINI_API_KEY:
         print("Error: GEMINI_API_KEY is empty. Cannot write article.")
         return None
@@ -57,8 +57,7 @@ def generate_ai_content(title, source_text):
         "contents": [{"parts": [{"text": prompt}]}]
     }
     
-    # 4 अलग-अलग जेमिनी मॉडल्स की लिस्ट (सुरक्षा बाईपास के लिए)
-    # अगर 1.5-flash ब्लॉक होगा, तो कोड अपने आप 'gemini-pro' या 'gemini-1.0-pro' का उपयोग कर लेगा!
+    # 4 अलग-अलग जेमिनी मॉडल्स की लिस्ट
     MODELS_TO_TRY = [
         "gemini-1.5-flash",
         "gemini-1.5-flash-latest",
@@ -67,8 +66,9 @@ def generate_ai_content(title, source_text):
     ]
     
     for model_name in MODELS_TO_TRY:
-        print(f"Trying Google Gemini Model: {model_name}...")
-        url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+        print(f"Trying Google Gemini Model on v1beta: {model_name}...")
+        # यहाँ v1 को बदलकर v1beta किया गया है जो नई कीज़ के लिए आवश्यक है
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
         
         try:
             response = requests.post(url, headers=headers, json=payload, timeout=30)
