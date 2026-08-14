@@ -39,7 +39,7 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """OpenRouter API (Llama 3.1 FREE) का उपयोग करके आर्टिकल लिखना"""
+    """OpenRouter API (Gemma 2 FREE) का उपयोग करके आर्टिकल लिखना"""
     if not OPENROUTER_API_KEY:
         print("Error: OPENROUTER_API_KEY is empty. Cannot write article.")
         return None
@@ -62,9 +62,9 @@ def generate_ai_content(title, source_text):
         "Content-Type": "application/json"
     }
     
-    # यहाँ मॉडल को बदलकर लामा 3.1 फ़्री किया गया है जो हमेशा चलता है
+    # यहाँ मॉडल को बदलकर Google Gemma 2 फ़्री किया गया है
     payload = {
-        "model": "meta-llama/llama-3.1-8b-instruct:free",
+        "model": "google/gemma-2-9b-it:free",
         "messages": [
             {"role": "user", "content": prompt}
         ]
