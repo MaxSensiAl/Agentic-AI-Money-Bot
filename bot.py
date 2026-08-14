@@ -4,6 +4,7 @@ import random
 import time
 import requests
 import feedparser
+import subprocess
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
@@ -29,6 +30,24 @@ RSS_FEEDS = [
 
 # --- FUNCTIONS ---
 
+def resolve_dns_via_cloudflare(domain):
+    """1.1.1.1 (Cloudflare DNS-over-HTTPS) का उपयोग करके डोमेन का असली और ताज़ा AWS IP निकालना"""
+    url = f"https://1.1.1.1/dns-query?name={domain}&type=A"
+    headers = {"accept": "application/dns-json"}
+    try:
+        # 1.1.1.1 सीधे आईपी है, इसलिए यह बिना किसी DNS एरर के तुरंत काम करेगा
+        response = requests.get(url, headers=headers, timeout=10)
+        res_json = response.json()
+        if "Answer" in res_json:
+            for answer in res_json["Answer"]:
+                if answer.get("type") == 1:
+                    ip = answer.get("data")
+                    print(f"Cloudflare 1.1.1.1 Resolved {domain} to {ip} 🌐")
+                    return ip
+    except Exception as e:
+        print(f"Cloudflare DoH Resolution failed: {e}")
+    return None
+
 def get_short_url(long_url):
     """ShrinkMe API के जरिए लिंक छोटा करना"""
     try:
@@ -39,20 +58,23 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Hugging Face API (Qwen 2.5 7B Super-Fast) का उपयोग करके आर्टिकल लिखना (साफ और सरल कोड)"""
+    """Hugging Face API (Qwen 2.5 7B Super-Fast) का उपयोग करके आर्टिकल लिखना"""
     if not HF_TOKEN:
         print("Error: HF_TOKEN is empty. Cannot write article.")
         return None
 
     prompt = f"Write a 800-word SEO optimized professional news article in English about: {title}. Context: {source_text}. Format requirements: 1. Use HTML tags like <h2>, <h3>, <p>, and <blockquote>. 2. Add a 'Key Highlights' section using <ul> <li>. 3. Make it human-like and engaging. 4. Include a disclaimer at the end."
     
-    # Qwen 2.5 7B - सुपर-फ़ास्ट मॉडल
     url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct"
     
-    headers = {
-        "Authorization": f"Bearer {HF_TOKEN}",
-        "Content-Type": "application/json"
-    }
+    # 1. 1.1.1.1 के ज़रिए हगिंग फेस का ताजा और असली AWS IP लाइव निकालें
+    hf_ip = resolve_dns_via_cloudflare("api-inference.huggingface.co")
+    resolve_arg = None
+    
+    if hf_ip:
+        # cURL को निर्देश दें कि वह सिस्टम DNS को बाईपास करके सीधे इस ताज़ा AWS IP पर जाए
+        resolve_arg = f"api-inference.huggingface.co:443:{hf_ip}"
+    
     payload = {
         "inputs": prompt,
         "parameters": {
@@ -61,35 +83,61 @@ def generate_ai_content(title, source_text):
         }
     }
     
-    try:
-        # बिना किसी cURL या IP बाईपास के सीधे सामान्य पायथन रिक्वेस्ट भेजना
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        res_json = response.json()
-        
-        # यदि मॉडल अभी लोड हो रहा हो
-        if isinstance(res_json, dict) and "error" in res_json and "loading" in res_json["error"].lower():
-            wait_time = res_json.get("estimated_time", 20.0)
-            print(f"Model is currently loading. Waiting for {wait_time} seconds...")
-            time.sleep(wait_time)
-            # दोबारा प्रयास करें
-            response = requests.post(url, headers=headers, json=payload, timeout=30)
-            res_json = response.json()
+    payload_str = json.dumps(payload)
+    
+    # 3 बार ऑटो-रिट्राय लूप
+    for attempt in range(3):
+        print(f"Hugging Face API Call via cURL with 1.1.1.1 Resolve - Attempt {attempt + 1}/3...")
+        try:
+            cmd = [
+                "curl", "-sS", "-X", "POST",
+                "-H", f"Authorization: Bearer {HF_TOKEN}",
+                "-H", "Content-Type: application/json"
+            ]
+            
+            # यदि 1.1.1.1 से लाइव आईपी मिल गया है, तो उसे यहाँ जोड़ें
+            if resolve_arg:
+                cmd.extend(["--resolve", resolve_arg])
+                
+            cmd.extend(["-d", payload_str, url])
+            
+            # कमांड रन करना
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            response_text = result.stdout
+            
+            if not response_text:
+                print(f"Empty response from curl. stderr: {result.stderr}")
+                continue
+                
+            res_json = json.loads(response_text)
+            
+            # यदि हडिंग फेस का मॉडल बैकग्राउंड में अभी लोड हो रहा हो
+            if isinstance(res_json, dict) and "error" in res_json and "loading" in res_json["error"].lower():
+                wait_time = res_json.get("estimated_time", 20.0)
+                print(f"Model is currently loading. Waiting for {wait_time} seconds before retrying...")
+                time.sleep(wait_time)
+                continue  # अगली कोशिश करें
 
-        # सफल रिस्पांस मिलने पर
-        if isinstance(res_json, list) and len(res_json) > 0 and 'generated_text' in res_json[0]:
-            raw_text = res_json[0]['generated_text']
-            if prompt in raw_text:
-                raw_text = raw_text.replace(prompt, "")
-            return raw_text.strip()
-        elif isinstance(res_json, dict) and 'generated_text' in res_json:
-            return res_json['generated_text'].strip()
-        else:
-            print("Hugging Face API Error Response:")
-            print(res_json)
-            return None
-    except Exception as e:
-        print(f"Hugging Face Error: {e}")
-        return None
+            # सफल रिस्पांस मिलने पर
+            if isinstance(res_json, list) and len(res_json) > 0 and 'generated_text' in res_json[0]:
+                raw_text = res_json[0]['generated_text']
+                if prompt in raw_text:
+                    raw_text = raw_text.replace(prompt, "")
+                return raw_text.strip()
+            elif isinstance(res_json, dict) and 'generated_text' in res_json:
+                return res_json['generated_text'].strip()
+            else:
+                print(f"Hugging Face response format mismatch: {res_json}")
+                
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed with error: {e}")
+        
+        if attempt < 2:
+            print("Waiting 5 seconds before next attempt...")
+            time.sleep(5)
+            
+    print("All attempts failed.")
+    return None
 
 def post_to_blogger(title, content):
     """Service Account का उपयोग करके Blogger पर पोस्ट करना"""
