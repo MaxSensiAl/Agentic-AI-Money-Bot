@@ -35,7 +35,7 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Google Gemini 1.5-Flash का उपयोग करके आर्टिकल लिखना"""
+    """Google Gemini 1.5-Flash का उपयोग करके आर्टिकल लिखना (स्मार्ट ऑथेंटिकेशन के साथ)"""
     if not GEMINI_API_KEY:
         print("Error: GEMINI_API_KEY is empty. Cannot write article.")
         return None
@@ -52,13 +52,21 @@ def generate_ai_content(title, source_text):
     5. Write in English but keep the tone global.
     """
     
-    # बिल्कुल सही और ताज़ा गूगल जेमिनी v1 एंडपॉइंट
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {'Content-Type': 'application/json'}
     payload = {
         "contents": [{"parts": [{"text": prompt}]}]
     }
     
+    # स्मार्ट ऑथेंटिकेशन जुगाड़
+    # यदि की 'AIzaSy' से शुरू होती है (Standard API Key)
+    if GEMINI_API_KEY.startswith("AIzaSy"):
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    # यदि की 'AQ.' से शुरू होती है (OAuth Access/Refresh Token)
+    else:
+        print("OAuth Token (AQ.) detected. Authenticating via Bearer Token header... 🔐")
+        url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"
+        headers["Authorization"] = f"Bearer {GEMINI_API_KEY}"
+        
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=30)
         res_json = response.json()
