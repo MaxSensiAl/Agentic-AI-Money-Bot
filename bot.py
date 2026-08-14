@@ -35,16 +35,18 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Google Service Account का उपयोग करके सीधे Gemini API को अधिकृत रूप से कॉल करना"""
+    """Google Service Account का उपयोग करके सीधे Gemini API को अधिकृत रूप से कॉल करना (मास्टर स्कोप के साथ)"""
     if not SERVICE_ACCOUNT_JSON:
         print("Error: SERVICE_ACCOUNT_JSON is empty. Cannot generate token.")
         return None
 
     try:
-        # सर्विस अकाउंट JSON से अधिकृत क्रेडेंशियल्स लोड करना
+        # सर्विस अकाउंट JSON से क्रेडेंशियल्स लोड करना
         info = json.loads(SERVICE_ACCOUNT_JSON)
+        
+        # यहाँ स्कोप को बदलकर मास्टर स्कोप 'cloud-platform' किया गया है ताकि 100% वर्किंग एक्सेस टोकन मिले
         creds = service_account.Credentials.from_service_account_info(
-            info, scopes=['https://www.googleapis.com/auth/generativelanguage']
+            info, scopes=['https://www.googleapis.com/auth/cloud-platform']
         )
         
         # गूगल ऑथ ट्रांसपोर्ट का उपयोग करके लाइव ऑथेंटिकेशन टोकन जनरेट करना
