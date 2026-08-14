@@ -35,7 +35,7 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Google Gemini 1.5-Flash का उपयोग करके आर्टिकल लिखना"""
+    """Google Gemini API (मल्टी-मॉडल बाईपास जुगाड़ के साथ)"""
     if not GEMINI_API_KEY:
         print("Error: GEMINI_API_KEY is empty. Cannot write article.")
         return None
@@ -52,27 +52,38 @@ def generate_ai_content(title, source_text):
     5. Write in English but keep the tone global.
     """
     
-    # बिल्कुल सही और ताज़ा गूगल जेमिनी v1 एंडपॉइंट
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {'Content-Type': 'application/json'}
     payload = {
         "contents": [{"parts": [{"text": prompt}]}]
     }
     
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        res_json = response.json()
+    # 4 अलग-अलग जेमिनी मॉडल्स की लिस्ट (सुरक्षा बाईपास के लिए)
+    # अगर 1.5-flash ब्लॉक होगा, तो कोड अपने आप 'gemini-pro' या 'gemini-1.0-pro' का उपयोग कर लेगा!
+    MODELS_TO_TRY = [
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-latest",
+        "gemini-pro",
+        "gemini-1.0-pro"
+    ]
+    
+    for model_name in MODELS_TO_TRY:
+        print(f"Trying Google Gemini Model: {model_name}...")
+        url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
         
-        # सफल रिस्पांस मिलने पर
-        if 'candidates' in res_json:
-            return res_json['candidates'][0]['content']['parts'][0]['text']
-        else:
-            print("Gemini API Error Response:")
-            print(json.dumps(res_json, indent=2))
-            return None
-    except Exception as e:
-        print(f"Gemini Error: {e}")
-        return None
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            res_json = response.json()
+            
+            if 'candidates' in res_json:
+                print(f"Success! Article generated using Model: {model_name} 🎉")
+                return res_json['candidates'][0]['content']['parts'][0]['text']
+            else:
+                print(f"Model {model_name} failed: {res_json.get('error', {}).get('message', 'Unknown Error')}")
+        except Exception as e:
+            print(f"Model {model_name} failed with exception: {e}")
+            
+    print("All Google Gemini models failed to generate content.")
+    return None
 
 def post_to_blogger(title, content):
     """Service Account का उपयोग करके Blogger पर पोस्ट करना"""
