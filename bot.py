@@ -9,15 +9,15 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 # --- DNS INTERCEPTOR JUGAAD (पायथन के नेटवर्क सॉकेट को ओवरराइड करना) ---
-# इससे गिटहब के टूटे हुए DNS सर्वर की ज़रूरत नहीं पड़ेगी और SSL सर्टिफिकेट एरर भी नहीं आएगा
+# यहाँ हगिंग फेस के असली और मुख्य IP (104.18.23.19) का उपयोग किया गया है
 try:
     original_getaddrinfo = socket.getaddrinfo
     def custom_getaddrinfo(*args):
         host = args[0]
         # यदि हगिंग फेस की एपीआई को कॉल किया जा रहा है
         if host == "api-inference.huggingface.co":
-            # सीधे क्लाउडफ्लेयर का एक्टिव IP वापस करें
-            return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('172.67.138.83', args[1]))]
+            # हगिंग फेस का असली और मुख्य क्लाउडफ्लेयर IP
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('104.18.23.19', args[1]))]
         return original_getaddrinfo(*args)
     socket.getaddrinfo = custom_getaddrinfo
     print("DNS Resolver patched successfully! 🛠️")
@@ -63,7 +63,7 @@ def generate_ai_content(title, source_text):
 
     prompt = f"Write a 800-word SEO optimized professional news article in English about: {title}. Context: {source_text}. Format requirements: 1. Use HTML tags like <h2>, <h3>, <p>, and <blockquote>. 2. Add a 'Key Highlights' section using <ul> <li>. 3. Make it human-like and engaging. 4. Include a disclaimer at the end."
     
-    # सामान्य URL (हमारा DNS इंटरसेप्टर इसे अपने आप IP से कनेक्ट कर देगा)
+    # सामान्य URL (हमारा DNS इंटरसेप्टर इसे अपने आप सही IP से कनेक्ट कर देगा)
     url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct"
     
     headers = {
@@ -163,7 +163,7 @@ def main():
             response = requests.get(feed_url, headers=headers, timeout=15)
             
             if response.status_code == 200:
-                feed = feedparser.parse(response.content)
+                feed = parser = feedparser.parse(response.content)
                 if feed.entries:
                     entry = random.choice(feed.entries)
                     selected_feed_url = feed_url
