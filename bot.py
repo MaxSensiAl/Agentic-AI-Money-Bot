@@ -40,16 +40,17 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Hugging Face API (Qwen 2.5 72B) का उपयोग करके आर्टिकल लिखना (AWS IP बाईपास के साथ)"""
+    """Hugging Face API (Qwen 2.5 7B Super-Fast) का उपयोग करके आर्टिकल लिखना"""
     if not HF_TOKEN:
         print("Error: HF_TOKEN is empty. Cannot write article.")
         return None
 
     prompt = f"Write a 800-word SEO optimized professional news article in English about: {title}. Context: {source_text}. Format requirements: 1. Use HTML tags like <h2>, <h3>, <p>, and <blockquote>. 2. Add a 'Key Highlights' section using <ul> <li>. 3. Make it human-like and engaging. 4. Include a disclaimer at the end."
     
-    url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct"
+    # यहाँ मॉडल का नाम बदलकर Qwen2.5-7B-Instruct (सुपर फ़ास्ट) किया गया है
+    url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct"
     
-    # हगिंग फेस के असली और मुख्य अमेज़न (AWS) सर्वर का लाइव IP एड्रेस
+    # अमेज़न AWS सर्वर का लाइव और स्थिर IP एड्रेस
     resolve_arg = "api-inference.huggingface.co:443:54.85.123.45"
     
     payload = {
@@ -66,7 +67,7 @@ def generate_ai_content(title, source_text):
     for attempt in range(3):
         print(f"Hugging Face API Call via cURL with AWS Resolve - Attempt {attempt + 1}/3...")
         try:
-            # cURL को सीधे अमेज़न AWS सर्वर के IP (54.85.123.45) पर भेजने का निर्देश
+            # cURL को सीधे अमेज़न AWS सर्वर के IP पर भेजने का निर्देश
             cmd = [
                 "curl", "-sS", "-X", "POST",
                 "-H", f"Authorization: Bearer {HF_TOKEN}",
@@ -77,7 +78,7 @@ def generate_ai_content(title, source_text):
             ]
             
             # कमांड रन करना
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=50)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             response_text = result.stdout
             
             if not response_text:
