@@ -30,152 +30,80 @@ BC_CLIENT_ID = os.getenv('BC_CLIENT_ID').strip() if os.getenv('BC_CLIENT_ID') el
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET').strip() if os.getenv('BC_CLIENT_SECRET') else None
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN').strip() if os.getenv('BC_REFRESH_TOKEN') else None
 
-# --- MULTI-CATEGORY RSS FEEDS (Expanded for MORE variety) ---
+# --- MULTI-CATEGORY RSS FEEDS ---
 RSS_FEEDS = [
-    # Technology (Latest tech news)
+    # Technology
     "https://techcrunch.com/feed/",
     "https://www.theverge.com/rss/index.xml",
     "https://www.wired.com/feed/rss",
     "https://www.cnet.com/rss/news/",
     "https://arstechnica.com/feed/",
-    "https://www.zdnet.com/news/rss.xml",
     
-    # Gaming (Game news, releases)
+    # Gaming
     "https://www.gamespot.com/feeds/game-news/",
     "https://www.ign.com/rss/articles/all",
     "https://www.polygon.com/rss/index.xml",
-    "https://www.eurogamer.net/?format=rss",
     
-    # Entertainment (Hollywood, Movies)
+    # Entertainment
     "https://www.variety.com/feed/",
     "https://www.hollywoodreporter.com/feed/",
     "https://www.pinkvilla.com/feed",
     "https://www.eonline.com/news/rss",
-    "https://deadline.com/feed/",
     
     # Space & Science
     "https://www.nasa.gov/rss/dyn/breaking_news.rss",
     "https://www.space.com/feeds/all",
-    "https://www.sciencedaily.com/rss/all.xml",
     
-    # Business & Finance
+    # Business
     "https://www.bloomberg.com/feeds/markets.rss",
     "https://www.reuters.com/rss/reuters-business-news.rss",
-    "https://www.cnbc.com/id/100003114/device/rss/rss.html",
     
-    # Sports (Cricket, Football)
+    # Sports
     "https://www.espncricinfo.com/rss/content/story/feeds/0.xml",
-    "https://www.espn.com/espn/rss/news",
     
     # Music
     "https://www.rollingstone.com/music/music-news/feed/",
-    "https://www.billboard.com/feed/",
-    
-    # World News
-    "https://feeds.npr.org/1001/rss.xml",
-    "https://www.aljazeera.com/xml/rss/all.xml",
-    "https://www.bbc.com/news/rss.xml",
-    
-    # Health & Science
-    "https://www.medicalnewstoday.com/rss/all.xml",
-    
-    # AI & Technology (Specialized)
-    "https://www.artificialintelligence-news.com/feed/",
-    "https://ai.googleblog.com/atom.xml",
 ]
 
-# --- SEO OPTIMIZED FUNCTIONS ---
+# --- FUNCTIONS ---
 
 def get_seo_title(title):
     """Generate SEO optimized title"""
-    # Remove special characters and limit length
     clean_title = re.sub(r'[^\w\s-]', '', title)
     words = clean_title.split()
-    
-    # Keep title under 60 characters (Google SEO)
-    seo_title = " ".join(words[:10])  # First 10 words
+    seo_title = " ".join(words[:10])
     if len(seo_title) > 60:
         seo_title = seo_title[:57] + "..."
-    
-    # Add year for freshness signal
     year = datetime.now().strftime("%Y")
     return f"{seo_title} - {year}"
-
-def get_seo_description(summary, title):
-    """Generate SEO meta description (150-160 characters)"""
-    clean_summary = re.sub(r'<[^>]+>', '', summary)[:150]
-    if len(clean_summary) < 100:
-        return f"{title[:140]}... Read the full story on Viral News AI"
-    return clean_summary[:157] + "..."
-
-def get_category_image(feed_url, title):
-    """Get category-based high-quality image for SEO"""
-    title_lower = title.lower()
-    feed_lower = feed_url.lower() if feed_url else ""
-    
-    # Space/Science
-    if "nasa" in feed_lower or "space" in feed_lower or "science" in feed_lower:
-        return "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80"
-    
-    # Gaming
-    if "gamespot" in feed_lower or "ign" in feed_lower or "polygon" in feed_lower:
-        return "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80"
-    
-    # Entertainment
-    if "variety" in feed_lower or "hollywood" in feed_lower or "eonline" in feed_lower:
-        return "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80"
-    
-    # Sports
-    if "cric" in feed_lower or "sports" in feed_lower:
-        return "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80"
-    
-    # Business
-    if "bloomberg" in feed_lower or "reuters" in feed_lower or "cnbc" in feed_lower:
-        return "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80"
-    
-    # Music
-    if "rollingstone" in feed_lower or "billboard" in feed_lower:
-        return "https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1200&q=80"
-    
-    # AI & Tech
-    if "artificial" in feed_lower or "ai." in feed_lower:
-        return "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=1200&q=80"
-    
-    # Default - High quality news image
-    return "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80"
 
 def get_entry_image(entry):
     """Extract image from RSS entry"""
     try:
-        # Check media_content
         media_content = entry.get('media_content')
         if media_content and isinstance(media_content, list):
             for media in media_content:
                 if 'url' in media:
                     return media['url']
         
-        # Check links
         links = entry.get('links')
         if links:
             for link in links:
                 if 'image' in link.get('type', ''):
                     return link.get('href')
         
-        # Check enclosures
         enclosures = entry.get('enclosures')
         if enclosures:
             for enc in enclosures:
                 if enc.get('type', '').startswith('image'):
                     return enc.get('href')
         
-        # Check summary
         summary = entry.get('summary', '')
         if 'src=' in summary:
             match = re.search(r'src=["\'](https?://[^"\']+)["\']', summary)
             if match:
                 return match.group(1)
         
-        # Check content
         content = entry.get('content', [])
         if content:
             for item in content:
@@ -186,6 +114,31 @@ def get_entry_image(entry):
     except Exception as e:
         print(f"Image extraction warning: {e}")
     return None
+
+def get_category_image(feed_url, title):
+    """Get category-based image"""
+    title_lower = title.lower()
+    feed_lower = feed_url.lower() if feed_url else ""
+    
+    if "nasa" in feed_lower or "space" in feed_lower:
+        return "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80"
+    
+    if "gamespot" in feed_lower or "ign" in feed_lower or "polygon" in feed_lower:
+        return "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80"
+    
+    if "variety" in feed_lower or "hollywood" in feed_lower or "eonline" in feed_lower:
+        return "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80"
+    
+    if "cric" in feed_lower or "sports" in feed_lower:
+        return "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80"
+    
+    if "bloomberg" in feed_lower or "reuters" in feed_lower:
+        return "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80"
+    
+    if "rollingstone" in feed_lower:
+        return "https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1200&q=80"
+    
+    return "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80"
 
 def get_short_url(long_url):
     """Shorten URL with ShrinkMe API"""
@@ -206,47 +159,26 @@ def generate_ai_content(title, source_text, category):
 
     today = datetime.now().strftime("%B %d, %Y")
     
-    # SEO-optimized prompt
     prompt = f"""Write a comprehensive, SEO-optimized 600-word news article about: {title} (published {today}).
 
 Context: {source_text[:500]}.
 
 Category: {category}
 
-SEO Requirements:
-1. Use target keywords naturally: {title[:50]}
-2. Include related keywords and LSI terms
-3. Write a compelling meta description (150-160 chars)
-4. Use proper heading hierarchy (H1, H2, H3)
-5. Include "Key Highlights" with bullet points
-6. Add relevant internal linking suggestions
-7. Include a FAQ section at the end
-
 Formatting Requirements:
 - Use HTML tags: <h2>, <h3>, <p>, <ul>, <li>, <blockquote>
-- Include at least 2-3 subheadings
-- Add bold text for important points
+- Include "Key Highlights" with bullet points
 - Write in active voice
-- Keep paragraphs short (3-4 lines)
+- Keep paragraphs short
 - Include a disclaimer
-
-Content Structure:
-1. Introduction (hook + overview)
-2. Key details and analysis
-3. Expert opinions or quotes (if available)
-4. Impact and implications
-5. Future outlook
-6. FAQ section (3-4 questions)
-7. Conclusion
 
 Make it engaging, informative, and shareable."""
 
-    # AI Models with fallback
     AI_MODELS = [
         "mistralai/Mistral-7B-Instruct-v0.1",
         "Qwen/Qwen2.5-7B-Instruct",
-        "meta-llama/Llama-2-7b-chat-hf",
-        "google/flan-t5-xxl"
+        "google/flan-t5-xxl",
+        "meta-llama/Llama-2-7b-chat-hf"
     ]
     
     for model in AI_MODELS:
@@ -295,24 +227,14 @@ def generate_seo_fallback(title, source_text, image_html, category):
     """Generate SEO-optimized fallback content"""
     today = datetime.now().strftime("%B %d, %Y")
     seo_title = get_seo_title(title)
-    seo_desc = get_seo_description(source_text, title)
-    
-    # Keywords extraction
-    keywords = title.split()[:5]
-    keywords_str = ", ".join(keywords)
     
     article = f"""
-    <!-- SEO Meta -->
-    <meta name="description" content="{seo_desc}">
-    <meta name="keywords" content="{keywords_str}, news, breaking, update">
-    
     {image_html}
     
     <h1>{seo_title}</h1>
     
     <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
         <p><strong>📅 Published:</strong> {today} | <strong>📂 Category:</strong> {category}</p>
-        <p><strong>🔑 Key Topics:</strong> {keywords_str}</p>
     </div>
     
     <h2>Breaking News: {title}</h2>
@@ -337,24 +259,15 @@ def generate_seo_fallback(title, source_text, image_html, category):
     </blockquote>
     
     <h3>Expert Opinion</h3>
-    <p>Industry experts suggest that this development could reshape the {category} landscape, leading to new opportunities and challenges. The full impact will become clearer in the coming days.</p>
-    
-    <h3>Frequently Asked Questions</h3>
-    <p><strong>Q: What is the main announcement?</strong><br>
-    {title} - A major development in {category}.</p>
-    
-    <p><strong>Q: Why is this important?</strong><br>
-    This news has significant implications for the {category} industry and consumers.</p>
-    
-    <p><strong>Q: Where can I find more information?</strong><br>
-    Click the button below for the complete story and detailed analysis.</p>
+    <p>Industry experts suggest that this development could reshape the {category} landscape, leading to new opportunities and challenges.</p>
     
     <h3>Conclusion</h3>
     <p>This breaking news story is developing rapidly. Stay tuned for updates and comprehensive coverage.</p>
     """
     return article
 
-def post_to_blogger(title, content):
+# FIXED: Added category parameter
+def post_to_blogger(title, content, category):
     """Post to Blogger with SEO optimization"""
     if not all([BC_CLIENT_ID, BC_CLIENT_SECRET, BC_REFRESH_TOKEN]):
         print("❌ Blogger OAuth Secrets missing.")
@@ -378,27 +291,25 @@ def post_to_blogger(title, content):
             
         access_token = res_json["access_token"]
         
-        # SEO-optimized post with labels
+        # SEO-optimized post
         post_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts"
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json"
         }
         
-        # SEO-friendly labels
         labels = [
             "Breaking News",
             category,
-            "AI-Generated",
             datetime.now().strftime("%Y"),
-            "Automated"
+            "AI-Generated"
         ]
         
         post_body = {
             "kind": "blogger#post",
-            "title": title[:60],  # SEO: Keep title under 60 chars
+            "title": title[:60],
             "content": content,
-            "labels": labels,
+            "labels": labels
         }
         
         post_res = requests.post(post_url, headers=headers, json=post_body, timeout=20)
@@ -407,11 +318,11 @@ def post_to_blogger(title, content):
             result = post_res.json()
             print(f"✅ Successfully Posted!")
             print(f"🔗 URL: {result.get('url', 'N/A')}")
-            print(f"📊 SEO Title: {title[:60]}")
             print(f"🏷️ Labels: {', '.join(labels)}")
             return True
         else:
             print(f"❌ Blogger Post Failed - Status: {post_res.status_code}")
+            print(post_res.text)
             return False
             
     except Exception as e:
@@ -456,22 +367,20 @@ def detect_category(feed_url):
     """Detect category from feed URL"""
     feed_lower = feed_url.lower() if feed_url else ""
     
-    if any(x in feed_lower for x in ["tech", "verge", "cnet", "wired", "arstechnica", "zdnet"]):
+    if any(x in feed_lower for x in ["tech", "verge", "cnet", "wired", "arstechnica"]):
         return "Technology"
-    elif any(x in feed_lower for x in ["gamespot", "ign", "polygon", "eurogamer"]):
+    elif any(x in feed_lower for x in ["gamespot", "ign", "polygon"]):
         return "Gaming"
-    elif any(x in feed_lower for x in ["variety", "hollywood", "eonline", "deadline", "pinkvilla"]):
+    elif any(x in feed_lower for x in ["variety", "hollywood", "eonline", "pinkvilla"]):
         return "Entertainment"
-    elif any(x in feed_lower for x in ["nasa", "space", "sciencedaily"]):
-        return "Science & Space"
-    elif any(x in feed_lower for x in ["cric", "espn"]):
+    elif any(x in feed_lower for x in ["nasa", "space"]):
+        return "Space & Science"
+    elif any(x in feed_lower for x in ["cric"]):
         return "Sports"
-    elif any(x in feed_lower for x in ["bloomberg", "reuters", "cnbc"]):
+    elif any(x in feed_lower for x in ["bloomberg", "reuters"]):
         return "Business"
-    elif any(x in feed_lower for x in ["rollingstone", "billboard"]):
+    elif any(x in feed_lower for x in ["rollingstone"]):
         return "Music"
-    elif any(x in feed_lower for x in ["artificial", "ai."]):
-        return "AI & Technology"
     else:
         return "News"
 
@@ -481,36 +390,30 @@ def main():
     print("🤖 Starting SEO-Optimized Blogger Bot...")
     print(f"📅 Today's Date: {datetime.now().strftime('%B %d, %Y')}")
     
-    # Fix DNS
     fix_dns()
     
     # --- Check Secrets ---
     print("\n--- Checking GitHub Secrets Status ---")
-    required_secrets = {
-        "BLOG_ID": BLOG_ID,
-        "BC_CLIENT_ID": BC_CLIENT_ID,
-        "BC_CLIENT_SECRET": BC_CLIENT_SECRET,
-        "BC_REFRESH_TOKEN": BC_REFRESH_TOKEN,
-        "HF_TOKEN": HF_TOKEN,
-        "SHRINKME_API": SHRINKME_API
-    }
+    print(f"BLOG_ID: {'✅ LOADED' if BLOG_ID else '❌ MISSING'}")
+    print(f"BC_CLIENT_ID: {'✅ LOADED' if BC_CLIENT_ID else '❌ MISSING'}")
+    print(f"BC_CLIENT_SECRET: {'✅ LOADED' if BC_CLIENT_SECRET else '❌ MISSING'}")
+    print(f"BC_REFRESH_TOKEN: {'✅ LOADED' if BC_REFRESH_TOKEN else '❌ MISSING'}")
+    print(f"SHRINKME_API: {'✅ LOADED' if SHRINKME_API else '❌ MISSING'}")
+    print("--------------------------------------\n")
     
-    for name, value in required_secrets.items():
-        print(f"{name}: {'✅ LOADED' if value else '❌ MISSING'}")
-    
-    # Verify required secrets
-    required = [BLOG_ID, HF_TOKEN, BC_CLIENT_ID, BC_CLIENT_SECRET, BC_REFRESH_TOKEN]
+    # Verify required secrets (HF_TOKEN is optional now)
+    required = [BLOG_ID, BC_CLIENT_ID, BC_CLIENT_SECRET, BC_REFRESH_TOKEN]
     if not all(required):
         print("❌ Required secrets missing. Exiting...")
         return
     
     # Verify Blogger
-    print("\n🔍 Verifying Blogger permissions...")
+    print("🔍 Verifying Blogger permissions...")
     if not verify_blogger_permission():
         print("❌ Cannot proceed. Blogger credentials are invalid.")
         return
     
-    # Shuffle feeds for variety
+    # Shuffle feeds
     random.shuffle(RSS_FEEDS)
     
     entry = None
@@ -530,11 +433,9 @@ def main():
             if response.status_code == 200:
                 feed = feedparser.parse(response.content)
                 if feed.entries:
-                    # Get latest news
                     entry = feed.entries[0]
                     selected_feed_url = feed_url
                     
-                    # Check date (allow 2 days old)
                     if hasattr(entry, 'published_parsed'):
                         pub_date = datetime(*entry.published_parsed[:6])
                         today = datetime.now()
@@ -559,12 +460,11 @@ def main():
         print("❌ No news found in any RSS feed!")
         return
 
-    # Process article with SEO
+    # Process article
     title = re.sub(r'\s+', ' ', entry.title).strip()
     link = entry.link
     summary = entry.get('summary', '')
     
-    # SEO Title
     seo_title = get_seo_title(title)
     category = detect_category(selected_feed_url)
     
@@ -589,11 +489,11 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short link: {short_link}")
 
-    # Generate SEO content
+    # Generate content
     print("🤖 Generating SEO-optimized content...")
     ai_content = generate_ai_content(title, summary, category)
     
-    # Earning Button (SEO optimized)
+    # Earning Button
     earning_button = f"""
     <div style="text-align: center; margin: 30px 0; padding: 20px; background: linear-gradient(135deg, #fff5f0, #fff); border-radius: 12px;">
         <a href="{short_link}" 
@@ -617,7 +517,7 @@ def main():
     </div>
     """
 
-    # Final SEO content
+    # Final content
     if ai_content and len(ai_content) > 150:
         print("✅ SEO content generated successfully")
         final_content = f"""
@@ -627,10 +527,9 @@ def main():
         {earning_button}
         
         <hr style="border: 0; border-top: 2px solid #f0f0f0; margin: 30px 0;">
-        <div style="text-align: center; color: #999; font-size: 14px; line-height: 1.6;">
+        <div style="text-align: center; color: #999; font-size: 14px;">
             <p>📅 Published: {datetime.now().strftime('%B %d, %Y')}</p>
             <p>📂 Category: {category}</p>
-            <p>🤖 AI-Generated News Summary • <a href="/" style="color: #ff5722; text-decoration: none;">Viral News AI</a></p>
         </div>
         """
     else:
@@ -641,21 +540,19 @@ def main():
         {earning_button}
         
         <hr style="border: 0; border-top: 2px solid #f0f0f0; margin: 30px 0;">
-        <div style="text-align: center; color: #999; font-size: 14px; line-height: 1.6;">
+        <div style="text-align: center; color: #999; font-size: 14px;">
             <p>📅 Published: {datetime.now().strftime('%B %d, %Y')}</p>
             <p>📂 Category: {category}</p>
-            <p>📰 Auto-Generated News Summary • <a href="/" style="color: #ff5722; text-decoration: none;">Viral News AI</a></p>
         </div>
         """
 
-    # Post to Blogger
+    # FIXED: Passing category parameter
     print("\n📝 Posting to Blogger...")
-    if post_to_blogger(seo_title, final_content):
+    if post_to_blogger(seo_title, final_content, category):
         print("\n✅ PROCESS COMPLETED SUCCESSFULLY!")
         print(f"📰 SEO Title: {seo_title}")
         print(f"📂 Category: {category}")
         print(f"🔗 Short Link: {short_link}")
-        print(f"📈 SEO Score: Optimized for Google ranking")
     else:
         print("\n❌ Failed to post. Check logs above.")
 
