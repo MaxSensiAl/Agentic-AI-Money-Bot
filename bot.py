@@ -56,12 +56,12 @@ UNSPLASH_IMAGES = {
 POSTED_FILE = 'posted_news.txt'
 
 def clean_and_format_title(title):
-    """Clean title - keep year, remove duplicates"""
+    """Clean title - remove extra text"""
     if not title:
         return ""
     clean = re.sub(r'\s+', ' ', title).strip()
-    # Remove duplicate year patterns
-    clean = re.sub(r'202[0-9]\s*[-|]\s*202[0-9]', '2026', clean)
+    # Remove duplicate year
+    clean = re.sub(r'202[0-9]\s*[-|]\s*202[0-9]', '', clean)
     clean = re.sub(r'\s*[-|]\s*$', '', clean)
     return clean[:70].strip()
 
@@ -69,7 +69,7 @@ def load_posted_news():
     try:
         if os.path.exists(POSTED_FILE):
             with open(POSTED_FILE, 'r', encoding='utf-8') as f:
-                return set(clean_and_format_title(line.strip()).lower() for line in f if line.strip())
+                return set(line.strip().lower() for line in f if line.strip())
     except:
         pass
     return set()
@@ -131,22 +131,20 @@ def get_all_blogger_titles(access_token):
         return existing_titles
 
 def is_duplicate_title(new_title, existing_titles):
-    """Smart duplicate - 80% similarity"""
+    """STRICT duplicate detection"""
     new_clean = clean_and_format_title(new_title).lower().strip()
-    new_words = set(new_clean.split())
     
-    for existing in existing_titles:
-        if existing == new_clean:
-            return True
-        
-        existing_words = set(existing.split())
-        if len(new_words) > 4 and len(existing_words) > 4:
-            common = new_words.intersection(existing_words)
-            if len(common) / len(new_words) > 0.8:
+    # Exact match
+    if new_clean in existing_titles:
+        return True
+    
+    # First 25 chars match
+    if len(new_clean) > 25:
+        for existing in existing_titles:
+            if new_clean[:25] in existing:
                 return True
-        
-        if len(new_clean) > 30 and new_clean[:30] in existing:
-            return True
+            if existing[:25] in new_clean:
+                return True
     
     return False
 
@@ -244,22 +242,38 @@ def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
     
+    # Entertainment (Movies, Hollywood)
+    if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla", "eonline"]):
+        return "Entertainment"
+    if any(x in title_lower for x in ["spider-man", "movie", "film", "hollywood", "box office", "marvel", "dc"]):
+        return "Entertainment"
+    
+    # Space
     if "space" in feed_lower or "nasa" in feed_lower:
         if "fusion" in title_lower:
             return "Technology"
         return "Space"
+    
+    # Technology
     if any(x in feed_lower for x in ["tech", "verge", "cnet"]):
         return "Technology"
+    
+    # Gaming
     if any(x in feed_lower for x in ["gamespot", "ign"]):
         return "Gaming"
-    if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla"]):
-        return "Entertainment"
+    
+    # Music
     if any(x in feed_lower for x in ["rollingstone"]):
         return "Music"
+    
+    # Sports
     if "cric" in feed_lower:
         return "Sports"
+    
+    # Business
     if any(x in feed_lower for x in ["bloomberg", "reuters"]):
         return "Business"
+    
     return "News"
 
 def generate_long_content(title, full_content, category):
@@ -291,9 +305,6 @@ Use HTML tags: <h2>, <h3>, <p>, <ul>, <li>"""
                             text = text.replace(prompt, '').strip()
                         if len(text) > 500:
                             return text
-            except requests.exceptions.Timeout:
-                print(f"⏰ Timeout, trying next...")
-                continue
             except:
                 continue
     
@@ -328,6 +339,7 @@ def post_to_blogger(access_token, title, content, category):
 
 def main():
     print("🤖 Starting Blogger Bot...")
+    print(f"📅 {datetime.now().strftime('%B %d, %Y')}")
     fix_dns()
     
     access_token = get_blogger_access_token()
@@ -335,6 +347,7 @@ def main():
         print("❌ Invalid token.")
         return
     
+    # Load ALL existing titles
     existing_titles = get_all_blogger_titles(access_token)
     local_posted = load_posted_news()
     all_posted = existing_titles.union(local_posted)
@@ -363,6 +376,7 @@ def main():
                         if pub_date.date() < datetime.now().date() - timedelta(days=2):
                             continue
                     
+                    # ⭐ DUPLICATE CHECK
                     if is_duplicate_title(temp_title, all_posted):
                         print(f"⏭️ SKIP: {temp_title[:40]}...")
                         continue
@@ -412,7 +426,9 @@ def main():
     print(f"\n📝 Posting: {title}")
     if post_to_blogger(access_token, title, final_content, category):
         save_posted_news(title)
-        print("✅ SUCCESS!")
+        print("\n✅ SUCCESS!")
+        print(f"📰 {title}")
+        print(f"📂 {category}")
         print(f"🔗 {short_link}")
     else:
         print("❌ Failed!")
