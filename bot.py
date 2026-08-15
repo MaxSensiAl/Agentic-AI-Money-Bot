@@ -7,7 +7,6 @@ import feedparser
 import re
 from datetime import datetime, timedelta
 import socket
-import base64
 
 # --- DNS FIX ---
 def fix_dns():
@@ -41,6 +40,40 @@ RSS_FEEDS = [
     "https://www.espncricinfo.com/rss/content/story/feeds/0.xml",
     "https://www.rollingstone.com/music/music-news/feed/",
 ]
+
+# --- POSTED NEWS TRACKING ---
+POSTED_FILE = 'posted_news.txt'
+
+def load_posted_news():
+    """पहले से पोस्ट की गई news load करो"""
+    try:
+        if os.path.exists(POSTED_FILE):
+            with open(POSTED_FILE, 'r', encoding='utf-8') as f:
+                return set(line.strip() for line in f if line.strip())
+    except:
+        pass
+    return set()
+
+def save_posted_news(title):
+    """नई news save करो"""
+    try:
+        with open(POSTED_FILE, 'a', encoding='utf-8') as f:
+            f.write(title + '\n')
+    except:
+        pass
+
+def is_already_posted(title):
+    """Check करो ये news पहले post हुई है या नहीं"""
+    posted = load_posted_news()
+    # Clean title for comparison
+    clean_title = title.lower().strip()
+    for p in posted:
+        if p.lower().strip() == clean_title:
+            return True
+        # Partial match (50% similar)
+        if len(clean_title) > 20 and clean_title[:20] in p.lower():
+            return True
+    return False
 
 # --- IMAGE SOURCES ---
 UNSPLASH_IMAGES = {
@@ -102,50 +135,27 @@ def get_entry_image(entry):
     return None
 
 def generate_ai_image(prompt, category):
-    """Generate HD image using AI (Pollinations.ai - Free, No API Key)"""
+    """Generate HD image using AI (Pollinations.ai - Free)"""
     try:
         print("🎨 Generating AI image...")
-        
-        # Clean prompt
-        clean_prompt = prompt.replace('"', '').replace("'", '')
-        clean_prompt = clean_prompt[:100]  # Limit length
-        
-        # Pollinations.ai - Free AI image generation
-        # It generates HD images without any API key
+        clean_prompt = prompt.replace('"', '').replace("'", '')[:100]
         url = f"https://image.pollinations.ai/prompt/{clean_prompt.replace(' ', '%20')}"
-        
-        # Add quality parameters
         url += "?width=1200&height=600&nologo=true"
         
-        print(f"🎨 AI Image URL: {url}")
-        
-        # Download the image
         response = requests.get(url, timeout=30)
         if response.status_code == 200:
-            # Upload to imgbb or use directly
-            # For now, we'll use the URL directly
             return url
-        else:
-            print(f"❌ AI Image generation failed: {response.status_code}")
-            return None
-            
-    except Exception as e:
-        print(f"❌ AI Image error: {e}")
-        return None
+    except:
+        pass
+    return None
 
 def search_unsplash_image(query, category):
     """Search HD image from Unsplash"""
     try:
         print("🔍 Searching Unsplash...")
-        
-        # Clean query
-        clean_query = query.replace('"', '').replace("'", '')
-        clean_query = clean_query[:50]
-        
-        # Unsplash free API (no key needed for basic search)
+        clean_query = query.replace('"', '').replace("'", '')[:50]
         url = f"https://api.unsplash.com/photos/random?query={clean_query}&orientation=landscape"
         
-        # Try with public access (no key)
         try:
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
@@ -154,49 +164,16 @@ def search_unsplash_image(query, category):
                     return data['urls']['regular']
         except:
             pass
-        
-        # Fallback: Category based image
-        if category in UNSPLASH_IMAGES:
-            return UNSPLASH_IMAGES[category]
-        
-        return None
-    except Exception as e:
-        print(f"❌ Unsplash error: {e}")
-        return None
+    except:
+        pass
+    return None
 
-def search_pexels_image(query, category):
-    """Search HD image from Pexels"""
-    try:
-        print("🔍 Searching Pexels...")
-        
-        # Pexels free API (public access)
-        url = f"https://api.pexels.com/v1/search?query={query}&per_page=1"
-        
-        # Try with public access
-        try:
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('photos') and len(data['photos']) > 0:
-                    return data['photos'][0]['src']['large']
-        except:
-            pass
-        
-        # Fallback: Category based image
-        if category in UNSPLASH_IMAGES:
-            return UNSPLASH_IMAGES[category]
-        
-        return None
-    except Exception as e:
-        print(f"❌ Pexels error: {e}")
-        return None
-
-def get_high_quality_image(title, category, feed_url):
-    """Get HD image - Multiple sources"""
-    print("📸 Looking for HD image...")
+def get_hd_image_strict(entry, title, category):
+    """Strict image check - Returns ONLY if image found"""
+    print("📸 Checking for HD image (STRICT MODE)...")
     
-    # 1️⃣ Try RSS feed first
-    image = get_entry_image(entry)  # This will be called from main
+    # 1️⃣ Try RSS image
+    image = get_entry_image(entry)
     if image:
         print("✅ RSS image found!")
         return image
@@ -207,25 +184,19 @@ def get_high_quality_image(title, category, feed_url):
         print("✅ Unsplash HD image found!")
         return image
     
-    # 3️⃣ Try Pexels
-    image = search_pexels_image(title, category)
-    if image:
-        print("✅ Pexels HD image found!")
-        return image
-    
-    # 4️⃣ Generate AI Image
+    # 3️⃣ Try AI Generation
     print("🎨 Trying AI image generation...")
     image = generate_ai_image(title, category)
     if image:
         print("✅ AI HD image generated!")
         return image
     
-    # 5️⃣ Final Fallback: Category image
+    # 4️⃣ Category fallback
     if category in UNSPLASH_IMAGES:
-        print("✅ Fallback category image used")
+        print("✅ Category fallback image used")
         return UNSPLASH_IMAGES[category]
     
-    # 6️⃣ Ultimate fallback
+    # 5️⃣ Ultimate fallback
     print("✅ Ultimate fallback image used")
     return "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80"
 
@@ -243,7 +214,6 @@ def get_short_url(long_url):
 def detect_category(feed_url, title):
     """Detect category"""
     feed_lower = feed_url.lower()
-    title_lower = title.lower()
     
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
@@ -300,7 +270,7 @@ Add a disclaimer at the end."""
         except:
             print("AI failed, using fallback")
     
-    # Fallback 1000+ words content
+    # Fallback content
     today = datetime.now().strftime("%B %d, %Y")
     
     highlights = [
@@ -334,16 +304,16 @@ Add a disclaimer at the end."""
 <p>इस खबर के कई पहलू हैं। विशेषज्ञों के अनुसार, यह एक महत्वपूर्ण मोड़ है। इसके आगे क्या प्रभाव होंगे, यह देखना दिलचस्प होगा।</p>
 
 <h3>💬 Expert Opinions - विशेषज्ञों की राय</h3>
-<p>उद्योग विशेषज्ञों का कहना है कि यह विकास {category} के लिए गेम-चेंजर साबित हो सकता है। कुछ का मानना है कि इससे नई संभावनाएं खुलेंगी।</p>
+<p>उद्योग विशेषज्ञों का कहना है कि यह विकास {category} के लिए गेम-चेंजर साबित हो सकता है।</p>
 
 <h3>🌍 Impact & Implications - प्रभाव और परिणाम</h3>
-<p>इस खबर का असर वैश्विक स्तर पर देखा जा रहा है। कंपनियां अपनी रणनीतियां बदल रही हैं। कंज्यूमर भी इस पर अपनी प्रतिक्रिया दे रहे हैं।</p>
+<p>इस खबर का असर वैश्विक स्तर पर देखा जा रहा है।</p>
 
 <h3>🔮 What's Next - आगे क्या?</h3>
-<p>अगले कुछ दिनों में और अपडेट आने की उम्मीद है। इस खबर पर नजर बनाए रखें। नीचे दिए गए बटन पर क्लिक करें पूरी जानकारी के लिए।</p>
+<p>अगले कुछ दिनों में और अपडेट आने की उम्मीद है।</p>
 
 <h3>✅ Conclusion - निष्कर्ष</h3>
-<p>यह एक डेवलपिंग स्टोरी है। आने वाले समय में और जानकारी सामने आएगी। तब तक के लिए, यह सबसे बड़ी खबर है जो {category} जगत को हिला रही है।</p>
+<p>यह एक डेवलपिंग स्टोरी है।</p>
 
 <p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
 """
@@ -420,8 +390,6 @@ def verify_blogger():
 # --- MAIN ---
 
 def main():
-    global entry  # To access in get_high_quality_image
-    
     print("🤖 Starting Long-Content Blogger Bot...")
     print(f"📅 {datetime.now().strftime('%B %d, %Y')}")
     
@@ -447,13 +415,17 @@ def main():
         print("❌ Blogger verification failed!")
         return
     
-    # Find news with image
-    print("\n🔍 Searching for news WITH IMAGE...")
+    # Load already posted news
+    posted_news = load_posted_news()
+    print(f"\n📊 Already posted: {len(posted_news)} news")
+    
+    # Find news with image (SKIP DUPLICATES)
+    print("\n🔍 Searching for NEW news WITH IMAGE...")
     
     entry = None
     selected_feed = None
     image_url = None
-    found_with_image = False
+    found_news = False
     
     shuffled_feeds = RSS_FEEDS.copy()
     random.shuffle(shuffled_feeds)
@@ -465,8 +437,8 @@ def main():
             if response.status_code == 200:
                 feed = feedparser.parse(response.content)
                 if feed.entries:
-                    # Try first 3 entries
-                    for i in range(min(3, len(feed.entries))):
+                    # Try first 5 entries
+                    for i in range(min(5, len(feed.entries))):
                         entry = feed.entries[i]
                         selected_feed = feed_url
                         
@@ -476,60 +448,38 @@ def main():
                             if pub_date.date() < datetime.now().date() - timedelta(days=2):
                                 continue
                         
-                        # Get title and category
+                        # Get title
                         title = re.sub(r'\s+', ' ', entry.title).strip()
+                        
+                        # ⭐ CHECK: Already posted?
+                        if is_already_posted(title):
+                            print(f"⏭️ SKIP: Already posted: {title[:40]}...")
+                            continue
+                        
                         category = detect_category(selected_feed, title)
                         
-                        # ⭐ GET HD IMAGE (Auto Generate if not found)
-                        print("📸 Getting HD image...")
-                        
-                        # First try RSS image
-                        image_url = get_entry_image(entry)
-                        if image_url:
-                            print("✅ RSS image found!")
-                        else:
-                            # Try Unsplash
-                            image_url = search_unsplash_image(title, category)
-                            if image_url:
-                                print("✅ Unsplash HD image found!")
-                            else:
-                                # Try Pexels
-                                image_url = search_pexels_image(title, category)
-                                if image_url:
-                                    print("✅ Pexels HD image found!")
-                                else:
-                                    # Generate AI Image
-                                    print("🎨 AI generating image...")
-                                    image_url = generate_ai_image(title, category)
-                                    if image_url:
-                                        print("✅ AI HD image generated!")
-                                    else:
-                                        # Final fallback
-                                        print("📸 Using category fallback image")
-                                        if category in UNSPLASH_IMAGES:
-                                            image_url = UNSPLASH_IMAGES[category]
-                                        else:
-                                            image_url = "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80"
+                        # ⭐ CHECK IMAGE (STRICT)
+                        image_url = get_hd_image_strict(entry, title, category)
                         
                         if image_url:
-                            print(f"✅ IMAGE FOUND! Posting this news...")
-                            found_with_image = True
+                            print(f"✅ NEW news with IMAGE found!")
+                            found_news = True
                             break
                         else:
-                            print(f"❌ No image found, checking next...")
+                            print(f"❌ No image, checking next...")
                     
-                    if found_with_image:
+                    if found_news:
                         break
         except Exception as e:
             print(f"❌ Error: {e}")
     
-    # ⛔ NO IMAGE FOUND
-    if not found_with_image or not entry or not image_url:
-        print("\n❌❌❌ NO NEWS WITH IMAGE FOUND!")
+    # ⛔ NO NEWS FOUND
+    if not found_news or not entry or not image_url:
+        print("\n❌❌❌ NO NEW NEWS WITH IMAGE FOUND!")
         print("⏭️ Today's post cancelled. Will try again in 1 hour.")
         return
     
-    # ✅ IMAGE FOUND - PROCEED TO POST
+    # ✅ POST
     title = re.sub(r'\s+', ' ', entry.title).strip()
     link = entry.link
     full_content = get_full_content(entry)
@@ -537,8 +487,7 @@ def main():
     
     print(f"\n📰 Title: {title}")
     print(f"📂 Category: {category}")
-    print(f"📝 Content Length: {len(full_content)} chars")
-    print(f"🖼️ Image Source: {image_url[:50]}...")
+    print(f"🖼️ Image: ✅ Found")
     
     image_html = f"""
     <img src='{image_url}' 
@@ -550,7 +499,7 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
-    # Generate 1000-1500 word content
+    # Generate content
     print("🤖 Generating 1000-1500 word content...")
     ai_content = generate_long_content(title, full_content, category)
     
@@ -599,10 +548,11 @@ def main():
     # Post
     print("\n📝 Posting to Blogger...")
     if post_to_blogger(title, final_content, category):
+        # ✅ Save to posted news
+        save_posted_news(title)
         print("\n✅ COMPLETED SUCCESSFULLY!")
         print(f"📰 Title: {title}")
         print(f"📂 Category: {category}")
-        print(f"📝 Words: 1000-1500")
         print(f"🖼️ Image: ✅ HD Quality")
         print(f"🔗 Short Link: {short_link}")
     else:
