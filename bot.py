@@ -46,9 +46,7 @@ def generate_ai_content(title, source_text):
         print("❌ HF_TOKEN is empty")
         return None
 
-    prompt = f"""Write a 400-word SEO optimized professional news article in English about: {title}. 
-Context: {source_text[:500]}. 
-Use HTML tags: <h2>, <h3>, <p>. Add Key Highlights with <ul><li>. Include a disclaimer at the end."""
+    prompt = f"Write a 400-word SEO optimized professional news article in English about: {title}. Context: {source_text[:500]}. Use HTML tags: <h2>, <h3>, <p>. Add Key Highlights with <ul><li>. Include a disclaimer at the end."
 
     API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
     
@@ -176,7 +174,7 @@ def post_to_blogger(title, content):
         return False
 
 def verify_blogger_permission():
-    """Blogger Access Verify करना (OAuth2 का उपयोग करके)"""
+    """Blogger Access Verify करना (सटीक एरर ट्रैकर के साथ)"""
     if not all([BC_CLIENT_ID, BC_CLIENT_SECRET, BC_REFRESH_TOKEN]):
         print("❌ Blogger OAuth Secrets missing in Verification.")
         return False
@@ -189,12 +187,17 @@ def verify_blogger_permission():
             "grant_type": "refresh_token"
         }
         res = requests.post(token_url, data=payload, timeout=15)
-        access_token = res.json().get("access_token")
+        res_json = res.json()
         
-        if not access_token:
+        # यदि रिफ्रेश फेल होता है, तो पूरा गूगल का एरर रिस्पॉन्स प्रिंट करें
+        if "access_token" not in res_json:
             print("❌ Cannot retrieve access token for verification.")
+            print("Google Token Server Error Response:")
+            print(json.dumps(res_json, indent=2))
             return False
             
+        access_token = res_json["access_token"]
+        
         blog_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}"
         headers = {"Authorization": f"Bearer {access_token}"}
         blog_res = requests.get(blog_url, headers=headers, timeout=15)
@@ -204,6 +207,7 @@ def verify_blogger_permission():
             return True
         else:
             print(f"❌ Blog Verification Failed - Status: {blog_res.status_code}")
+            print(blog_res.text)
             return False
     except Exception as e:
         print(f"❌ Verification Error: {e}")
