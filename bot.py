@@ -18,7 +18,7 @@ def fix_dns():
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
-HF_TOKEN = os.getenv('HF_TOKEN') or os.getenv('GEMINI_API')
+HF_TOKEN = os.getenv('HF_TOKEN')
 
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
@@ -41,40 +41,6 @@ RSS_FEEDS = [
     "https://www.rollingstone.com/music/music-news/feed/",
 ]
 
-# --- POSTED NEWS TRACKING ---
-POSTED_FILE = 'posted_news.txt'
-
-def load_posted_news():
-    """पहले से पोस्ट की गई news load करो"""
-    try:
-        if os.path.exists(POSTED_FILE):
-            with open(POSTED_FILE, 'r', encoding='utf-8') as f:
-                return set(line.strip() for line in f if line.strip())
-    except:
-        pass
-    return set()
-
-def save_posted_news(title):
-    """नई news save करो"""
-    try:
-        with open(POSTED_FILE, 'a', encoding='utf-8') as f:
-            f.write(title + '\n')
-    except:
-        pass
-
-def is_already_posted(title):
-    """Check करो ये news पहले post हुई है या नहीं"""
-    posted = load_posted_news()
-    # Clean title for comparison
-    clean_title = title.lower().strip()
-    for p in posted:
-        if p.lower().strip() == clean_title:
-            return True
-        # Partial match (50% similar)
-        if len(clean_title) > 20 and clean_title[:20] in p.lower():
-            return True
-    return False
-
 # --- IMAGE SOURCES ---
 UNSPLASH_IMAGES = {
     "Technology": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
@@ -88,8 +54,91 @@ UNSPLASH_IMAGES = {
 
 # --- FUNCTIONS ---
 
+def get_blogger_access_token():
+    """Blogger API Access Token प्राप्त करें"""
+    try:
+        token_url = "https://oauth2.googleapis.com/token"
+        payload = {
+            "client_id": BC_CLIENT_ID,
+            "client_secret": BC_CLIENT_SECRET,
+            "refresh_token": BC_REFRESH_TOKEN,
+            "grant_type": "refresh_token"
+        }
+        res = requests.post(token_url, data=payload, timeout=15)
+        return res.json().get("access_token")
+    except Exception as e:
+        print(f"❌ Error getting Access Token: {e}")
+        return None
+
+def get_all_blogger_titles(access_token):
+    """Blogger से सभी पोस्ट्स के टाइटल्स लोड करें"""
+    existing_titles = set()
+    if not access_token:
+        return existing_titles
+    
+    try:
+        page_token = None
+        total = 0
+        while True:
+            url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts?maxResults=100"
+            if page_token:
+                url += f"&pageToken={page_token}"
+            
+            headers = {"Authorization": f"Bearer {access_token}"}
+            res = requests.get(url, headers=headers, timeout=15)
+            
+            if res.status_code != 200:
+                break
+                
+            data = res.json()
+            posts = data.get("items", [])
+            
+            for post in posts:
+                title = post.get("title", "").lower().strip()
+                if title:
+                    existing_titles.add(title)
+                    total += 1
+            
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+        
+        print(f"📥 Total {total} posts loaded from Blogger")
+        return existing_titles
+        
+    except Exception as e:
+        print(f"⚠️ Error loading Blogger titles: {e}")
+        return existing_titles
+
+def is_duplicate_title(new_title, existing_titles):
+    """Smart duplicate detection"""
+    new_title_lower = new_title.lower().strip()
+    new_words = set(new_title_lower.split())
+    
+    for existing in existing_titles:
+        # Exact match
+        if existing == new_title_lower:
+            return True
+        
+        # 70% similar words
+        existing_words = set(existing.split())
+        if len(new_words) > 3 and len(existing_words) > 3:
+            common = new_words.intersection(existing_words)
+            if len(common) / len(new_words) > 0.7:
+                return True
+        
+        # First 35 chars match
+        if len(new_title_lower) > 35 and new_title_lower[:35] in existing:
+            return True
+        
+        # Last 30 chars match
+        if len(new_title_lower) > 30 and new_title_lower[-30:] in existing:
+            return True
+    
+    return False
+
 def get_full_content(entry):
-    """Extract FULL content"""
+    """Full content extract"""
     try:
         content = entry.get('content')
         if content and isinstance(content, list):
@@ -113,16 +162,19 @@ def get_entry_image(entry):
             for media in media_content:
                 if 'url' in media:
                     return media['url']
+        
         links = entry.get('links')
         if links:
             for link in links:
                 if 'image' in link.get('type', ''):
                     return link.get('href')
+        
         summary = entry.get('summary', '')
         if 'src=' in summary:
             match = re.search(r'src=["\'](https?://[^"\']+)["\']', summary)
             if match:
                 return match.group(1)
+        
         content = entry.get('content', [])
         if content:
             for item in content:
@@ -135,70 +187,56 @@ def get_entry_image(entry):
     return None
 
 def generate_ai_image(prompt, category):
-    """Generate HD image using AI (Pollinations.ai - Free)"""
+    """HD AI Image generate using Pollinations.ai"""
     try:
-        print("🎨 Generating AI image...")
-        clean_prompt = prompt.replace('"', '').replace("'", '')[:100]
-        url = f"https://image.pollinations.ai/prompt/{clean_prompt.replace(' ', '%20')}"
-        url += "?width=1200&height=600&nologo=true"
+        print("🎨 Generating HD AI image...")
+        clean_prompt = prompt.replace('"', '').replace("'", '')[:80]
         
-        response = requests.get(url, timeout=30)
+        # Pollinations.ai - Free AI image generation
+        url = f"https://image.pollinations.ai/prompt/{clean_prompt.replace(' ', '%20')}"
+        url += f"?width=1200&height=630&nologo=true&seed={random.randint(1, 1000)}"
+        
+        # Verify image exists
+        response = requests.head(url, timeout=10)
         if response.status_code == 200:
             return url
-    except:
-        pass
-    return None
-
-def search_unsplash_image(query, category):
-    """Search HD image from Unsplash"""
-    try:
-        print("🔍 Searching Unsplash...")
-        clean_query = query.replace('"', '').replace("'", '')[:50]
-        url = f"https://api.unsplash.com/photos/random?query={clean_query}&orientation=landscape"
         
-        try:
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                if data and 'urls' in data:
-                    return data['urls']['regular']
-        except:
-            pass
+        # Try with different parameters
+        url2 = f"https://image.pollinations.ai/prompt/{clean_prompt.replace(' ', '%20')}"
+        url2 += "?width=1200&height=600&nologo=true"
+        response2 = requests.head(url2, timeout=10)
+        if response2.status_code == 200:
+            return url2
+            
     except:
         pass
     return None
 
 def get_hd_image_strict(entry, title, category):
-    """Strict image check - Returns ONLY if image found"""
-    print("📸 Checking for HD image (STRICT MODE)...")
+    """Strict image check - returns None if no image"""
+    print("📸 Checking for HD image...")
     
-    # 1️⃣ Try RSS image
+    # 1️⃣ RSS image
     image = get_entry_image(entry)
-    if image:
+    if image and image.startswith('http'):
         print("✅ RSS image found!")
         return image
     
-    # 2️⃣ Try Unsplash
-    image = search_unsplash_image(title, category)
-    if image:
-        print("✅ Unsplash HD image found!")
-        return image
-    
-    # 3️⃣ Try AI Generation
+    # 2️⃣ AI generated
     print("🎨 Trying AI image generation...")
     image = generate_ai_image(title, category)
-    if image:
+    if image and image.startswith('http'):
         print("✅ AI HD image generated!")
         return image
     
-    # 4️⃣ Category fallback
+    # 3️⃣ Category fallback
     if category in UNSPLASH_IMAGES:
         print("✅ Category fallback image used")
         return UNSPLASH_IMAGES[category]
     
-    # 5️⃣ Ultimate fallback
-    print("✅ Ultimate fallback image used")
-    return "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80"
+    # ❌ No image
+    print("❌ No image found!")
+    return None
 
 def get_short_url(long_url):
     """Shorten URL"""
@@ -232,13 +270,20 @@ def detect_category(feed_url, title):
     return "News"
 
 def generate_long_content(title, full_content, category):
-    """Generate 1000-1500 word content"""
+    """AI content with multiple models"""
     if HF_TOKEN:
-        try:
-            prompt = f"""Write a DETAILED 1000-1500 word news article in Hinglish (Hindi+English mix) about: {title}
-
+        models = [
+            "mistralai/Mistral-7B-Instruct-v0.1",
+            "Qwen/Qwen2.5-7B-Instruct",
+            "google/flan-t5-xxl"
+        ]
+        
+        for model in models:
+            try:
+                print(f"🤖 Trying model: {model}")
+                
+                prompt = f"""Write a DETAILED 1000-1500 word news article in Hinglish (Hindi+English mix) about: {title}
 Context: {full_content[:1000]}
-
 Category: {category}
 
 Structure:
@@ -250,25 +295,32 @@ Structure:
 6. What's Next (100 words)
 7. Conclusion (100 words)
 
-Use HTML tags: <h2>, <h3>, <p>, <ul>, <li>
-Make it SEO friendly, engaging, and professional.
-Add a disclaimer at the end."""
+Use HTML tags: <h2>, <h3>, <p>, <ul>, <li>"""
 
-            API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
-            headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
-            payload = {"inputs": prompt, "parameters": {"max_new_tokens": 2000, "temperature": 0.7}}
-            
-            response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
-            if response.status_code == 200:
-                result = response.json()
-                if isinstance(result, list) and len(result) > 0:
-                    text = result[0].get('generated_text', '')
-                    if prompt in text:
-                        text = text.replace(prompt, '').strip()
-                    if len(text) > 800:
-                        return text
-        except:
-            print("AI failed, using fallback")
+                API_URL = f"https://api-inference.huggingface.co/models/{model}"
+                headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
+                payload = {"inputs": prompt, "parameters": {"max_new_tokens": 2000, "temperature": 0.7}}
+                
+                response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
+                
+                if response.status_code == 503:
+                    print(f"⏳ Model {model} loading, waiting 30s...")
+                    time.sleep(30)
+                    response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if isinstance(result, list) and len(result) > 0:
+                        text = result[0].get('generated_text', '')
+                        if prompt in text:
+                            text = text.replace(prompt, '').strip()
+                        if len(text) > 500:
+                            print(f"✅ AI Success with {model}")
+                            return text
+                            
+            except Exception as e:
+                print(f"⚠️ Model {model} failed: {e}")
+                continue
     
     # Fallback content
     today = datetime.now().strftime("%B %d, %Y")
@@ -301,7 +353,6 @@ Add a disclaimer at the end."""
 
 <h3>📊 Detailed Analysis - विस्तृत विश्लेषण</h3>
 <p>{full_content[:400]}...</p>
-<p>इस खबर के कई पहलू हैं। विशेषज्ञों के अनुसार, यह एक महत्वपूर्ण मोड़ है। इसके आगे क्या प्रभाव होंगे, यह देखना दिलचस्प होगा।</p>
 
 <h3>💬 Expert Opinions - विशेषज्ञों की राय</h3>
 <p>उद्योग विशेषज्ञों का कहना है कि यह विकास {category} के लिए गेम-चेंजर साबित हो सकता है।</p>
@@ -315,26 +366,12 @@ Add a disclaimer at the end."""
 <h3>✅ Conclusion - निष्कर्ष</h3>
 <p>यह एक डेवलपिंग स्टोरी है।</p>
 
-<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
+<p><em>Disclaimer: This is an AI-generated news summary. Please refer to the original source.</em></p>
 """
 
-def post_to_blogger(title, content, category):
+def post_to_blogger(access_token, title, content, category):
     """Post to Blogger"""
     try:
-        token_url = "https://oauth2.googleapis.com/token"
-        payload = {
-            "client_id": BC_CLIENT_ID,
-            "client_secret": BC_CLIENT_SECRET,
-            "refresh_token": BC_REFRESH_TOKEN,
-            "grant_type": "refresh_token"
-        }
-        res = requests.post(token_url, data=payload, timeout=15)
-        access_token = res.json().get("access_token")
-        
-        if not access_token:
-            print("❌ Cannot get access token")
-            return False
-        
         post_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts"
         headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
         
@@ -357,34 +394,7 @@ def post_to_blogger(title, content, category):
             return False
             
     except Exception as e:
-        print(f"❌ Error: {e}")
-        return False
-
-def verify_blogger():
-    """Verify Blogger access"""
-    try:
-        token_url = "https://oauth2.googleapis.com/token"
-        payload = {
-            "client_id": BC_CLIENT_ID,
-            "client_secret": BC_CLIENT_SECRET,
-            "refresh_token": BC_REFRESH_TOKEN,
-            "grant_type": "refresh_token"
-        }
-        res = requests.post(token_url, data=payload, timeout=15)
-        access_token = res.json().get("access_token")
-        
-        if not access_token:
-            return False
-            
-        blog_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}"
-        headers = {"Authorization": f"Bearer {access_token}"}
-        blog_res = requests.get(blog_url, headers=headers, timeout=15)
-        
-        if blog_res.status_code == 200:
-            print(f"✅ Blogger verified! Blog: {blog_res.json().get('name')}")
-            return True
-        return False
-    except:
+        print(f"❌ Blogger Post Error: {e}")
         return False
 
 # --- MAIN ---
@@ -395,31 +405,15 @@ def main():
     
     fix_dns()
     
-    # Check secrets
-    print("\n--- Checking Secrets ---")
-    secrets = {
-        "BLOG_ID": BLOG_ID,
-        "BC_CLIENT_ID": BC_CLIENT_ID,
-        "BC_CLIENT_SECRET": BC_CLIENT_SECRET,
-        "BC_REFRESH_TOKEN": BC_REFRESH_TOKEN,
-        "SHRINKME_API": SHRINKME_API
-    }
-    for name, value in secrets.items():
-        print(f"{name}: {'✅' if value else '❌'}")
-    
-    if not all(secrets.values()):
-        print("❌ Missing secrets!")
+    # Get Access Token
+    access_token = get_blogger_access_token()
+    if not access_token:
+        print("❌ Access token invalid. Exiting...")
         return
     
-    if not verify_blogger():
-        print("❌ Blogger verification failed!")
-        return
+    # Load existing Blogger titles
+    existing_titles = get_all_blogger_titles(access_token)
     
-    # Load already posted news
-    posted_news = load_posted_news()
-    print(f"\n📊 Already posted: {len(posted_news)} news")
-    
-    # Find news with image (SKIP DUPLICATES)
     print("\n🔍 Searching for NEW news WITH IMAGE...")
     
     entry = None
@@ -431,55 +425,56 @@ def main():
     random.shuffle(shuffled_feeds)
     
     for feed_url in shuffled_feeds:
-        print(f"\n📰 Checking: {feed_url}")
+        print(f"\n📰 Checking Feed: {feed_url}")
         try:
             response = requests.get(feed_url, timeout=15)
             if response.status_code == 200:
                 feed = feedparser.parse(response.content)
-                if feed.entries:
-                    # Try first 5 entries
-                    for i in range(min(5, len(feed.entries))):
-                        entry = feed.entries[i]
-                        selected_feed = feed_url
-                        
-                        # Check date
-                        if hasattr(entry, 'published_parsed'):
-                            pub_date = datetime(*entry.published_parsed[:6])
-                            if pub_date.date() < datetime.now().date() - timedelta(days=2):
-                                continue
-                        
-                        # Get title
-                        title = re.sub(r'\s+', ' ', entry.title).strip()
-                        
-                        # ⭐ CHECK: Already posted?
-                        if is_already_posted(title):
-                            print(f"⏭️ SKIP: Already posted: {title[:40]}...")
-                            continue
-                        
-                        category = detect_category(selected_feed, title)
-                        
-                        # ⭐ CHECK IMAGE (STRICT)
-                        image_url = get_hd_image_strict(entry, title, category)
-                        
-                        if image_url:
-                            print(f"✅ NEW news with IMAGE found!")
-                            found_news = True
-                            break
-                        else:
-                            print(f"❌ No image, checking next...")
+                
+                # Check first 10 entries
+                for i in range(min(10, len(feed.entries))):
+                    temp_entry = feed.entries[i]
+                    temp_title = re.sub(r'\s+', ' ', temp_entry.title).strip()
                     
-                    if found_news:
+                    # Check date
+                    if hasattr(temp_entry, 'published_parsed'):
+                        pub_date = datetime(*temp_entry.published_parsed[:6])
+                        if pub_date.date() < datetime.now().date() - timedelta(days=2):
+                            continue
+                    
+                    # Check duplicate
+                    if is_duplicate_title(temp_title, existing_titles):
+                        print(f"⏭️ SKIP (Already posted): {temp_title[:45]}...")
+                        continue
+                    
+                    # Detect category
+                    category = detect_category(feed_url, temp_title)
+                    
+                    # Check image
+                    image_url = get_hd_image_strict(temp_entry, temp_title, category)
+                    
+                    if image_url:
+                        entry = temp_entry
+                        selected_feed = feed_url
+                        found_news = True
+                        print(f"✅ NEW news with IMAGE found!")
                         break
+                    else:
+                        print(f"❌ No image, checking next...")
+                
+                if found_news:
+                    break
+                    
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"❌ Error checking feed: {e}")
     
-    # ⛔ NO NEWS FOUND
+    # No news found
     if not found_news or not entry or not image_url:
         print("\n❌❌❌ NO NEW NEWS WITH IMAGE FOUND!")
         print("⏭️ Today's post cancelled. Will try again in 1 hour.")
         return
     
-    # ✅ POST
+    # Process
     title = re.sub(r'\s+', ' ', entry.title).strip()
     link = entry.link
     full_content = get_full_content(entry)
@@ -489,10 +484,13 @@ def main():
     print(f"📂 Category: {category}")
     print(f"🖼️ Image: ✅ Found")
     
+    # Image HTML
     image_html = f"""
-    <img src='{image_url}' 
-         alt='{title}' 
-         style='width: 100%; max-height: 600px; object-fit: cover; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);'>
+    <div style="text-align: center; margin-bottom: 25px;">
+        <img src='{image_url}' 
+             alt='{title}' 
+             style='width: 100%; max-width: 700px; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);'>
+    </div>
     """
     
     # Shorten link
@@ -505,7 +503,7 @@ def main():
     
     # Earning button
     earning_button = f"""
-    <div style="text-align: center; margin: 30px 0; padding: 20px; background: linear-gradient(135deg, #fff5f0, #fff); border-radius: 12px;">
+    <div style="text-align: center; margin: 30px 0; padding: 20px; background: #f5f5f5; border-radius: 12px;">
         <a href="{short_link}" 
            target="_blank" 
            style="background: linear-gradient(135deg, #ff5722, #ff6f00); 
@@ -515,11 +513,9 @@ def main():
                   font-size: 20px; 
                   font-weight: bold; 
                   border-radius: 50px; 
-                  box-shadow: 0 8px 25px rgba(255,87,34,0.4); 
-                  display: inline-block; 
-                  transition: all 0.3s;
+                  display: inline-block;
                   text-transform: uppercase;
-                  letter-spacing: 1px;">
+                  box-shadow: 0 4px 15px rgba(255,87,34,0.3);">
             📖 पूरी खबर पढ़ें - READ FULL STORY
         </a>
         <p style="font-size: 12px; color: #999; margin-top: 10px;">Click to read the complete story on the original source</p>
@@ -532,7 +528,7 @@ def main():
     {ai_content}
     {earning_button}
     
-    <hr style="border: 0; border-top: 2px solid #f0f0f0; margin: 30px 0;">
+    <hr style="border: 0; border-top: 2px solid #e0e0e0; margin: 30px 0;">
     
     <div style="text-align: center; color: #999; font-size: 14px;">
         <p>📅 Published: {datetime.now().strftime('%B %d, %Y')}</p>
@@ -547,14 +543,13 @@ def main():
     
     # Post
     print("\n📝 Posting to Blogger...")
-    if post_to_blogger(title, final_content, category):
-        # ✅ Save to posted news
-        save_posted_news(title)
+    if post_to_blogger(access_token, title, final_content, category):
         print("\n✅ COMPLETED SUCCESSFULLY!")
         print(f"📰 Title: {title}")
         print(f"📂 Category: {category}")
         print(f"🖼️ Image: ✅ HD Quality")
         print(f"🔗 Short Link: {short_link}")
+        print(f"📝 Words: 1000-1500")
     else:
         print("❌ Failed to post!")
 
