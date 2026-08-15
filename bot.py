@@ -4,16 +4,18 @@ import random
 import time
 import requests
 import feedparser
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
 
-# --- CONFIGURATION (GitHub Secrets se data lena) ---
-BLOG_ID = os.getenv('BLOG_ID')
-SHRINKME_API = os.getenv('SHRINKME_API')
-SERVICE_ACCOUNT_JSON = os.getenv('SERVICE_ACCOUNT_JSON')
-
-# Hugging Face token
+# --- CONFIGURATION (GitHub Secrets से डेटा उठाना) ---
+BLOG_ID = os.getenv('BLOG_ID').strip() if os.getenv('BLOG_ID') else None
+SHRINKME_API = os.getenv('SHRINKME_API').strip() if os.getenv('SHRINKME_API') else None
 HF_TOKEN = os.getenv('HF_TOKEN') or os.getenv('GEMINI_API')
+if HF_TOKEN:
+    HF_TOKEN = HF_TOKEN.strip()
+
+# ब्लॉगर पर्सनल एडमिन क्रेडेंशियल्स (OAuth2)
+BC_CLIENT_ID = os.getenv('BC_CLIENT_ID').strip() if os.getenv('BC_CLIENT_ID') else None
+BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET').strip() if os.getenv('BC_CLIENT_SECRET') else None
+BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN').strip() if os.getenv('BC_REFRESH_TOKEN') else None
 
 # RSS Feeds
 RSS_FEEDS = [
@@ -28,7 +30,7 @@ RSS_FEEDS = [
 # --- FUNCTIONS ---
 
 def get_short_url(long_url):
-    """ShrinkMe API se link chhota karna"""
+    """ShrinkMe API के जरिए लिंक छोटा करना"""
     try:
         if not SHRINKME_API:
             return long_url
@@ -39,17 +41,15 @@ def get_short_url(long_url):
         return long_url
 
 def generate_ai_content(title, source_text):
-    """Hugging Face Inference API se article generate karna"""
+    """Hugging Face Inference API से article generate karna"""
     if not HF_TOKEN:
         print("❌ HF_TOKEN is empty")
         return None
 
-    # Simplified prompt for better response
     prompt = f"""Write a 400-word SEO optimized professional news article in English about: {title}. 
 Context: {source_text[:500]}. 
 Use HTML tags: <h2>, <h3>, <p>. Add Key Highlights with <ul><li>. Include a disclaimer at the end."""
 
-    # Using Hugging Face official inference endpoint
     API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
     
     headers = {
@@ -88,18 +88,14 @@ Use HTML tags: <h2>, <h3>, <p>. Add Key Highlights with <ul><li>. Include a disc
             print(f"❌ API Error: {response.status_code}")
             return None
             
-    except requests.exceptions.ConnectionError:
-        print("❌ Connection error - trying fallback...")
-        return generate_ai_content_fallback(title, source_text)
     except Exception as e:
-        print(f"❌ Error: {e}")
-        return None
+        print(f"❌ Hugging Face Error: {e} - trying fallback...")
+        return generate_ai_content_fallback(title, source_text)
 
 def generate_ai_content_fallback(title, source_text):
     """Fallback using local simple article generation"""
-    # Simple template-based article when API fails
     highlights = [
-        f"• {title} - Major development in the tech industry",
+        f"• {title} - Major development in the industry",
         "• Key stakeholders are closely monitoring the situation",
         "• Industry experts weigh in on the implications",
         "• Public response has been significant"
@@ -127,25 +123,35 @@ def generate_ai_content_fallback(title, source_text):
     return article
 
 def post_to_blogger(title, content):
-    """Blogger API se post karna - with proper OAuth handling"""
+    """Blogger Personal OAuth क्रेडेंशियल्स का उपयोग करके सीधे एडमिन अकाउंट से पोस्ट करना"""
+    if not all([BC_CLIENT_ID, BC_CLIENT_SECRET, BC_REFRESH_TOKEN]):
+        print("❌ Blogger OAuth Secrets missing.")
+        return False
+        
     try:
-        if not SERVICE_ACCOUNT_JSON:
-            print("❌ SERVICE_ACCOUNT_JSON missing")
+        # 1. Refresh Token से नया Access Token प्राप्त करना
+        token_url = "https://oauth2.googleapis.com/token"
+        payload = {
+            "client_id": BC_CLIENT_ID,
+            "client_secret": BC_CLIENT_SECRET,
+            "refresh_token": BC_REFRESH_TOKEN,
+            "grant_type": "refresh_token"
+        }
+        res = requests.post(token_url, data=payload, timeout=15)
+        res_json = res.json()
+        
+        if "access_token" not in res_json:
+            print(f"❌ Failed to refresh Blogger token: {res_json}")
             return False
             
-        # Service account credentials load
-        info = json.loads(SERVICE_ACCOUNT_JSON)
+        access_token = res_json["access_token"]
         
-        # Create credentials
-        creds = service_account.Credentials.from_service_account_info(
-            info, 
-            scopes=['https://www.googleapis.com/auth/blogger']
-        )
-        
-        # Build service
-        service = build('blogger', 'v3', credentials=creds)
-        
-        # Prepare post body
+        # 2. ब्लॉगर पर पोस्ट इंसर्ट करना (सीधे आपके एडमिन अकाउंट से!)
+        post_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
         post_body = {
             "kind": "blogger#post",
             "title": title,
@@ -153,46 +159,54 @@ def post_to_blogger(title, content):
             "labels": ["AI-generated", "News", "Automated"]
         }
         
-        # Insert post
-        result = service.posts().insert(
-            blogId=BLOG_ID,
-            body=post_body,
-            isDraft=False
-        ).execute()
+        post_res = requests.post(post_url, headers=headers, json=post_body, timeout=20)
         
-        print(f"✅ Successfully Posted!")
-        print(f"📝 Title: {title}")
-        print(f"🔗 URL: {result.get('url', 'N/A')}")
-        return True
-        
-    except json.JSONDecodeError as e:
-        print(f"❌ Invalid JSON in SERVICE_ACCOUNT_JSON: {e}")
-        return False
+        if post_res.status_code in [200, 201]:
+            result = post_res.json()
+            print(f"✅ Successfully Posted!")
+            print(f"🔗 URL: {result.get('url', 'N/A')}")
+            return True
+        else:
+            print(f"❌ Blogger Post Failed - Status: {post_res.status_code}")
+            print(post_res.text)
+            return False
+            
     except Exception as e:
-        print(f"❌ Blogger Error: {e}")
-        print("💡 Make sure:")
-        print("  1. Service account email is added as admin in Blogger")
-        print("  2. Blog ID is correct")
-        print("  3. Blogger API is enabled in Google Cloud Console")
+        print(f"❌ Blogger OAuth Error: {e}")
         return False
 
 def verify_blogger_permission():
-    """Service account access verify karna"""
+    """Blogger Access Verify करना (OAuth2 का उपयोग करके)"""
+    if not all([BC_CLIENT_ID, BC_CLIENT_SECRET, BC_REFRESH_TOKEN]):
+        print("❌ Blogger OAuth Secrets missing in Verification.")
+        return False
     try:
-        info = json.loads(SERVICE_ACCOUNT_JSON)
-        creds = service_account.Credentials.from_service_account_info(
-            info, 
-            scopes=['https://www.googleapis.com/auth/blogger']
-        )
-        service = build('blogger', 'v3', credentials=creds)
+        token_url = "https://oauth2.googleapis.com/token"
+        payload = {
+            "client_id": BC_CLIENT_ID,
+            "client_secret": BC_CLIENT_SECRET,
+            "refresh_token": BC_REFRESH_TOKEN,
+            "grant_type": "refresh_token"
+        }
+        res = requests.post(token_url, data=payload, timeout=15)
+        access_token = res.json().get("access_token")
         
-        # Try to get blog info to verify access
-        blog = service.blogs().get(blogId=BLOG_ID).execute()
-        print(f"✅ Blogger access verified!")
-        print(f"📝 Blog: {blog.get('name')}")
-        return True
+        if not access_token:
+            print("❌ Cannot retrieve access token for verification.")
+            return False
+            
+        blog_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}"
+        headers = {"Authorization": f"Bearer {access_token}"}
+        blog_res = requests.get(blog_url, headers=headers, timeout=15)
+        
+        if blog_res.status_code == 200:
+            print(f"✅ Blogger access verified! Blog: {blog_res.json().get('name')}")
+            return True
+        else:
+            print(f"❌ Blog Verification Failed - Status: {blog_res.status_code}")
+            return False
     except Exception as e:
-        print(f"❌ Cannot access Blogger: {e}")
+        print(f"❌ Verification Error: {e}")
         return False
 
 # --- MAIN LOGIC ---
@@ -203,13 +217,14 @@ def main():
     # --- Checking GitHub Secrets ---
     print("\n--- Checking GitHub Secrets Status ---")
     print(f"BLOG_ID: {'✅ LOADED' if BLOG_ID else '❌ MISSING'}")
+    print(f"BC_CLIENT_ID: {'✅ LOADED' if BC_CLIENT_ID else '❌ MISSING'}")
+    print(f"BC_CLIENT_SECRET: {'✅ LOADED' if BC_CLIENT_SECRET else '❌ MISSING'}")
+    print(f"BC_REFRESH_TOKEN: {'✅ LOADED' if BC_REFRESH_TOKEN else '❌ MISSING'}")
     print(f"HF_TOKEN: {'✅ LOADED' if HF_TOKEN else '❌ MISSING'}")
-    print(f"SHRINKME_API: {'✅ LOADED' if SHRINKME_API else '❌ MISSING'}")
-    print(f"SERVICE_ACCOUNT_JSON: {'✅ LOADED' if SERVICE_ACCOUNT_JSON else '❌ MISSING'}")
     print("--------------------------------------\n")
     
     # Verify required secrets
-    required = [BLOG_ID, HF_TOKEN, SERVICE_ACCOUNT_JSON]
+    required = [BLOG_ID, HF_TOKEN, BC_CLIENT_ID, BC_CLIENT_SECRET, BC_REFRESH_TOKEN]
     if not all(required):
         print("❌ Required secrets missing. Exiting...")
         return
@@ -217,11 +232,7 @@ def main():
     # Verify Blogger access first
     print("🔍 Verifying Blogger permissions...")
     if not verify_blogger_permission():
-        print("❌ Cannot proceed. Fix Blogger permissions first.")
-        print("\n📌 Steps to fix:")
-        print("1. Go to your Blogger blog → Settings → Permissions")
-        print("2. Add your service account email as an 'Admin'")
-        print("3. The email is in your SERVICE_ACCOUNT_JSON under 'client_email'")
+        print("❌ Cannot proceed. Blogger credentials are invalid or expired.")
         return
     
     # Shuffle feeds
