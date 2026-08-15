@@ -32,36 +32,23 @@ BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN').strip() if os.getenv('BC_REFRES
 
 # --- MULTI-CATEGORY RSS FEEDS ---
 RSS_FEEDS = [
-    # Technology
     "https://techcrunch.com/feed/",
     "https://www.theverge.com/rss/index.xml",
     "https://www.wired.com/feed/rss",
     "https://www.cnet.com/rss/news/",
     "https://arstechnica.com/feed/",
-    
-    # Gaming
     "https://www.gamespot.com/feeds/game-news/",
     "https://www.ign.com/rss/articles/all",
     "https://www.polygon.com/rss/index.xml",
-    
-    # Entertainment
     "https://www.variety.com/feed/",
     "https://www.hollywoodreporter.com/feed/",
     "https://www.pinkvilla.com/feed",
     "https://www.eonline.com/news/rss",
-    
-    # Space & Science
     "https://www.nasa.gov/rss/dyn/breaking_news.rss",
     "https://www.space.com/feeds/all",
-    
-    # Business
     "https://www.bloomberg.com/feeds/markets.rss",
     "https://www.reuters.com/rss/reuters-business-news.rss",
-    
-    # Sports
     "https://www.espncricinfo.com/rss/content/story/feeds/0.xml",
-    
-    # Music
     "https://www.rollingstone.com/music/music-news/feed/",
 ]
 
@@ -117,7 +104,6 @@ def get_entry_image(entry):
 
 def get_category_image(feed_url, title):
     """Get category-based image"""
-    title_lower = title.lower()
     feed_lower = feed_url.lower() if feed_url else ""
     
     if "nasa" in feed_lower or "space" in feed_lower:
@@ -266,7 +252,6 @@ def generate_seo_fallback(title, source_text, image_html, category):
     """
     return article
 
-# FIXED: Added category parameter
 def post_to_blogger(title, content, category):
     """Post to Blogger with SEO optimization"""
     if not all([BC_CLIENT_ID, BC_CLIENT_SECRET, BC_REFRESH_TOKEN]):
@@ -401,7 +386,7 @@ def main():
     print(f"SHRINKME_API: {'✅ LOADED' if SHRINKME_API else '❌ MISSING'}")
     print("--------------------------------------\n")
     
-    # Verify required secrets (HF_TOKEN is optional now)
+    # Verify required secrets
     required = [BLOG_ID, BC_CLIENT_ID, BC_CLIENT_SECRET, BC_REFRESH_TOKEN]
     if not all(required):
         print("❌ Required secrets missing. Exiting...")
@@ -546,7 +531,7 @@ def main():
         </div>
         """
 
-    # FIXED: Passing category parameter
+    # ✅ FIXED: Post to Blogger
     print("\n📝 Posting to Blogger...")
     if post_to_blogger(seo_title, final_content, category):
         print("\n✅ PROCESS COMPLETED SUCCESSFULLY!")
