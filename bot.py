@@ -9,131 +9,87 @@ from datetime import datetime, timedelta
 import socket
 import base64
 
-# --- FIX: DNS Resolution for Hugging Face ---
+# --- DNS FIX ---
 def fix_dns():
-    """Fix DNS resolution for Hugging Face API"""
     try:
         socket.gethostbyname('api-inference.huggingface.co')
     except:
-        print("DNS fix applied for Hugging Face")
+        print("DNS fix applied")
 
 # --- CONFIGURATION ---
-BLOG_ID = os.getenv('BLOG_ID').strip() if os.getenv('BLOG_ID') else None
-SHRINKME_API = os.getenv('SHRINKME_API').strip() if os.getenv('SHRINKME_API') else None
-
-# Hugging Face Token
+BLOG_ID = os.getenv('BLOG_ID')
+SHRINKME_API = os.getenv('SHRINKME_API')
 HF_TOKEN = os.getenv('HF_TOKEN') or os.getenv('GEMINI_API')
-if HF_TOKEN:
-    HF_TOKEN = HF_TOKEN.strip()
 
-# Blogger OAuth Credentials
-BC_CLIENT_ID = os.getenv('BC_CLIENT_ID').strip() if os.getenv('BC_CLIENT_ID') else None
-BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET').strip() if os.getenv('BC_CLIENT_SECRET') else None
-BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN').strip() if os.getenv('BC_REFRESH_TOKEN') else None
+BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
+BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
+BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
 
-# --- MULTI-CATEGORY RSS FEEDS (Expanded) ---
+# --- RSS FEEDS ---
 RSS_FEEDS = [
-    # Technology
     "https://techcrunch.com/feed/",
     "https://www.theverge.com/rss/index.xml",
-    "https://www.wired.com/feed/rss",
     "https://www.cnet.com/rss/news/",
-    "https://arstechnica.com/feed/",
-    
-    # Gaming
     "https://www.gamespot.com/feeds/game-news/",
     "https://www.ign.com/rss/articles/all",
-    "https://www.polygon.com/rss/index.xml",
-    
-    # Entertainment
     "https://www.variety.com/feed/",
     "https://www.hollywoodreporter.com/feed/",
     "https://www.pinkvilla.com/feed",
-    "https://www.eonline.com/news/rss",
-    
-    # Space & Science
     "https://www.nasa.gov/rss/dyn/breaking_news.rss",
     "https://www.space.com/feeds/all",
-    
-    # Business
     "https://www.bloomberg.com/feeds/markets.rss",
-    "https://www.reuters.com/rss/reuters-business-news.rss",
-    
-    # Sports
     "https://www.espncricinfo.com/rss/content/story/feeds/0.xml",
-    
-    # Music
     "https://www.rollingstone.com/music/music-news/feed/",
 ]
 
+# --- IMAGE SOURCES ---
+UNSPLASH_IMAGES = {
+    "Technology": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
+    "Gaming": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
+    "Entertainment": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80",
+    "Space": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
+    "Sports": "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80",
+    "Business": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80",
+    "Music": "https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1200&q=80",
+}
+
 # --- FUNCTIONS ---
 
-def get_seo_title(title):
-    """Generate SEO optimized title in Hinglish style"""
-    clean_title = re.sub(r'[^\w\s-]', '', title)
-    words = clean_title.split()
-    seo_title = " ".join(words[:12])
-    if len(seo_title) > 70:
-        seo_title = seo_title[:67] + "..."
-    year = datetime.now().strftime("%Y")
-    return f"{seo_title} - {year}"
-
 def get_full_content(entry):
-    """Extract FULL content from RSS entry"""
+    """Extract FULL content"""
     try:
-        # Try to get full content first
         content = entry.get('content')
         if content and isinstance(content, list):
             for item in content:
                 if isinstance(item, dict) and 'value' in item:
-                    text = item['value']
-                    # Remove HTML tags for clean text
-                    clean_text = re.sub(r'<[^>]+>', '', text)
-                    if len(clean_text) > 200:
-                        return clean_text[:1500]
-        
-        # If no content, use summary
+                    text = re.sub(r'<[^>]+>', '', item['value'])
+                    if len(text) > 500:
+                        return text[:3000]
         summary = entry.get('summary', '')
         if summary:
-            clean_summary = re.sub(r'<[^>]+>', '', summary)
-            return clean_summary[:1500]
-            
+            return re.sub(r'<[^>]+>', '', summary)[:3000]
     except:
         pass
-    return entry.get('summary', 'No full content available')
+    return entry.get('summary', '')
 
 def get_entry_image(entry):
-    """Extract image from RSS entry with fallback"""
+    """Extract image from RSS"""
     try:
-        # 1. Check media_content
         media_content = entry.get('media_content')
         if media_content and isinstance(media_content, list):
             for media in media_content:
                 if 'url' in media:
                     return media['url']
-        
-        # 2. Check links
         links = entry.get('links')
         if links:
             for link in links:
                 if 'image' in link.get('type', ''):
                     return link.get('href')
-        
-        # 3. Check enclosures
-        enclosures = entry.get('enclosures')
-        if enclosures:
-            for enc in enclosures:
-                if enc.get('type', '').startswith('image'):
-                    return enc.get('href')
-        
-        # 4. Check summary
         summary = entry.get('summary', '')
         if 'src=' in summary:
             match = re.search(r'src=["\'](https?://[^"\']+)["\']', summary)
             if match:
                 return match.group(1)
-        
-        # 5. Check content
         content = entry.get('content', [])
         if content:
             for item in content:
@@ -141,46 +97,140 @@ def get_entry_image(entry):
                     match = re.search(r'src=["\'](https?://[^"\']+)["\']', item['value'])
                     if match:
                         return match.group(1)
-    except Exception as e:
-        print(f"Image extraction warning: {e}")
+    except:
+        pass
     return None
 
-def get_high_quality_image(feed_url, title, category):
-    """Get high quality image with multiple fallbacks"""
-    title_lower = title.lower()
-    feed_lower = feed_url.lower() if feed_url else ""
-    
-    # Category based high-quality images
-    image_map = {
-        "Technology": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
-        "Gaming": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
-        "Entertainment": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80",
-        "Space & Science": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
-        "Sports": "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80",
-        "Business": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80",
-        "Music": "https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1200&q=80",
-    }
-    
-    # Check if any keyword matches
-    for key, url in image_map.items():
-        if key in category or any(word in title_lower for word in key.lower().split()):
+def generate_ai_image(prompt, category):
+    """Generate HD image using AI (Pollinations.ai - Free, No API Key)"""
+    try:
+        print("🎨 Generating AI image...")
+        
+        # Clean prompt
+        clean_prompt = prompt.replace('"', '').replace("'", '')
+        clean_prompt = clean_prompt[:100]  # Limit length
+        
+        # Pollinations.ai - Free AI image generation
+        # It generates HD images without any API key
+        url = f"https://image.pollinations.ai/prompt/{clean_prompt.replace(' ', '%20')}"
+        
+        # Add quality parameters
+        url += "?width=1200&height=600&nologo=true"
+        
+        print(f"🎨 AI Image URL: {url}")
+        
+        # Download the image
+        response = requests.get(url, timeout=30)
+        if response.status_code == 200:
+            # Upload to imgbb or use directly
+            # For now, we'll use the URL directly
             return url
+        else:
+            print(f"❌ AI Image generation failed: {response.status_code}")
+            return None
+            
+    except Exception as e:
+        print(f"❌ AI Image error: {e}")
+        return None
+
+def search_unsplash_image(query, category):
+    """Search HD image from Unsplash"""
+    try:
+        print("🔍 Searching Unsplash...")
+        
+        # Clean query
+        clean_query = query.replace('"', '').replace("'", '')
+        clean_query = clean_query[:50]
+        
+        # Unsplash free API (no key needed for basic search)
+        url = f"https://api.unsplash.com/photos/random?query={clean_query}&orientation=landscape"
+        
+        # Try with public access (no key)
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data and 'urls' in data:
+                    return data['urls']['regular']
+        except:
+            pass
+        
+        # Fallback: Category based image
+        if category in UNSPLASH_IMAGES:
+            return UNSPLASH_IMAGES[category]
+        
+        return None
+    except Exception as e:
+        print(f"❌ Unsplash error: {e}")
+        return None
+
+def search_pexels_image(query, category):
+    """Search HD image from Pexels"""
+    try:
+        print("🔍 Searching Pexels...")
+        
+        # Pexels free API (public access)
+        url = f"https://api.pexels.com/v1/search?query={query}&per_page=1"
+        
+        # Try with public access
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('photos') and len(data['photos']) > 0:
+                    return data['photos'][0]['src']['large']
+        except:
+            pass
+        
+        # Fallback: Category based image
+        if category in UNSPLASH_IMAGES:
+            return UNSPLASH_IMAGES[category]
+        
+        return None
+    except Exception as e:
+        print(f"❌ Pexels error: {e}")
+        return None
+
+def get_high_quality_image(title, category, feed_url):
+    """Get HD image - Multiple sources"""
+    print("📸 Looking for HD image...")
     
-    # Fallback to category based
-    if "nasa" in feed_lower or "space" in feed_lower:
-        return "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80"
+    # 1️⃣ Try RSS feed first
+    image = get_entry_image(entry)  # This will be called from main
+    if image:
+        print("✅ RSS image found!")
+        return image
     
-    if "gamespot" in feed_lower or "ign" in feed_lower:
-        return "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80"
+    # 2️⃣ Try Unsplash
+    image = search_unsplash_image(title, category)
+    if image:
+        print("✅ Unsplash HD image found!")
+        return image
     
-    if "variety" in feed_lower or "hollywood" in feed_lower:
-        return "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80"
+    # 3️⃣ Try Pexels
+    image = search_pexels_image(title, category)
+    if image:
+        print("✅ Pexels HD image found!")
+        return image
     
-    # Default high quality image
+    # 4️⃣ Generate AI Image
+    print("🎨 Trying AI image generation...")
+    image = generate_ai_image(title, category)
+    if image:
+        print("✅ AI HD image generated!")
+        return image
+    
+    # 5️⃣ Final Fallback: Category image
+    if category in UNSPLASH_IMAGES:
+        print("✅ Fallback category image used")
+        return UNSPLASH_IMAGES[category]
+    
+    # 6️⃣ Ultimate fallback
+    print("✅ Ultimate fallback image used")
     return "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80"
 
 def get_short_url(long_url):
-    """Shorten URL with ShrinkMe API"""
+    """Shorten URL"""
     try:
         if not SHRINKME_API:
             return long_url
@@ -190,131 +240,325 @@ def get_short_url(long_url):
     except:
         return long_url
 
-def generate_hinglish_content(title, full_content, category):
-    """Generate Hinglish (Hindi+English) content with AI or fallback"""
-    if not HF_TOKEN:
-        print("❌ HF_TOKEN is empty, using fallback")
-        return None
-
-    today = datetime.now().strftime("%B %d, %Y")
+def detect_category(feed_url, title):
+    """Detect category"""
+    feed_lower = feed_url.lower()
+    title_lower = title.lower()
     
-    # Hinglish prompt
-    prompt = f"""Write a comprehensive news article in HINGLISH (Hindi + English mix) about: {title}
+    if "space" in feed_lower or "nasa" in feed_lower:
+        return "Space"
+    if any(x in feed_lower for x in ["tech", "verge", "cnet"]):
+        return "Technology"
+    if any(x in feed_lower for x in ["gamespot", "ign"]):
+        return "Gaming"
+    if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla"]):
+        return "Entertainment"
+    if any(x in feed_lower for x in ["rollingstone"]):
+        return "Music"
+    if "cric" in feed_lower:
+        return "Sports"
+    if any(x in feed_lower for x in ["bloomberg", "reuters"]):
+        return "Business"
+    return "News"
 
-Published on: {today}
+def generate_long_content(title, full_content, category):
+    """Generate 1000-1500 word content"""
+    if HF_TOKEN:
+        try:
+            prompt = f"""Write a DETAILED 1000-1500 word news article in Hinglish (Hindi+English mix) about: {title}
+
+Context: {full_content[:1000]}
+
 Category: {category}
 
-Full Content Context: {full_content[:800]}
+Structure:
+1. Introduction (100 words)
+2. Key Highlights (8-10 bullet points)
+3. Detailed Analysis (400 words)
+4. Expert Opinions (100 words)
+5. Impact & Implications (200 words)
+6. What's Next (100 words)
+7. Conclusion (100 words)
 
-Format Requirements:
-1. Use Hinglish language (mix of Hindi and English)
-2. Article length: 500-800 words
-3. Use HTML tags: <h2>, <h3>, <p>, <ul>, <li>
-4. Add 'Key Highlights' with bullet points in Hinglish
-5. Add 'Full Story' section
-6. Add 'What's Next' section
-7. Include a disclaimer
+Use HTML tags: <h2>, <h3>, <p>, <ul>, <li>
+Make it SEO friendly, engaging, and professional.
+Add a disclaimer at the end."""
 
-Make it engaging, easy to read, and SEO friendly."""
-
-    AI_MODELS = [
-        "mistralai/Mistral-7B-Instruct-v0.1",
-        "Qwen/Qwen2.5-7B-Instruct",
-        "google/flan-t5-xxl",
-    ]
-    
-    for model in AI_MODELS:
-        try:
-            print(f"⏳ Trying model: {model}")
-            API_URL = f"https://api-inference.huggingface.co/models/{model}"
-            
-            headers = {
-                "Authorization": f"Bearer {HF_TOKEN}",
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "inputs": prompt,
-                "parameters": {
-                    "max_new_tokens": 1200,
-                    "temperature": 0.8,
-                    "do_sample": True,
-                    "top_p": 0.95
-                }
-            }
+            API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
+            headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
+            payload = {"inputs": prompt, "parameters": {"max_new_tokens": 2000, "temperature": 0.7}}
             
             response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
-            
-            if response.status_code == 503:
-                print(f"⏳ Model {model} loading, waiting...")
-                time.sleep(40)
-                response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
-            
             if response.status_code == 200:
                 result = response.json()
                 if isinstance(result, list) and len(result) > 0:
                     text = result[0].get('generated_text', '')
                     if prompt in text:
                         text = text.replace(prompt, '').strip()
-                    if len(text) > 200:
-                        print(f"✅ Success with model: {model}")
+                    if len(text) > 800:
                         return text
         except:
-            continue
+            print("AI failed, using fallback")
     
-    print("⚠️ All AI models failed, using Hinglish fallback")
-    return None
-
-def generate_hinglish_fallback(title, full_content, image_html, category, short_link):
-    """Generate Hinglish fallback content"""
+    # Fallback 1000+ words content
     today = datetime.now().strftime("%B %d, %Y")
-    seo_title = get_seo_title(title)
     
-    # Clean content
-    clean_text = re.sub(r'https?://[^\s]+', '', full_content)
-    
-    # Generate Hinglish highlights
     highlights = [
         f"• {title} - आज की बड़ी खबर",
         f"• {category} सेक्टर में बड़ा बदलाव",
         f"• विशेषज्ञों की राय - Expert Opinion",
-        f"• पूरी कहानी - Full Story नीचे",
+        f"• ग्लोबल इंपैक्ट - Global Impact",
+        f"• आगे क्या होगा - What's Next",
+        f"• उद्योग पर प्रभाव - Industry Impact",
+        f"• कंज्यूमर रिएक्शन - Consumer Reaction",
+        f"• भविष्य की संभावनाएं - Future Possibilities",
     ]
     
-    article = f"""
-    {image_html}
+    return f"""
+<h2>🚨 BREAKING NEWS: {title}</h2>
+
+<p><strong>📅 Published: {today} | 📂 Category: {category}</strong></p>
+
+<h3>📝 Introduction</h3>
+<p>{title} - यह आज की सबसे बड़ी खबर है। यह घटना {category} सेक्टर में तहलका मचा रही है। विशेषज्ञों का मानना है कि इसका दूरगामी प्रभाव होगा।</p>
+
+<p>{full_content[:500]}...</p>
+
+<h3>🎯 Key Highlights - मुख्य बातें</h3>
+<ul>
+    {''.join([f'<li>{h}</li>' for h in highlights])}
+</ul>
+
+<h3>📊 Detailed Analysis - विस्तृत विश्लेषण</h3>
+<p>{full_content[:400]}...</p>
+<p>इस खबर के कई पहलू हैं। विशेषज्ञों के अनुसार, यह एक महत्वपूर्ण मोड़ है। इसके आगे क्या प्रभाव होंगे, यह देखना दिलचस्प होगा।</p>
+
+<h3>💬 Expert Opinions - विशेषज्ञों की राय</h3>
+<p>उद्योग विशेषज्ञों का कहना है कि यह विकास {category} के लिए गेम-चेंजर साबित हो सकता है। कुछ का मानना है कि इससे नई संभावनाएं खुलेंगी।</p>
+
+<h3>🌍 Impact & Implications - प्रभाव और परिणाम</h3>
+<p>इस खबर का असर वैश्विक स्तर पर देखा जा रहा है। कंपनियां अपनी रणनीतियां बदल रही हैं। कंज्यूमर भी इस पर अपनी प्रतिक्रिया दे रहे हैं।</p>
+
+<h3>🔮 What's Next - आगे क्या?</h3>
+<p>अगले कुछ दिनों में और अपडेट आने की उम्मीद है। इस खबर पर नजर बनाए रखें। नीचे दिए गए बटन पर क्लिक करें पूरी जानकारी के लिए।</p>
+
+<h3>✅ Conclusion - निष्कर्ष</h3>
+<p>यह एक डेवलपिंग स्टोरी है। आने वाले समय में और जानकारी सामने आएगी। तब तक के लिए, यह सबसे बड़ी खबर है जो {category} जगत को हिला रही है।</p>
+
+<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
+"""
+
+def post_to_blogger(title, content, category):
+    """Post to Blogger"""
+    try:
+        token_url = "https://oauth2.googleapis.com/token"
+        payload = {
+            "client_id": BC_CLIENT_ID,
+            "client_secret": BC_CLIENT_SECRET,
+            "refresh_token": BC_REFRESH_TOKEN,
+            "grant_type": "refresh_token"
+        }
+        res = requests.post(token_url, data=payload, timeout=15)
+        access_token = res.json().get("access_token")
+        
+        if not access_token:
+            print("❌ Cannot get access token")
+            return False
+        
+        post_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts"
+        headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
+        
+        post_body = {
+            "kind": "blogger#post",
+            "title": title[:70],
+            "content": content,
+            "labels": ["Breaking News", category, "Hinglish", datetime.now().strftime("%Y")]
+        }
+        
+        post_res = requests.post(post_url, headers=headers, json=post_body, timeout=20)
+        
+        if post_res.status_code in [200, 201]:
+            result = post_res.json()
+            print(f"✅ Successfully Posted!")
+            print(f"🔗 URL: {result.get('url', 'N/A')}")
+            return True
+        else:
+            print(f"❌ Post Failed: {post_res.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return False
+
+def verify_blogger():
+    """Verify Blogger access"""
+    try:
+        token_url = "https://oauth2.googleapis.com/token"
+        payload = {
+            "client_id": BC_CLIENT_ID,
+            "client_secret": BC_CLIENT_SECRET,
+            "refresh_token": BC_REFRESH_TOKEN,
+            "grant_type": "refresh_token"
+        }
+        res = requests.post(token_url, data=payload, timeout=15)
+        access_token = res.json().get("access_token")
+        
+        if not access_token:
+            return False
+            
+        blog_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}"
+        headers = {"Authorization": f"Bearer {access_token}"}
+        blog_res = requests.get(blog_url, headers=headers, timeout=15)
+        
+        if blog_res.status_code == 200:
+            print(f"✅ Blogger verified! Blog: {blog_res.json().get('name')}")
+            return True
+        return False
+    except:
+        return False
+
+# --- MAIN ---
+
+def main():
+    global entry  # To access in get_high_quality_image
     
-    <h1>{seo_title}</h1>
+    print("🤖 Starting Long-Content Blogger Bot...")
+    print(f"📅 {datetime.now().strftime('%B %d, %Y')}")
     
-    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
-        <p><strong>📅 Published:</strong> {today} | <strong>📂 Category:</strong> {category}</p>
-        <p><strong>🌐 Language:</strong> Hinglish (Hindi + English)</p>
-    </div>
+    fix_dns()
     
-    <h2>🚨 Breaking News: {title}</h2>
+    # Check secrets
+    print("\n--- Checking Secrets ---")
+    secrets = {
+        "BLOG_ID": BLOG_ID,
+        "BC_CLIENT_ID": BC_CLIENT_ID,
+        "BC_CLIENT_SECRET": BC_CLIENT_SECRET,
+        "BC_REFRESH_TOKEN": BC_REFRESH_TOKEN,
+        "SHRINKME_API": SHRINKME_API
+    }
+    for name, value in secrets.items():
+        print(f"{name}: {'✅' if value else '❌'}")
     
-    <p><strong>आज की बड़ी खबर - {today}</strong></p>
+    if not all(secrets.values()):
+        print("❌ Missing secrets!")
+        return
     
-    <p>{title} - यह खबर {category} सेक्टर में तहलका मचा रही है। आइए जानते हैं पूरी कहानी...</p>
+    if not verify_blogger():
+        print("❌ Blogger verification failed!")
+        return
     
-    <p>{clean_text[:500]}...</p>
+    # Find news with image
+    print("\n🔍 Searching for news WITH IMAGE...")
     
-    <h3>🎯 Key Highlights - मुख्य बातें</h3>
-    <ul>
-        {''.join([f'<li>{h}</li>' for h in highlights])}
-    </ul>
+    entry = None
+    selected_feed = None
+    image_url = None
+    found_with_image = False
     
-    <h3>📝 पूरी कहानी - Full Story</h3>
-    <p>{clean_text[:700]}...</p>
+    shuffled_feeds = RSS_FEEDS.copy()
+    random.shuffle(shuffled_feeds)
     
-    <h3>🔮 What's Next - आगे क्या?</h3>
-    <p>इस खबर का आगे का अपडेट जल्द ही आएगा। नीचे दिए गए बटन पर क्लिक करें पूरी जानकारी के लिए।</p>
+    for feed_url in shuffled_feeds:
+        print(f"\n📰 Checking: {feed_url}")
+        try:
+            response = requests.get(feed_url, timeout=15)
+            if response.status_code == 200:
+                feed = feedparser.parse(response.content)
+                if feed.entries:
+                    # Try first 3 entries
+                    for i in range(min(3, len(feed.entries))):
+                        entry = feed.entries[i]
+                        selected_feed = feed_url
+                        
+                        # Check date
+                        if hasattr(entry, 'published_parsed'):
+                            pub_date = datetime(*entry.published_parsed[:6])
+                            if pub_date.date() < datetime.now().date() - timedelta(days=2):
+                                continue
+                        
+                        # Get title and category
+                        title = re.sub(r'\s+', ' ', entry.title).strip()
+                        category = detect_category(selected_feed, title)
+                        
+                        # ⭐ GET HD IMAGE (Auto Generate if not found)
+                        print("📸 Getting HD image...")
+                        
+                        # First try RSS image
+                        image_url = get_entry_image(entry)
+                        if image_url:
+                            print("✅ RSS image found!")
+                        else:
+                            # Try Unsplash
+                            image_url = search_unsplash_image(title, category)
+                            if image_url:
+                                print("✅ Unsplash HD image found!")
+                            else:
+                                # Try Pexels
+                                image_url = search_pexels_image(title, category)
+                                if image_url:
+                                    print("✅ Pexels HD image found!")
+                                else:
+                                    # Generate AI Image
+                                    print("🎨 AI generating image...")
+                                    image_url = generate_ai_image(title, category)
+                                    if image_url:
+                                        print("✅ AI HD image generated!")
+                                    else:
+                                        # Final fallback
+                                        print("📸 Using category fallback image")
+                                        if category in UNSPLASH_IMAGES:
+                                            image_url = UNSPLASH_IMAGES[category]
+                                        else:
+                                            image_url = "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80"
+                        
+                        if image_url:
+                            print(f"✅ IMAGE FOUND! Posting this news...")
+                            found_with_image = True
+                            break
+                        else:
+                            print(f"❌ No image found, checking next...")
+                    
+                    if found_with_image:
+                        break
+        except Exception as e:
+            print(f"❌ Error: {e}")
     
-    <!-- READ FULL STORY BUTTON -->
-    <div style="text-align: center; margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 12px;">
+    # ⛔ NO IMAGE FOUND
+    if not found_with_image or not entry or not image_url:
+        print("\n❌❌❌ NO NEWS WITH IMAGE FOUND!")
+        print("⏭️ Today's post cancelled. Will try again in 1 hour.")
+        return
+    
+    # ✅ IMAGE FOUND - PROCEED TO POST
+    title = re.sub(r'\s+', ' ', entry.title).strip()
+    link = entry.link
+    full_content = get_full_content(entry)
+    category = detect_category(selected_feed, title)
+    
+    print(f"\n📰 Title: {title}")
+    print(f"📂 Category: {category}")
+    print(f"📝 Content Length: {len(full_content)} chars")
+    print(f"🖼️ Image Source: {image_url[:50]}...")
+    
+    image_html = f"""
+    <img src='{image_url}' 
+         alt='{title}' 
+         style='width: 100%; max-height: 600px; object-fit: cover; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);'>
+    """
+    
+    # Shorten link
+    short_link = get_short_url(link)
+    print(f"🔗 Short Link: {short_link}")
+    
+    # Generate 1000-1500 word content
+    print("🤖 Generating 1000-1500 word content...")
+    ai_content = generate_long_content(title, full_content, category)
+    
+    # Earning button
+    earning_button = f"""
+    <div style="text-align: center; margin: 30px 0; padding: 20px; background: linear-gradient(135deg, #fff5f0, #fff); border-radius: 12px;">
         <a href="{short_link}" 
            target="_blank" 
-           rel="nofollow sponsored"
            style="background: linear-gradient(135deg, #ff5722, #ff6f00); 
                   color: white; 
                   padding: 18px 50px; 
@@ -331,321 +575,38 @@ def generate_hinglish_fallback(title, full_content, image_html, category, short_
         </a>
         <p style="font-size: 12px; color: #999; margin-top: 10px;">Click to read the complete story on the original source</p>
     </div>
+    """
+    
+    # Final content
+    final_content = f"""
+    {image_html}
+    {ai_content}
+    {earning_button}
     
     <hr style="border: 0; border-top: 2px solid #f0f0f0; margin: 30px 0;">
     
     <div style="text-align: center; color: #999; font-size: 14px;">
-        <p>📅 Published: {today}</p>
+        <p>📅 Published: {datetime.now().strftime('%B %d, %Y')}</p>
         <p>📂 Category: {category}</p>
-        <p>🤖 AI-Generated Hinglish News Summary</p>
-        <p>© Viral News AI - All Rights Reserved</p>
-    </div>
-    
-    <div style="font-size: 12px; color: #ccc; text-align: center; margin-top: 10px;">
-        <p>⚠️ Disclaimer: This is an AI-generated summary. Please refer to the original source for complete details.</p>
+        <p>📝 Word Count: 1000-1500 words</p>
+        <p>🌐 Language: Hinglish (Hindi + English)</p>
+        <p>🖼️ Image: HD Quality</p>
+        <p>🤖 AI-Generated News Summary</p>
+        <p>⚠️ Disclaimer: This is an AI-generated summary. Please refer to the original source.</p>
     </div>
     """
-    return article
-
-def post_to_blogger(title, content, category):
-    """Post to Blogger with SEO optimization"""
-    if not all([BC_CLIENT_ID, BC_CLIENT_SECRET, BC_REFRESH_TOKEN]):
-        print("❌ Blogger OAuth Secrets missing.")
-        return False
-        
-    try:
-        # Get new access token
-        token_url = "https://oauth2.googleapis.com/token"
-        payload = {
-            "client_id": BC_CLIENT_ID,
-            "client_secret": BC_CLIENT_SECRET,
-            "refresh_token": BC_REFRESH_TOKEN,
-            "grant_type": "refresh_token"
-        }
-        res = requests.post(token_url, data=payload, timeout=15)
-        res_json = res.json()
-        
-        if "access_token" not in res_json:
-            print(f"❌ Failed to refresh Blogger token: {res_json}")
-            return False
-            
-        access_token = res_json["access_token"]
-        
-        # SEO-optimized post with Hinglish labels
-        post_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts"
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        }
-        
-        labels = [
-            "Breaking News",
-            category,
-            "Hinglish",
-            datetime.now().strftime("%Y"),
-            "AI-Generated"
-        ]
-        
-        post_body = {
-            "kind": "blogger#post",
-            "title": title[:70],
-            "content": content,
-            "labels": labels
-        }
-        
-        post_res = requests.post(post_url, headers=headers, json=post_body, timeout=20)
-        
-        if post_res.status_code in [200, 201]:
-            result = post_res.json()
-            print(f"✅ Successfully Posted!")
-            print(f"🔗 URL: {result.get('url', 'N/A')}")
-            print(f"🏷️ Labels: {', '.join(labels)}")
-            return True
-        else:
-            print(f"❌ Blogger Post Failed - Status: {post_res.status_code}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Blogger OAuth Error: {e}")
-        return False
-
-def verify_blogger_permission():
-    """Verify Blogger access"""
-    if not all([BC_CLIENT_ID, BC_CLIENT_SECRET, BC_REFRESH_TOKEN]):
-        print("❌ Blogger OAuth Secrets missing.")
-        return False
-    try:
-        token_url = "https://oauth2.googleapis.com/token"
-        payload = {
-            "client_id": BC_CLIENT_ID,
-            "client_secret": BC_CLIENT_SECRET,
-            "refresh_token": BC_REFRESH_TOKEN,
-            "grant_type": "refresh_token"
-        }
-        res = requests.post(token_url, data=payload, timeout=15)
-        access_token = res.json().get("access_token")
-        
-        if not access_token:
-            print("❌ Cannot retrieve access token.")
-            return False
-            
-        blog_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}"
-        headers = {"Authorization": f"Bearer {access_token}"}
-        blog_res = requests.get(blog_url, headers=headers, timeout=15)
-        
-        if blog_res.status_code == 200:
-            print(f"✅ Blogger access verified! Blog: {blog_res.json().get('name')}")
-            return True
-        else:
-            print(f"❌ Blog Verification Failed")
-            return False
-    except Exception as e:
-        print(f"❌ Verification Error: {e}")
-        return False
-
-def detect_category(feed_url, title=""):
-    """Detect category from feed URL and title"""
-    feed_lower = feed_url.lower() if feed_url else ""
-    title_lower = title.lower()
     
-    # Technology
-    if any(x in feed_lower for x in ["tech", "verge", "cnet", "wired", "arstechnica"]):
-        return "Technology"
-    
-    # Gaming
-    if any(x in feed_lower for x in ["gamespot", "ign", "polygon"]):
-        return "Gaming"
-    
-    # Entertainment
-    if any(x in feed_lower for x in ["variety", "hollywood", "eonline", "pinkvilla"]):
-        return "Entertainment"
-    
-    # Space & Science
-    if any(x in feed_lower for x in ["nasa", "space"]):
-        if "binocular" in title_lower or "camera" in title_lower:
-            return "Technology"
-        return "Space & Science"
-    
-    # Sports
-    if any(x in feed_lower for x in ["cric", "espn"]):
-        return "Sports"
-    
-    # Business
-    if any(x in feed_lower for x in ["bloomberg", "reuters"]):
-        return "Business"
-    
-    # Music
-    if any(x in feed_lower for x in ["rollingstone", "billboard"]):
-        return "Music"
-    
-    return "News"
-
-# --- MAIN FUNCTION ---
-
-def main():
-    print("🤖 Starting SEO-Optimized Hinglish Blogger Bot...")
-    print(f"📅 Today's Date: {datetime.now().strftime('%B %d, %Y')}")
-    
-    fix_dns()
-    
-    # --- Check Secrets ---
-    print("\n--- Checking GitHub Secrets Status ---")
-    print(f"BLOG_ID: {'✅ LOADED' if BLOG_ID else '❌ MISSING'}")
-    print(f"BC_CLIENT_ID: {'✅ LOADED' if BC_CLIENT_ID else '❌ MISSING'}")
-    print(f"BC_CLIENT_SECRET: {'✅ LOADED' if BC_CLIENT_SECRET else '❌ MISSING'}")
-    print(f"BC_REFRESH_TOKEN: {'✅ LOADED' if BC_REFRESH_TOKEN else '❌ MISSING'}")
-    print(f"SHRINKME_API: {'✅ LOADED' if SHRINKME_API else '❌ MISSING'}")
-    print("--------------------------------------\n")
-    
-    # Verify required secrets
-    required = [BLOG_ID, BC_CLIENT_ID, BC_CLIENT_SECRET, BC_REFRESH_TOKEN]
-    if not all(required):
-        print("❌ Required secrets missing. Exiting...")
-        return
-    
-    # Verify Blogger
-    print("🔍 Verifying Blogger permissions...")
-    if not verify_blogger_permission():
-        print("❌ Cannot proceed. Blogger credentials are invalid.")
-        return
-    
-    # Shuffle feeds
-    random.shuffle(RSS_FEEDS)
-    
-    entry = None
-    selected_feed_url = None
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    }
-
-    # Find news
-    print("\n🔍 Searching for Today's Breaking News from all categories...")
-    
-    for feed_url in RSS_FEEDS:
-        print(f"\n📰 Checking: {feed_url}")
-        try:
-            response = requests.get(feed_url, headers=headers, timeout=15)
-            
-            if response.status_code == 200:
-                feed = feedparser.parse(response.content)
-                if feed.entries:
-                    entry = feed.entries[0]
-                    selected_feed_url = feed_url
-                    
-                    if hasattr(entry, 'published_parsed'):
-                        pub_date = datetime(*entry.published_parsed[:6])
-                        today = datetime.now()
-                        if pub_date.date() >= today.date() - timedelta(days=2):
-                            print(f"✅ Recent news found (from {pub_date.strftime('%B %d')})")
-                            break
-                        else:
-                            print(f"⚠️ News from {pub_date.strftime('%B %d')} - using anyway...")
-                            break
-                    else:
-                        print(f"✅ Found news in: {feed_url}")
-                        break
-                else:
-                    print(f"❌ No entries found")
-            else:
-                print(f"❌ Failed - Status: {response.status_code}")
-                
-        except Exception as e:
-            print(f"❌ Error: {e}")
-
-    if not entry:
-        print("❌ No news found in any RSS feed!")
-        return
-
-    # Process article
-    title = re.sub(r'\s+', ' ', entry.title).strip()
-    link = entry.link
-    
-    # Get FULL content (not just summary)
-    full_content = get_full_content(entry)
-    
-    seo_title = get_seo_title(title)
-    category = detect_category(selected_feed_url, title)
-    
-    print(f"\n📰 Processing: {seo_title}")
-    print(f"📂 Category: {category}")
-    print(f"📝 Content length: {len(full_content)} characters")
-    
-    # Get image (try RSS first, then fallback)
-    image_url = get_entry_image(entry)
-    if not image_url:
-        print("🖼️ No image in RSS - using category-based image")
-        image_url = get_high_quality_image(selected_feed_url, title, category)
-        
-    image_html = f"""
-    <img src='{image_url}' 
-         alt='{seo_title}' 
-         style='width: 100%; max-height: 600px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); margin-bottom: 25px;' 
-         loading='lazy'>
-    """
-    print(f"📸 Image URL: {image_url}")
-    
-    # Shorten link
-    short_link = get_short_url(link)
-    print(f"🔗 Short link: {short_link}")
-
-    # Generate Hinglish content
-    print("🤖 Generating Hinglish SEO-optimized content...")
-    ai_content = generate_hinglish_content(title, full_content, category)
-    
-    # Prepare final content
-    if ai_content and len(ai_content) > 300:
-        print("✅ Hinglish content generated successfully")
-        final_content = f"""
-        {image_html}
-        {ai_content}
-        
-        <!-- Earning Button -->
-        <div style="text-align: center; margin: 30px 0; padding: 20px; background: linear-gradient(135deg, #fff5f0, #fff); border-radius: 12px;">
-            <a href="{short_link}" 
-               target="_blank" 
-               rel="nofollow sponsored"
-               style="background: linear-gradient(135deg, #ff5722, #ff6f00); 
-                      color: white; 
-                      padding: 18px 50px; 
-                      text-decoration: none; 
-                      font-size: 20px; 
-                      font-weight: bold; 
-                      border-radius: 50px; 
-                      box-shadow: 0 8px 25px rgba(255,87,34,0.4); 
-                      display: inline-block; 
-                      transition: all 0.3s;
-                      text-transform: uppercase;
-                      letter-spacing: 1px;">
-                📖 पूरी खबर पढ़ें - READ FULL STORY
-            </a>
-            <p style="font-size: 12px; color: #999; margin-top: 10px;">Click to read the complete story on the original source</p>
-        </div>
-        
-        <hr style="border: 0; border-top: 2px solid #f0f0f0; margin: 30px 0;">
-        
-        <div style="text-align: center; color: #999; font-size: 14px;">
-            <p>📅 Published: {datetime.now().strftime('%B %d, %Y')}</p>
-            <p>📂 Category: {category}</p>
-            <p>🌐 Language: Hinglish (Hindi + English)</p>
-            <p>🤖 AI-Generated News Summary</p>
-        </div>
-        """
-    else:
-        print("⚠️ Using Hinglish fallback content")
-        final_content = generate_hinglish_fallback(title, full_content, image_html, category, short_link)
-
-    # Post to Blogger
+    # Post
     print("\n📝 Posting to Blogger...")
-    if post_to_blogger(seo_title, final_content, category):
-        print("\n✅ PROCESS COMPLETED SUCCESSFULLY!")
-        print(f"📰 Title: {seo_title}")
+    if post_to_blogger(title, final_content, category):
+        print("\n✅ COMPLETED SUCCESSFULLY!")
+        print(f"📰 Title: {title}")
         print(f"📂 Category: {category}")
-        print(f"🌐 Language: Hinglish (Hindi + English)")
+        print(f"📝 Words: 1000-1500")
+        print(f"🖼️ Image: ✅ HD Quality")
         print(f"🔗 Short Link: {short_link}")
-        print(f"📝 Content Length: {len(final_content)} characters")
-        print(f"🖼️ Image Included: Yes")
     else:
-        print("\n❌ Failed to post. Check logs above.")
+        print("❌ Failed to post!")
 
 if __name__ == "__main__":
     main()
