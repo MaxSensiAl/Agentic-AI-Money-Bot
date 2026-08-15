@@ -342,16 +342,37 @@ def main():
     print(f"📅 {datetime.now().strftime('%B %d, %Y')}")
     fix_dns()
     
+    # Check if secrets are loaded
+    print("\n--- Checking Secrets ---")
+    secrets = {
+        "BLOG_ID": BLOG_ID,
+        "HF_TOKEN": HF_TOKEN,
+        "SHRINKME_API": SHRINKME_API,
+        "BC_CLIENT_ID": BC_CLIENT_ID,
+        "BC_CLIENT_SECRET": BC_CLIENT_SECRET,
+        "BC_REFRESH_TOKEN": BC_REFRESH_TOKEN
+    }
+    all_loaded = True
+    for name, value in secrets.items():
+        status = "✅ LOADED" if value else "❌ MISSING"
+        print(f"{name}: {status}")
+        if not value:
+            all_loaded = False
+    
+    if not all_loaded:
+        print("\n❌ Secrets missing! Please add all secrets in GitHub Settings.")
+        return
+    
     access_token = get_blogger_access_token()
     if not access_token:
-        print("❌ Invalid token.")
+        print("❌ Invalid token. Please check BC_CLIENT_ID, BC_CLIENT_SECRET, BC_REFRESH_TOKEN")
         return
     
     # Load ALL existing titles
     existing_titles = get_all_blogger_titles(access_token)
     local_posted = load_posted_news()
     all_posted = existing_titles.union(local_posted)
-    print(f"📊 Total tracked: {len(all_posted)}")
+    print(f"\n📊 Total tracked posts: {len(all_posted)}")
     
     found_news = False
     entry = None
@@ -361,8 +382,9 @@ def main():
     shuffled_feeds = RSS_FEEDS.copy()
     random.shuffle(shuffled_feeds)
     
+    print("\n🔍 Searching for new news...")
     for feed_url in shuffled_feeds:
-        print(f"📰 Checking: {feed_url}")
+        print(f"\n📰 Checking: {feed_url}")
         try:
             response = requests.get(feed_url, timeout=15)
             if response.status_code == 200:
@@ -378,7 +400,7 @@ def main():
                     
                     # ⭐ DUPLICATE CHECK
                     if is_duplicate_title(temp_title, all_posted):
-                        print(f"⏭️ SKIP: {temp_title[:40]}...")
+                        print(f"⏭️ SKIP (Duplicate): {temp_title[:40]}...")
                         continue
                     
                     category = detect_category(feed_url, temp_title)
@@ -388,6 +410,7 @@ def main():
                         entry = temp_entry
                         selected_feed = feed_url
                         found_news = True
+                        print(f"✅ NEW news found!")
                         break
                 if found_news:
                     break
@@ -395,7 +418,7 @@ def main():
             print(f"⚠️ Error: {e}")
     
     if not found_news or not entry:
-        print("❌ No new news found!")
+        print("\n❌ No new news found! Will try again in 1 hour.")
         return
     
     raw_title = entry.title
@@ -404,6 +427,9 @@ def main():
     full_content = get_full_content(entry)
     category = detect_category(selected_feed, title)
     
+    print(f"\n📰 Title: {title}")
+    print(f"📂 Category: {category}")
+    
     image_html = f"""
     <div style="text-align:center;margin-bottom:25px;">
         <img src='{image_url}' alt='{title}' style='width:100%;max-width:700px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);'>
@@ -411,6 +437,9 @@ def main():
     """
     
     short_link = get_short_url(link)
+    print(f"🔗 Short Link: {short_link}")
+    
+    print("🤖 Generating content...")
     ai_content = generate_long_content(title, full_content, category)
     
     earning_button = f"""
@@ -423,15 +452,16 @@ def main():
     
     final_content = f"{image_html}{ai_content}{earning_button}"
     
-    print(f"\n📝 Posting: {title}")
+    print(f"\n📝 Posting to Blogger...")
     if post_to_blogger(access_token, title, final_content, category):
         save_posted_news(title)
-        print("\n✅ SUCCESS!")
-        print(f"📰 {title}")
-        print(f"📂 {category}")
-        print(f"🔗 {short_link}")
+        print("\n✅✅✅ COMPLETED SUCCESSFULLY! ✅✅✅")
+        print(f"📰 Title: {title}")
+        print(f"📂 Category: {category}")
+        print(f"🔗 Short Link: {short_link}")
+        print(f"🖼️ Image: HD Quality")
     else:
-        print("❌ Failed!")
+        print("❌ Failed to post!")
 
 if __name__ == "__main__":
     main()
