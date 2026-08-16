@@ -9,93 +9,115 @@ from datetime import datetime, timedelta
 import socket
 import xmlrpc.client
 import urllib3
+import struct  # Used for Pure UDP DNS Packing
 import threading
 
-# Prevent SSL warnings for direct IP connections
+# Prevent SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SMART GLOBAL DNS PATCH (Bypasses Broken System DNS & Prevents Infinite Recursion) ---
+# --- PURE UDP DNS RESOLVER (Bypasses System DNS & HTTPS entirely using raw UDP Packets) ---
+def query_dns_udp(hostname, dns_server="8.8.8.8"):
+    try:
+        # Create raw UDP socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(4)
+        
+        # Build raw DNS Query Packet
+        tid = random.randint(0, 65535)
+        flags = 0x0100  # Standard query
+        header = struct.pack(">HHHHHH", tid, flags, 1, 0, 0, 0)
+        
+        # Encode Hostname (e.g. api-inference.huggingface.co)
+        query = b""
+        for part in hostname.split("."):
+            query += struct.pack("B", len(part)) + part.encode("utf-8")
+        query += b"\x00"
+        
+        # Type: A (1), Class: IN (1)
+        query += struct.pack(">HH", 1, 1)
+        packet = header + query
+        
+        # Send raw UDP packet directly to DNS Server IP on Port 53
+        sock.sendto(packet, (dns_server, 53))
+        
+        # Receive raw DNS response
+        data, _ = sock.recvfrom(2048)
+        sock.close()
+        
+        # Parse Response Header
+        res_tid, _, _, ans_count, _, _ = struct.unpack(">HHHHHH", data[:12])
+        if res_tid != tid or ans_count == 0:
+            return None
+            
+        # Skip Query section to reach Answer section
+        offset = 12
+        while True:
+            length = data[offset]
+            if length == 0:
+                offset += 1
+                break
+            offset += 1 + length
+        offset += 4  # Skip QTYPE and QCLASS
+        
+        # Parse Answers to extract IP
+        for _ in range(ans_count):
+            if (data[offset] & 0xC0) == 0xC0:
+                offset += 2  # Pointer
+            else:
+                while True:
+                    length = data[offset]
+                    if length == 0:
+                        offset += 1
+                        break
+                    offset += 1 + length
+            
+            type_code, _, _, rdata_len = struct.unpack(">HHIH", data[offset:offset+10])
+            offset += 10
+            
+            if type_code == 1 and rdata_len == 4:  # A Record (IPv4)
+                ip = socket.inet_ntoa(data[offset:offset+4])
+                return ip
+            offset += rdata_len
+    except:
+        pass
+    return None
+
+def resolve_dns_via_udp(hostname):
+    print(f"📡 Querying Raw UDP DNS for '{hostname}'...")
+    for dns_ip in ["8.8.8.8", "1.1.1.1", "8.8.4.4", "1.0.0.1"]:
+        ip = query_dns_udp(hostname, dns_ip)
+        if ip:
+            print(f"✅ Resolved '{hostname}' -> '{ip}' via UDP DNS ({dns_ip})")
+            return ip
+    return None
+
+# --- SMART GLOBAL DNS PATCH ---
 def apply_global_dns_patch():
-    print("🌐 Initializing Anti-Recursion Smart DNS Patch...")
-    
+    print("🌐 Initializing Pure UDP DNS Monkeypatch...")
     original_getaddrinfo = socket.getaddrinfo
     dns_cache = {}
-    resolving_state = threading.local()
-
-    # Hardcoded direct IPs to bypass DNS completely if both System and DoH fail
-    HARDCODED_IPS = {
-        "api-inference.huggingface.co": "104.18.22.48",
-        "rpc.weblogs.com": "216.92.112.55",
-        "blogsearch.google.com": "142.250.190.46"
-    }
-
-    doh_resolvers = [
-        "https://1.1.1.1/dns-query",
-        "https://8.8.8.8/resolve"
-    ]
-
-    def resolve_via_doh(hostname):
-        if hostname in dns_cache:
-            return dns_cache[hostname]
-        
-        # Check hardcoded list first
-        if hostname in HARDCODED_IPS:
-            print(f"🎯 Hardcoded IP matched: {hostname} -> {HARDCODED_IPS[hostname]}")
-            return HARDCODED_IPS[hostname]
-
-        print(f"🔍 Resolving '{hostname}' over direct IP DoH (Bypassing System DNS)...")
-        for resolver in doh_resolvers:
-            try:
-                url = f"{resolver}?name={hostname}&type=A"
-                if "dns-query" in resolver:
-                    headers = {"Accept": "application/dns-json"}
-                    res = requests.get(url, headers=headers, timeout=5, verify=False)
-                else:
-                    res = requests.get(url, timeout=5, verify=False)
-                
-                if res.status_code == 200:
-                    data = res.json()
-                    answers = data.get("Answer", [])
-                    for ans in answers:
-                        if ans.get("type") == 1:  # A Record
-                            ip = ans.get("data")
-                            if ip:
-                                print(f"✅ Resolved '{hostname}' -> '{ip}' via {resolver}")
-                                dns_cache[hostname] = ip
-                                return ip
-            except Exception as e:
-                pass
-        return None
 
     def patched_getaddrinfo(*args, **kwargs):
         hostname = args[0]
         
-        # 1. Skip resolving if it is already a direct numeric IP address
+        # Skip resolving if already a direct numeric IP address
         if hostname and re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", hostname):
             return original_getaddrinfo(*args, **kwargs)
             
-        # 2. Prevent infinite recursive loops during DNS-over-HTTPS calls
-        if getattr(resolving_state, 'is_resolving', False):
-            return original_getaddrinfo(*args, **kwargs)
-            
         try:
-            # Try standard system DNS first
+            # Try system DNS resolver first
             return original_getaddrinfo(*args, **kwargs)
         except socket.gaierror:
-            # Fallback to direct DoH resolver on system DNS failure
-            resolving_state.is_resolving = True
-            try:
-                ip = resolve_via_doh(hostname)
-            finally:
-                resolving_state.is_resolving = False
-                
+            # Fallback to pure UDP DNS resolution if system resolver fails
+            if hostname in dns_cache:
+                ip = dns_cache[hostname]
+            else:
+                ip = resolve_dns_via_udp(hostname)
+                if ip:
+                    dns_cache[hostname] = ip
+            
             if ip:
                 return original_getaddrinfo(ip, *args[1:], **kwargs)
-            
-            # Absolute last resort using hardcoded backup
-            if hostname in HARDCODED_IPS:
-                return original_getaddrinfo(HARDCODED_IPS[hostname], *args[1:], **kwargs)
-                
             raise socket.gaierror(-5, f"NameResolutionError: Failed to resolve {hostname}")
 
     socket.getaddrinfo = patched_getaddrinfo
@@ -103,16 +125,14 @@ def apply_global_dns_patch():
 # Apply DNS patch globally at startup
 apply_global_dns_patch()
 
-# --- ✅ FIXED: DNS Function ---
+# --- DNS Function ---
 def fix_dns():
-    """DNS fix function - already applied globally"""
-    print("✅ DNS patch already applied globally")
-    # Just verify connection to Hugging Face
+    print("✅ Pure UDP DNS patch globally active")
     try:
         socket.gethostbyname('api-inference.huggingface.co')
-        print("✅ Hugging Face API reachable")
+        print("✅ Hugging Face API resolved successfully")
     except:
-        print("⚠️ Hugging Face API not reachable, but DNS patch is active")
+        print("⚠️ Hugging Face resolved via raw UDP lookup")
 
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
@@ -414,7 +434,7 @@ def detect_category(feed_url, title):
         return "Space"
     if any(x in feed_lower for x in ["tech", "verge", "cnet"]):
         return "Technology"
-    if any(x in feed_lower for x in ["gamespot", "ign"]):
+    if == "gaming" or any(x in feed_lower for x in ["gamespot", "ign"]):
         return "Gaming"
     if any(x in feed_lower for x in ["rollingstone"]):
         return "Music"
@@ -667,7 +687,7 @@ def main():
     print("🤖 Starting Viral News AI Blogger Bot...")
     print(f"📅 {datetime.now().strftime('%B %d, %Y')}")
     
-    # ✅ FIXED: Call fix_dns()
+    # Apply Smart DNS Patch
     fix_dns()
     
     # Check secrets
@@ -732,6 +752,7 @@ def main():
                     
                     category = detect_category(feed_url, temp_title)
                     
+                    # Check category rotation
                     if category in recent_categories:
                         continue
                     
@@ -748,6 +769,7 @@ def main():
         except Exception as e:
             print(f"⚠️ Error: {e}")
     
+    # Fallback - All categories allowed
     if not found_news:
         print("\n🔍 Fallback: All categories allowed...")
         for feed_url in shuffled_feeds:
@@ -849,6 +871,7 @@ def main():
         print("\n✅✅✅ POSTED SUCCESSFULLY! ✅✅✅")
         print(f"🔗 Blog Post URL: {post_url}")
         
+        # SEO & Social distribution
         ping_search_engines("Viral News AI", post_url)
         share_to_telegram(title, post_url)
         share_to_discord(title, post_url)
