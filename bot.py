@@ -230,45 +230,171 @@ def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
     
+    # Entertainment
     if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla", "eonline"]):
         return "Entertainment"
-    if any(x in title_lower for x in ["spider-man", "movie", "film", "hollywood", "box office", "marvel", "dc", "drag race", "rupaul"]):
+    if any(x in title_lower for x in ["spider-man", "movie", "film", "hollywood", "box office", "marvel", "dc", "drag race", "rupaul", "series", "episode"]):
         return "Entertainment"
     
+    # Space
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
     
+    # Technology
     if any(x in feed_lower for x in ["tech", "verge", "cnet"]):
         return "Technology"
     
+    # Gaming
     if any(x in feed_lower for x in ["gamespot", "ign"]):
         return "Gaming"
     
+    # Music
     if any(x in feed_lower for x in ["rollingstone"]):
         return "Music"
     
-    # Sports - Cricket
-    if "cric" in feed_lower or any(x in title_lower for x in ["cricket", "century", "wicket", "odi", "test", "match"]):
+    # Sports
+    if "cric" in feed_lower or any(x in title_lower for x in ["cricket", "century", "wicket", "odi", "test", "match", "football", "goal"]):
         return "Sports"
     
+    # Business
     if any(x in feed_lower for x in ["bloomberg", "reuters"]):
         return "Business"
     
     return "News"
 
-def generate_sports_content(title, full_content, category):
-    """Generate SPORTS specific content - No generic sentences"""
+def generate_entertainment_content(title, full_content, category):
+    """Generate Entertainment specific content"""
     today = datetime.now().strftime("%B %d, %Y")
+    clean_title = clean_and_format_title(title)
+    first_para = full_content[:400] if full_content else ""
     
-    # Clean title
+    highlights = [
+        f"<li><strong>🎬 नई घोषणा:</strong> {clean_title[:50]} - Entertainment इंडस्ट्री में बड़ी खबर</li>",
+        f"<li><strong>🌟 स्टार कास्ट:</strong> बड़े सितारे इस प्रोजेक्ट का हिस्सा</li>",
+        f"<li><strong>📅 रिलीज़ डेट:</strong> आने वाले महीनों में रिलीज़ होगी</li>",
+        f"<li><strong>🍿 फैंस की प्रतिक्रिया:</strong> सोशल मीडिया पर उत्साह</li>",
+    ]
+    
+    intro = f"""
+<p>{clean_title}. This exciting announcement has created a buzz in the entertainment industry, with fans eagerly waiting for more details.</p>
+
+<p>{clean_title} - Entertainment इंडस्ट्री में यह एक बड़ी घोषणा है। फैंस इस प्रोजेक्ट का बेसब्री से इंतजार कर रहे हैं और सोशल मीडिया पर इसकी चर्चा जोरों पर है।</p>
+"""
+    
+    analysis = f"""
+<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+<p>{first_para}</p>
+<p>यह प्रोजेक्ट Entertainment इंडस्ट्री के लिए एक महत्वपूर्ण कदम है। इसमें बड़े सितारे शामिल हैं और इसके रिलीज़ होने की उम्मीद है।</p>
+
+<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
+<p>Film critics and industry experts are praising this announcement as a game-changer for the entertainment industry.</p>
+<p>फिल्म समीक्षकों और इंडस्ट्री विशेषज्ञों का मानना है कि यह घोषणा Entertainment जगत के लिए एक गेम-चेंजर साबित होगी।</p>
+
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह Entertainment इंडस्ट्री के लिए एक नई शुरुआत है।"</p>
+</blockquote>
+
+<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
+<p>This announcement is expected to create a significant impact on the entertainment landscape. Fans can expect more updates in the coming weeks.</p>
+<p>इस घोषणा का Entertainment इंडस्ट्री पर बड़ा प्रभाव पड़ेगा। आने वाले हफ्तों में और अपडेट आने की उम्मीद है।</p>
+
+<h3>✅ निष्कर्ष - Conclusion</h3>
+<p>This is a major development in the entertainment world that will be remembered for years to come.</p>
+<p>यह Entertainment जगत का एक बड़ा विकास है जो आने वाले वर्षों में याद रखा जाएगा।</p>
+"""
+    
+    return f"""
+<h2>🎬 BREAKING NEWS: {clean_title}</h2>
+
+<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
+    <p><strong>📅 Published: {today}</strong></p>
+    <p><strong>📂 Category: {category}</strong></p>
+</div>
+
+<h3>📝 परिचय - Introduction</h3>
+{intro}
+
+<h3>🎯 मुख्य बातें - Key Highlights</h3>
+<ul>
+    {''.join(highlights)}
+</ul>
+
+{analysis}
+
+<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
+"""
+
+def generate_technology_content(title, full_content, category):
+    """Generate Technology specific content"""
+    today = datetime.now().strftime("%B %d, %Y")
+    clean_title = clean_and_format_title(title)
+    first_para = full_content[:400] if full_content else ""
+    
+    highlights = [
+        f"<li><strong>💻 नया लॉन्च:</strong> {clean_title[:50]} - टेक जगत में बड़ी खबर</li>",
+        f"<li><strong>📱 नए फीचर्स:</strong> बेहतरीन स्पेक्स और कीमत</li>",
+        f"<li><strong>🔋 बैटरी लाइफ:</strong> लंबी बैटरी बैकअप</li>",
+        f"<li><strong>💵 कीमत:</strong> किफायती दाम में मिलेगा</li>",
+    ]
+    
+    intro = f"""
+<p>{clean_title}. This new launch is set to revolutionize the technology sector with its innovative features and competitive pricing.</p>
+
+<p>{clean_title} - टेक्नोलॉजी सेक्टर में यह एक बड़ा लॉन्च है। इसके नए फीचर्स और किफायती कीमत ने सभी का ध्यान खींचा है।</p>
+"""
+    
+    analysis = f"""
+<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+<p>{first_para}</p>
+<p>इस नए प्रोडक्ट में कई बेहतरीन फीचर्स हैं जो इसे कंपटीशन से अलग बनाते हैं। इसकी कीमत भी काफी आकर्षक है।</p>
+
+<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
+<p>Tech reviewers and industry experts are impressed by the specifications and pricing of this new product.</p>
+<p>टेक रिव्यूअर्स और इंडस्ट्री विशेषज्ञ इस नए प्रोडक्ट के स्पेक्स और कीमत से काफी प्रभावित हैं।</p>
+
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह प्रोडक्ट टेक्नोलॉजी सेक्टर में एक नया मानक स्थापित करेगा।"</p>
+</blockquote>
+
+<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
+<p>This launch is expected to set new benchmarks in the technology sector. More updates and reviews will follow in the coming days.</p>
+<p>इस लॉन्च से टेक्नोलॉजी सेक्टर में नए मानक स्थापित होने की उम्मीद है। आने वाले दिनों में और रिव्यू आएंगे।</p>
+
+<h3>✅ निष्कर्ष - Conclusion</h3>
+<p>This is a significant development in the technology sector that will impact consumers and competitors alike.</p>
+<p>यह टेक्नोलॉजी सेक्टर का एक महत्वपूर्ण विकास है जो कंज्यूमर्स और कंपटीटर्स दोनों को प्रभावित करेगा।</p>
+"""
+    
+    return f"""
+<h2>💻 BREAKING NEWS: {clean_title}</h2>
+
+<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
+    <p><strong>📅 Published: {today}</strong></p>
+    <p><strong>📂 Category: {category}</strong></p>
+</div>
+
+<h3>📝 परिचय - Introduction</h3>
+{intro}
+
+<h3>🎯 मुख्य बातें - Key Highlights</h3>
+<ul>
+    {''.join(highlights)}
+</ul>
+
+{analysis}
+
+<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
+"""
+
+def generate_sports_content(title, full_content, category):
+    """Generate SPORTS specific content"""
+    today = datetime.now().strftime("%B %d, %Y")
     clean_title = title.replace("Afg", "Afghanistan")
     if "seals" in clean_title.lower():
         clean_title = clean_title.replace("seals", "Seals")
     
-    # Extract cricket specific info
     first_para = full_content[:400] if full_content else ""
     
-    # ✅ SPORTS SPECIFIC HIGHLIGHTS
     highlights = [
         f"<li><strong>🏏 ऐतिहासिक जीत:</strong> यह वनडे क्रिकेट के इतिहास में अफगानिस्तान का अब तक का सबसे बड़ा और सफल रन चेज है।</li>",
         f"<li><strong>🌟 रहमत शाह का शतक:</strong> रहमत शाह ने जिम्मेदारी से बल्लेबाजी करते हुए टीम के लिए एक बेहतरीन मैच जिताऊ शतक लगाया।</li>",
@@ -276,14 +402,12 @@ def generate_sports_content(title, full_content, category):
         f"<li><strong>💪 मजबूत बल्लेबाजी:</strong> 299 रनों के मुश्किल लक्ष्य का पीछा करते हुए अफगान बल्लेबाजों ने गजब का संयम और आक्रामकता दिखाई।</li>",
     ]
     
-    # ✅ SPORTS SPECIFIC INTRODUCTION
     intro = f"""
 <p>Rahmat Shah's brilliant century, along with a historic 201-run partnership with Sediqullah Atal, guided Afghanistan to their highest-ever successful run chase in ODI cricket. The team successfully chased down the target of 299 runs to register a memorable victory.</p>
 
 <p>अफगानिस्तान क्रिकेट टीम ने वनडे इतिहास में अपना सबसे बड़ा रन चेज (Run Chase) हासिल करके एक नया इतिहास रच दिया है। स्टार बल्लेबाज रहमत शाह (Rahmat Shah) के शानदार शतक और सिद्दीकुल्लाह अटल (Sediqullah Atal) के साथ उनकी बेहतरीन साझेदारी की बदौलत टीम ने 299 रनों के बड़े लक्ष्य को सफलतापूर्वक हासिल कर लिया।</p>
 """
     
-    # ✅ SPORTS SPECIFIC ANALYSIS
     analysis = f"""
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
 <p>This historic chase showcases the immense growth of Afghanistan's batting lineup on the international stage. Facing a challenging target of 299, the batsmen showed incredible maturity and composure, proving that Afghanistan is now a complete and dangerous ODI team.</p>
@@ -333,42 +457,57 @@ def generate_sports_content(title, full_content, category):
 
 def generate_long_content(title, full_content, category):
     """Generate content based on category"""
-    today = datetime.now().strftime("%B %d, %Y")
     
-    # For Sports/Cricket, use specialized content
+    # For Entertainment
+    if category == "Entertainment":
+        return generate_entertainment_content(title, full_content, category)
+    
+    # For Sports/Cricket
     if category == "Sports" or "cricket" in title.lower() or "century" in title.lower():
         return generate_sports_content(title, full_content, category)
     
-    # For other categories
+    # For Technology
+    if category == "Technology":
+        return generate_technology_content(title, full_content, category)
+    
+    # For other categories (Gaming, Space, Music, Business, News)
+    today = datetime.now().strftime("%B %d, %Y")
     clean_title = clean_and_format_title(title)
     first_para = full_content[:400] if full_content else ""
     
     highlights = [
-        f"<li><strong>{clean_title[:50]}</strong> - आज की बड़ी खबर</li>",
-        f"<li><strong>{category} सेक्टर</strong> में बड़ा बदलाव</li>",
-        f"<li><strong>विशेषज्ञों की राय</strong> - Expert insights</li>",
-        f"<li><strong>ग्लोबल इंपैक्ट</strong> - Global impact</li>",
-        f"<li><strong>आगे क्या होगा</strong> - What's next</li>",
+        f"<li><strong>🔴 मुख्य खबर:</strong> {clean_title[:50]}</li>",
+        f"<li><strong>📂 Category:</strong> {category}</li>",
+        f"<li><strong>📊 विश्लेषण:</strong> विशेषज्ञों की राय</li>",
+        f"<li><strong>🔮 आगे क्या:</strong> आने वाले अपडेट</li>",
     ]
     
     intro = f"""
+<p>{clean_title}. This is the biggest news in the {category} sector today.</p>
+
 <p>{clean_title} - यह आज की {category} सेक्टर की सबसे बड़ी खबर है।</p>
-<p>{first_para}</p>
 """
     
     analysis = f"""
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
 <p>{first_para}</p>
-<p>इस खबर के बारे में और अधिक जानकारी सामने आ रही है। {category} सेक्टर के विशेषज्ञ इस पर अपनी राय दे रहे हैं।</p>
+<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं।</p>
 
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-<p>उद्योग विशेषज्ञों के अनुसार, यह विकास {category} सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
+<p>Experts believe this development will have a significant impact on the {category} sector.</p>
+<p>विशेषज्ञों का मानना है कि इस विकास का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ेगा।</p>
+
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर के लिए एक महत्वपूर्ण मोड़ है।"</p>
+</blockquote>
 
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>इस खबर का असर वैश्विक स्तर पर देखा जा रहा है। आने वाले दिनों में और अपडेट आने की उम्मीद है।</p>
+<p>This news is expected to have a significant impact on the {category} sector. More updates will follow in the coming days.</p>
+<p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है। आने वाले दिनों में और अपडेट आएंगे।</p>
 
 <h3>✅ निष्कर्ष - Conclusion</h3>
-<p>यह एक महत्वपूर्ण घटना है जो {category} सेक्टर को प्रभावित करेगी।</p>
+<p>This is a significant development that will shape the future of the {category} sector.</p>
+<p>यह एक महत्वपूर्ण विकास है जो {category} सेक्टर के भविष्य को आकार देगा।</p>
 """
     
     return f"""
