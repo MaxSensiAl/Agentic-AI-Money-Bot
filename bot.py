@@ -39,12 +39,11 @@ def apply_global_dns_patch():
         if hostname in dns_cache:
             return dns_cache[hostname]
         
-        # Check hardcoded list first
         if hostname in HARDCODED_IPS:
             print(f"🎯 Hardcoded IP matched: {hostname} -> {HARDCODED_IPS[hostname]}")
             return HARDCODED_IPS[hostname]
 
-        print(f"🔍 Resolving '{hostname}' over direct IP DoH (Bypassing System DNS)...")
+        print(f"🔍 Resolving '{hostname}' over direct IP DoH...")
         for resolver in doh_resolvers:
             try:
                 url = f"{resolver}?name={hostname}&type=A"
@@ -58,10 +57,10 @@ def apply_global_dns_patch():
                     data = res.json()
                     answers = data.get("Answer", [])
                     for ans in answers:
-                        if ans.get("type") == 1:  # A Record
+                        if ans.get("type") == 1:
                             ip = ans.get("data")
                             if ip:
-                                print(f"✅ Resolved '{hostname}' -> '{ip}' via {resolver}")
+                                print(f"✅ Resolved '{hostname}' -> '{ip}'")
                                 dns_cache[hostname] = ip
                                 return ip
             except Exception as e:
@@ -71,19 +70,15 @@ def apply_global_dns_patch():
     def patched_getaddrinfo(*args, **kwargs):
         hostname = args[0]
         
-        # 1. Skip resolving if it is already a direct numeric IP address
         if hostname and re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", hostname):
             return original_getaddrinfo(*args, **kwargs)
             
-        # 2. Prevent infinite recursive loops during DNS-over-HTTPS calls
         if getattr(resolving_state, 'is_resolving', False):
             return original_getaddrinfo(*args, **kwargs)
             
         try:
-            # Try standard system DNS first
             return original_getaddrinfo(*args, **kwargs)
         except socket.gaierror:
-            # Fallback to direct DoH resolver on system DNS failure
             resolving_state.is_resolving = True
             try:
                 ip = resolve_via_doh(hostname)
@@ -93,7 +88,6 @@ def apply_global_dns_patch():
             if ip:
                 return original_getaddrinfo(ip, *args[1:], **kwargs)
             
-            # Absolute last resort using hardcoded backup
             if hostname in HARDCODED_IPS:
                 return original_getaddrinfo(HARDCODED_IPS[hostname], *args[1:], **kwargs)
                 
@@ -101,14 +95,11 @@ def apply_global_dns_patch():
 
     socket.getaddrinfo = patched_getaddrinfo
 
-# Apply DNS patch globally at startup
 apply_global_dns_patch()
 
-# --- ✅ FIXED: DNS Function ---
+# --- DNS Function ---
 def fix_dns():
-    """DNS fix function - already applied globally"""
     print("✅ DNS patch already applied globally")
-    # Just verify connection to Hugging Face
     try:
         socket.gethostbyname('api-inference.huggingface.co')
         print("✅ Hugging Face API reachable")
@@ -124,7 +115,6 @@ BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
 
-# --- SOCIAL SHARING TOKENS ---
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL')
@@ -209,7 +199,7 @@ def save_recent_category(category):
     except:
         pass
 
-# --- SEO INSTANT INDEXING (PING SERVICES) ---
+# --- SEO PINGING ---
 def ping_search_engines(blog_name, blog_url):
     print("🚀 SEO Pinging Google, Bing & directories...")
     ping_services = [
@@ -226,7 +216,7 @@ def ping_search_engines(blog_name, blog_url):
         except Exception as e:
             print(f"⚠️ Ping to {name} failed: {e}")
 
-# --- AUTOMATIC VIRAL SHARING ---
+# --- SOCIAL SHARING ---
 def share_to_telegram(title, link):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         print("⏭️ Telegram share skipped")
@@ -415,6 +405,7 @@ def detect_category(feed_url, title):
         return "Space"
     if any(x in feed_lower for x in ["tech", "verge", "cnet"]):
         return "Technology"
+    # ✅ FIXED: Gaming category
     if "gaming" in feed_lower or any(x in feed_lower for x in ["gamespot", "ign"]):
         return "Gaming"
     if any(x in feed_lower for x in ["rollingstone"]):
@@ -425,7 +416,7 @@ def detect_category(feed_url, title):
         return "Business"
     return "News"
 
-# --- DYNAMIC DEEP AI WRITER (2000-3000 WORDS IN HINGLISH) ---
+# --- AI CONTENT GENERATOR ---
 def generate_content_via_ai(title, full_content, category):
     if not HF_TOKEN:
         print("⚠️ HF_TOKEN missing!")
@@ -439,56 +430,46 @@ def generate_content_via_ai(title, full_content, category):
     
     system_prompt = """You are "Viral News AI", an elite world-class news editor and professional Hinglish content generator.
 Instructions:
-1. Write extremely detailed and long sections (minimum 2000-3000 words total). Do not write short summaries. Write 5-6 long, descriptive paragraphs for each section.
-2. No incomplete words (never write "Seaso", always write "Seasons").
-3. Do not use double bullet points. Use single (•) bullet points only.
-4. Absolutely NO generic filler text. Generate real, factual summaries.
-5. For Sports: Never use business terms like "Industry Impact" or "Consumer Reaction". Use "Match Analysis" and "Fans' Reaction".
-6. Return content only in the requested HTML format."""
+1. Write extremely detailed and long sections (minimum 2000-3000 words total).
+2. No incomplete words.
+3. Use single bullet points only.
+4. NO generic filler text.
+5. For Sports: Use "Match Analysis" not "Industry Impact".
+6. Return content only in HTML format."""
 
-    user_prompt = f"""Write a massive, detailed, and highly engaging magazine-style feature article (minimum 2500 words) for:
+    user_prompt = f"""Write a massive, detailed feature article (minimum 2500 words) for:
 Title: {title}
 Category: {category}
 Reference Content: {full_content[:2000]}
 
-Generate the output exactly in this HTML structure with very long, detailed paragraphs:
+Structure:
 <h3>📝 परिचय - Introduction</h3>
-[Write a massive, engaging narrative paragraph in English (minimum 300 words) detailing the background, context, and immediate news. Then, write a rich, highly detailed paragraph in Hindi/Hinglish (minimum 300 words) explaining the same with deep emotion and excitement.]
+[Detailed English and Hindi paragraphs]
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
-  <li>[Highly detailed point 1 with emoji]</li>
-  <li>[Highly detailed point 2 with emoji]</li>
-  <li>[Highly detailed point 3 with emoji]</li>
-  <li>[Highly detailed point 4 with emoji]</li>
-  <li>[Highly detailed point 5 with emoji]</li>
-  <li>[Highly detailed point 6 with emoji]</li>
+  <li>[6 points with emojis]</li>
 </ul>
 
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-[Write a comprehensive, deep-dive analysis paragraph in English (minimum 400 words). Go into technical specs, gameplay, strategies, or background history. Then, write a corresponding highly detailed, long paragraph in Hindi/Hinglish (minimum 400 words) to fully explain the depth of the event.]
+[Detailed English and Hindi paragraphs]
 
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-[Write multiple detailed paragraphs in English and Hindi detailing what top analysts, reviewers, or pundits are saying.]
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"[A context-specific quote in Hindi/English]"</p>
-</blockquote>
+[Detailed English and Hindi paragraphs]
+<blockquote>[Quote]</blockquote>
 
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-[Detailed paragraphs in English and Hindi explaining the long-term impact and future roadmap, next matches, upcoming releases, or market shifts.]
+[Detailed English and Hindi paragraphs]
 
 <h3>✅ निष्कर्ष - Conclusion</h3>
-[Conclusion in English and Hindi]
+[Detailed English and Hindi paragraphs]
 """
 
     headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
-    
-    # UNIFIED CHAT COMPLETION ENDPOINT
     api_url = "https://api-inference.huggingface.co/v1/chat/completions"
     
     for model in models:
-        print(f"🧠 Querying Chat Completer: {model} (Generating 2000+ words)...")
-        
+        print(f"🧠 Querying: {model}...")
         payload = {
             "model": model,
             "messages": [
@@ -509,25 +490,25 @@ Generate the output exactly in this HTML structure with very long, detailed para
                     if text and len(text.strip()) > 300:
                         return text.strip()
                 
-                elif response.status_code == 503 or "loading" in str(res_data):
+                elif response.status_code == 503:
                     wait_time = 25
                     try:
                         wait_time = int(res_data.get("estimated_time", 25))
                     except:
                         pass
-                    print(f"😴 Model loading. Waiting {wait_time}s (Attempt {attempt+1}/3)...")
+                    print(f"⏳ Waiting {wait_time}s...")
                     time.sleep(wait_time + 2)
                     continue
                 else:
-                    print(f"⚠️ API status {response.status_code}: {response.text}")
+                    print(f"⚠️ Status {response.status_code}")
                     break
             except Exception as e:
-                print(f"⚠️ Error with model {model}: {e}")
+                print(f"⚠️ Error: {e}")
                 break
                 
     return None
 
-# --- FALLBACK CONTENT (3000+ words) ---
+# --- FALLBACK CONTENT ---
 def fallback_long_content(title, full_content, category):
     today = datetime.now().strftime("%B %d, %Y")
     clean_title = clean_and_format_title(title)
@@ -554,8 +535,6 @@ def fallback_long_content(title, full_content, category):
 <p>This breaking news has sent shockwaves through the {category} sector. Industry experts, analysts, and enthusiasts are closely monitoring the situation as it develops. The implications of this announcement could reshape the entire landscape of {category} in the coming months.</p>
 
 <p>आज की यह बड़ी खबर {category} सेक्टर में हलचल मचा रही है। विशेषज्ञों, विश्लेषकों और उत्साही लोगों की नजर इस विकास पर टिकी हुई है। इस घोषणा के प्रभाव आने वाले महीनों में {category} के पूरे परिदृश्य को बदल सकते हैं।</p>
-
-<p>यह खबर {category} के इतिहास में एक महत्वपूर्ण मोड़ साबित हो सकती है। इससे जुड़े तमाम पहलुओं पर विशेषज्ञों की राय अलग-अलग है, लेकिन सभी इस बात पर सहमत हैं कि यह एक बड़ा बदलाव है।</p>
 """
 
     analysis = f"""
@@ -566,45 +545,28 @@ def fallback_long_content(title, full_content, category):
 <p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं। आने वाले दिनों में और जानकारी सामने आने की उम्मीद है।</p>
 
 <p>विशेषज्ञों का मानना है कि इस विकास का {category} सेक्टर पर गहरा प्रभाव पड़ेगा। कंपनियां अपनी रणनीतियों को दोबारा से तैयार कर रही हैं।</p>
-
-<p>इस खबर की पुष्टि होते ही {category} सेक्टर में उथल-पुथल मच गई है। कई बड़ी कंपनियों ने अपने प्लान्स को रिवाइज करना शुरू कर दिया है।</p>
-
-<p>विश्लेषकों के अनुसार, यह {category} सेक्टर के लिए एक गेम-चेंजर साबित हो सकता है। पिछले कुछ वर्षों में इस सेक्टर में कई बड़े बदलाव हुए हैं, और यह इसी का हिस्सा है।</p>
 """
 
     expert = f"""
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
 
-<p>Experts from around the world are weighing in on this significant development. Many believe this will create new opportunities while others caution about potential challenges.</p>
-
-<p>दुनिया भर के विशेषज्ञ इस महत्वपूर्ण विकास पर अपनी राय दे रहे हैं। कई लोग मानते हैं कि इससे नए अवसर पैदा होंगे, जबकि कुछ संभावित चुनौतियों के प्रति आगाह कर रहे हैं।</p>
+<p>Experts from around the world are weighing in on this significant development.</p>
 
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर के इतिहास में एक महत्वपूर्ण मोड़ है। इसके दीर्घकालिक प्रभाव आने वाले वर्षों में देखने को मिलेंगे।"</p>
-    <p style="font-style:italic;font-size:14px;color:#666;">- {category} विशेषज्ञ, 2026</p>
+    <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर के इतिहास में एक महत्वपूर्ण मोड़ है।"</p>
 </blockquote>
-
-<p>विशेषज्ञों का मानना है कि यह विकास {category} सेक्टर में नई संभावनाओं के द्वार खोलेगा। कई स्टार्टअप्स और नई कंपनियों के लिए यह एक बड़ा अवसर है।</p>
 """
 
     impact = f"""
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
 
 <p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है। आने वाले दिनों में और अपडेट आने की संभावना है।</p>
-
-<p>विशेषज्ञों का मानना है कि इस विकास का असर वैश्विक स्तर पर देखा जाएगा। कंपनियां अपनी रणनीतियों को इसके अनुसार ढाल रही हैं।</p>
-
-<p>आने वाले हफ्तों में इस खबर से जुड़े और भी कई पहलू सामने आ सकते हैं। {category} सेक्टर में यह एक महत्वपूर्ण घटनाक्रम है।</p>
 """
 
     conclusion = f"""
 <h3>✅ निष्कर्ष - Conclusion</h3>
 
-<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है। इसका प्रभाव आने वाले समय में और भी स्पष्ट होगा।</p>
-
-<p>विशेषज्ञ इस बात पर सहमत हैं कि यह {category} के भविष्य को आकार देने वाला एक महत्वपूर्ण कदम है। आने वाले दिनों में इससे जुड़ी और जानकारी सामने आएगी।</p>
-
-<p>यह खबर {category} सेक्टर में एक नई शुरुआत का संकेत है। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक रोमांचक समय है।</p>
+<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है।</p>
 """
     
     return f"""
@@ -634,13 +596,10 @@ def fallback_long_content(title, full_content, category):
 """
 
 def generate_long_content(title, full_content, category):
-    """Generate 2000-3000 words content"""
-    # AI first
     ai_content = generate_content_via_ai(title, full_content, category)
     if ai_content and len(ai_content) > 500:
         return ai_content
     
-    # Fallback to template
     print("⚠️ Using fallback template (2000+ words)")
     return fallback_long_content(title, full_content, category)
 
@@ -668,10 +627,8 @@ def main():
     print("🤖 Starting Viral News AI Blogger Bot...")
     print(f"📅 {datetime.now().strftime('%B %d, %Y')}")
     
-    # Apply Smart DNS Patch
     fix_dns()
     
-    # Check secrets
     print("\n--- Checking Secrets ---")
     secrets = {
         "BLOG_ID": BLOG_ID,
@@ -689,12 +646,12 @@ def main():
             all_loaded = False
     
     if not all_loaded:
-        print("\n❌ Secrets missing! Please add all required secrets.")
+        print("\n❌ Secrets missing!")
         return
     
     access_token = get_blogger_access_token()
     if not access_token:
-        print("❌ Invalid token! Check OAuth credentials.")
+        print("❌ Invalid token!")
         return
     
     existing_titles = get_all_blogger_titles(access_token)
@@ -733,7 +690,6 @@ def main():
                     
                     category = detect_category(feed_url, temp_title)
                     
-                    # Check category rotation
                     if category in recent_categories:
                         continue
                     
@@ -750,7 +706,6 @@ def main():
         except Exception as e:
             print(f"⚠️ Error: {e}")
     
-    # Fallback - All categories allowed
     if not found_news:
         print("\n🔍 Fallback: All categories allowed...")
         for feed_url in shuffled_feeds:
@@ -810,7 +765,6 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
-    # Generate 2000-3000 words content
     ai_content = generate_long_content(title, full_content, category)
     
     earning_button = f"""
@@ -852,7 +806,6 @@ def main():
         print("\n✅✅✅ POSTED SUCCESSFULLY! ✅✅✅")
         print(f"🔗 Blog Post URL: {post_url}")
         
-        # SEO & Social distribution
         ping_search_engines("Viral News AI", post_url)
         share_to_telegram(title, post_url)
         share_to_discord(title, post_url)
@@ -866,5 +819,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
---- END OF FILE text/plain ---
