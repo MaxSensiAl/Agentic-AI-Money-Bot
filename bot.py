@@ -52,8 +52,9 @@ UNSPLASH_IMAGES = {
     "Music": "https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1200&q=80",
 }
 
-# --- POSTED NEWS TRACKING ---
+# --- TRACKING FILES ---
 POSTED_FILE = 'posted_news.txt'
+CATEGORIES_TRACKER = 'recent_categories.json'
 
 def clean_and_format_title(title):
     if not title:
@@ -61,7 +62,6 @@ def clean_and_format_title(title):
     clean = re.sub(r'\s+', ' ', title).strip()
     clean = re.sub(r'202[0-9]\s*[-|]\s*202[0-9]', '', clean)
     clean = re.sub(r'\s*[-|]\s*$', '', clean)
-    # Title cut-off boundary check to prevent words like "into" becoming "int"
     if len(clean) > 120:
         clean = clean[:120].rsplit(' ', 1)[0]
     return clean
@@ -80,6 +80,28 @@ def save_posted_news(title):
         cleaned = clean_and_format_title(title)
         with open(POSTED_FILE, 'a', encoding='utf-8') as f:
             f.write(cleaned + '\n')
+    except:
+        pass
+
+# --- CATEGORY ROTATION SYSTEMS ---
+def load_recent_categories():
+    try:
+        if os.path.exists(CATEGORIES_TRACKER):
+            with open(CATEGORIES_TRACKER, 'r') as f:
+                return json.load(f)
+    except:
+        pass
+    return []
+
+def save_recent_category(category):
+    try:
+        recent = load_recent_categories()
+        if category in recent:
+            recent.remove(category)
+        recent.insert(0, category)
+        recent = recent[:3]  # Remember last 3 categories to force rotation
+        with open(CATEGORIES_TRACKER, 'w') as f:
+            json.dump(recent, f)
     except:
         pass
 
@@ -193,7 +215,6 @@ def generate_hd_image_with_text(title, category):
         clean = title.replace('"', '').replace("'", '')[:60]
         prompt = f"{clean} {category} news"
         url = f"https://image.pollinations.ai/prompt/{prompt.replace(' ', '%20')}?width=1200&height=630&nologo=true&seed={random.randint(1, 9999)}"
-        # Removed requests.head checking to prevent broken image errors
         return url
     except:
         pass
@@ -250,24 +271,24 @@ def detect_category(feed_url, title):
     
     return "News"
 
-# --- DYNAMIC AI GENERATION USING HUGGING FACE ---
+# --- DYNAMIC AI GENERATION WITH LOADING DETECTION & BACKUP ---
 def generate_content_via_ai(title, full_content, category):
     if not HF_TOKEN:
-        print("⚠️ HF_TOKEN is missing! Using static fallback.")
+        print("⚠️ HF_TOKEN missing!")
         return None
     
-    print("🧠 Contacting Hugging Face Meta-Llama API...")
-    api_url = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
-    headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
+    models = [
+        "meta-llama/Meta-Llama-3-8B-Instruct",
+        "mistralai/Mistral-7B-Instruct-v0.3"
+    ]
     
-    system_prompt = """You are "Viral News AI", an advanced, highly professional SEO-friendly Hinglish content generator.
-Instructions:
+    system_prompt = """You are "Viral News AI", an advanced, professional SEO-friendly Hinglish content generator.
+Rules:
 1. No incomplete words (never write "Seaso", always write "Seasons").
 2. Do not use double bullet points. Use single (•) bullet points only.
 3. Absolutely NO generic filler text. Generate real, factual summaries.
 4. For Sports: Never use business terms like "Industry Impact" or "Consumer Reaction". Use "Match Analysis" and "Fans' Reaction".
-5. For Space/History: Do not treat old events as live breaking news.
-6. Return content only in the requested HTML format."""
+5. Return content only in the requested HTML format."""
 
     user_prompt = f"""Generate a detailed Hinglish (Hindi + English) blog post for:
 Title: {title}
@@ -302,25 +323,44 @@ Generate the output exactly in this HTML structure:
 [Conclusion in English and Hindi]
 """
 
-    payload = {
-        "inputs": f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{system_prompt}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{user_prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
-        "parameters": {"max_new_tokens": 1000, "temperature": 0.7}
-    }
+    headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
     
-    try:
-        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
-        if response.status_code == 200:
-            result = response.json()
-            if isinstance(result, list) and len(result) > 0:
-                text = result[0].get('generated_text', '')
-                if "<|start_header_id|>assistant<|end_header_id|>\n\n" in text:
-                    text = text.split("<|start_header_id|>assistant<|end_header_id|>\n\n")[-1]
-                return text.strip()
-    except Exception as e:
-        print(f"⚠️ AI API Error: {e}")
+    for model in models:
+        api_url = f"https://api-inference.huggingface.co/models/{model}"
+        print(f"🧠 Trying AI Model: {model}...")
+        
+        payload = {
+            "inputs": f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{system_prompt}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{user_prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+            "parameters": {"max_new_tokens": 1000, "temperature": 0.7}
+        }
+        
+        for attempt in range(3):
+            try:
+                response = requests.post(api_url, headers=headers, json=payload, timeout=40)
+                res_data = response.json()
+                
+                if response.status_code == 200:
+                    if isinstance(res_data, list) and len(res_data) > 0:
+                        text = res_data[0].get('generated_text', '')
+                        if "<|start_header_id|>assistant<|end_header_id|>\n\n" in text:
+                            text = text.split("<|start_header_id|>assistant<|end_header_id|>\n\n")[-1]
+                        return text.strip()
+                
+                elif response.status_code == 503 or (isinstance(res_data, dict) and "currently loading" in res_data.get("error", "")):
+                    wait_time = int(res_data.get("estimated_time", 20))
+                    print(f"😴 Model is loading. Waiting {wait_time} seconds (Attempt {attempt+1}/3)...")
+                    time.sleep(wait_time + 2)
+                    continue
+                else:
+                    print(f"⚠️ API returned status {response.status_code}: {response.text}")
+                    break
+            except Exception as e:
+                print(f"⚠️ Connection error with {model}: {e}")
+                break
+                
     return None
 
-# --- FALLBACK STATIC TEMPLATES (ONLY IF AI API FAILS) ---
+# --- FALLBACK STATIC TEMPLATES ---
 def fallback_long_content(title, full_content, category):
     today = datetime.now().strftime("%B %d, %Y")
     clean_title = clean_and_format_title(title)
@@ -408,6 +448,9 @@ def main():
     all_posted = existing_titles.union(local_posted)
     print(f"\n📊 Total tracked posts: {len(all_posted)}")
     
+    recent_categories = load_recent_categories()
+    print(f"🔄 Recent posted categories to rotate/avoid: {recent_categories}")
+    
     found_news = False
     entry = None
     selected_feed = None
@@ -416,9 +459,9 @@ def main():
     shuffled_feeds = RSS_FEEDS.copy()
     random.shuffle(shuffled_feeds)
     
-    print("\n🔍 Searching for new news...")
+    # --- PASS 1: SEARCH WITH CATEGORY ROTATION (EXCLUDING RECENT CATEGORIES) ---
+    print("\n🔍 Searching for new news (Pass 1: Category Rotation)...")
     for feed_url in shuffled_feeds:
-        print(f"\n📰 Checking: {feed_url}")
         try:
             response = requests.get(feed_url, timeout=15)
             if response.status_code == 200:
@@ -433,22 +476,60 @@ def main():
                             continue
                     
                     if is_duplicate_title(temp_title, all_posted):
-                        print(f"⏭️ SKIP (Duplicate): {temp_title[:40]}...")
                         continue
                     
                     category = detect_category(feed_url, temp_title)
+                    
+                    # SKIP if the category has been posted very recently
+                    if category in recent_categories:
+                        continue
+                    
                     image_url = get_hd_image_strict(temp_entry, temp_title, category)
                     
                     if image_url:
                         entry = temp_entry
                         selected_feed = feed_url
                         found_news = True
-                        print(f"✅ NEW news with IMAGE found!")
+                        print(f"✅ NEW news found in Category '{category}' (Not in recent list)!")
                         break
                 if found_news:
                     break
         except Exception as e:
             print(f"⚠️ Error: {e}")
+            
+    # --- PASS 2: FALLBACK (IF NO NEW NEWS IN OTHER CATEGORIES, ACCEPT ANY) ---
+    if not found_news:
+        print("\n🔍 No new news in other categories. Running Pass 2 (Allowing all categories)...")
+        for feed_url in shuffled_feeds:
+            try:
+                response = requests.get(feed_url, timeout=15)
+                if response.status_code == 200:
+                    feed = feedparser.parse(response.content)
+                    for i in range(min(15, len(feed.entries))):
+                        temp_entry = feed.entries[i]
+                        temp_title = temp_entry.title
+                        
+                        if hasattr(temp_entry, 'published_parsed'):
+                            pub_date = datetime(*temp_entry.published_parsed[:6])
+                            if pub_date.date() < datetime.now().date() - timedelta(days=2):
+                                                    continue
+                        
+                        if is_duplicate_title(temp_title, all_posted):
+                            continue
+                        
+                        category = detect_category(feed_url, temp_title)
+                        image_url = get_hd_image_strict(temp_entry, temp_title, category)
+                        
+                        if image_url:
+                            entry = temp_entry
+                            selected_feed = feed_url
+                            found_news = True
+                            print(f"✅ NEW news found in Category '{category}' (Fallback)!")
+                            break
+                    if found_news:
+                        break
+            except Exception as e:
+                print(f"⚠️ Error: {e}")
     
     if not found_news or not entry:
         print("\n❌ No new news found! Will try again in 1 hour.")
@@ -517,6 +598,7 @@ def main():
     print(f"\n📝 Posting to Blogger...")
     if post_to_blogger(access_token, title, final_content, category):
         save_posted_news(title)
+        save_recent_category(category) # <--- Save the category to rotation list!
         print("\n✅✅✅ COMPLETED SUCCESSFULLY! ✅✅✅")
         print(f"📰 Title: {title}")
         print(f"📂 Category: {category}")
