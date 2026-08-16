@@ -7,29 +7,42 @@ import feedparser
 import re
 from datetime import datetime, timedelta
 import socket
-import xmlrpc.client  # Used for Instant SEO Google/Bing indexing
+import xmlrpc.client
 import urllib3
+import threading
 
-# --- SMART GLOBAL DNS PATCH (Bypasses Broken GitHub Runner DNS) ---
+# Prevent SSL warnings for direct IP connections
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# --- SMART GLOBAL DNS PATCH (Bypasses Broken System DNS & Prevents Infinite Recursion) ---
 def apply_global_dns_patch():
-    print("🌐 Initializing Smart Global DNS Patch (DNS-over-HTTPS via Direct IP)...")
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    print("🌐 Initializing Anti-Recursion Smart DNS Patch...")
     
     original_getaddrinfo = socket.getaddrinfo
     dns_cache = {}
+    resolving_state = threading.local()
 
-    # Standard public DNS IPs (No Domain Name Lookup Needed)
+    # Hardcoded direct IPs to bypass DNS completely if both System and DoH fail
+    HARDCODED_IPS = {
+        "api-inference.huggingface.co": "104.18.22.48",
+        "rpc.weblogs.com": "216.92.112.55",
+        "blogsearch.google.com": "142.250.190.46"
+    }
+
     doh_resolvers = [
         "https://1.1.1.1/dns-query",
-        "https://1.0.0.1/dns-query",
-        "https://8.8.8.8/resolve",
-        "https://8.8.4.4/resolve"
+        "https://8.8.8.8/resolve"
     ]
 
     def resolve_via_doh(hostname):
         if hostname in dns_cache:
             return dns_cache[hostname]
         
+        # Check hardcoded list first
+        if hostname in HARDCODED_IPS:
+            print(f"🎯 Hardcoded IP matched: {hostname} -> {HARDCODED_IPS[hostname]}")
+            return HARDCODED_IPS[hostname]
+
         print(f"🔍 Resolving '{hostname}' over direct IP DoH (Bypassing System DNS)...")
         for resolver in doh_resolvers:
             try:
@@ -56,14 +69,33 @@ def apply_global_dns_patch():
 
     def patched_getaddrinfo(*args, **kwargs):
         hostname = args[0]
+        
+        # 1. Skip resolving if it is already a direct numeric IP address
+        if hostname and re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", hostname):
+            return original_getaddrinfo(*args, **kwargs)
+            
+        # 2. Prevent infinite recursive loops during DNS-over-HTTPS calls
+        if getattr(resolving_state, 'is_resolving', False):
+            return original_getaddrinfo(*args, **kwargs)
+            
         try:
-            # Try default system resolver first
+            # Try standard system DNS first
             return original_getaddrinfo(*args, **kwargs)
         except socket.gaierror:
-            # If system DNS fails, fallback to direct Cloudflare/Google IP DoH lookup
-            ip = resolve_via_doh(hostname)
+            # Fallback to direct DoH resolver on system DNS failure
+            resolving_state.is_resolving = True
+            try:
+                ip = resolve_via_doh(hostname)
+            finally:
+                resolving_state.is_resolving = False
+                
             if ip:
                 return original_getaddrinfo(ip, *args[1:], **kwargs)
+            
+            # Absolute last resort using hardcoded backup
+            if hostname in HARDCODED_IPS:
+                return original_getaddrinfo(HARDCODED_IPS[hostname], *args[1:], **kwargs)
+                
             raise socket.gaierror(-5, f"NameResolutionError: Failed to resolve {hostname}")
 
     socket.getaddrinfo = patched_getaddrinfo
@@ -427,7 +459,7 @@ Generate the output exactly in this HTML structure with very long, detailed para
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
 [Write multiple detailed paragraphs in English and Hindi detailing what top analysts, reviewers, or pundits are saying.]
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"[A powerful, highly specific quote matching this exact event in Hindi/English]"</p>
+    <p style="font-style:italic;font-size:16px;">"[A context-specific quote in Hindi/English]"</p>
 </blockquote>
 
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
@@ -625,8 +657,8 @@ def main():
     print("🤖 Starting Viral News AI Blogger Bot...")
     print(f"📅 {datetime.now().strftime('%B %d, %Y')}")
     
-    # 1. Apply Smart DNS Patch Before Any Network Activity
-    apply_global_dns_patch()
+    # Apply Smart DNS Patch
+    fix_dns()
     
     # Check secrets
     print("\n--- Checking Secrets ---")
@@ -707,7 +739,6 @@ def main():
         except Exception as e:
             print(f"⚠️ Error: {e}")
     
-    # Fallback - All categories allowed
     if not found_news:
         print("\n🔍 Fallback: All categories allowed...")
         for feed_url in shuffled_feeds:
