@@ -7,7 +7,7 @@ import feedparser
 import re
 from datetime import datetime, timedelta
 import socket
-import xmlrpc.client
+import xmlrpc.client  # Used for Instant SEO Google/Bing indexing
 
 # --- DNS FIX ---
 def fix_dns():
@@ -25,7 +25,7 @@ BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
 
-# --- SOCIAL SHARING TOKENS (OPTIONAL) ---
+# --- SOCIAL SHARING TOKENS ---
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL')
@@ -110,9 +110,9 @@ def save_recent_category(category):
     except:
         pass
 
-# --- SEO PINGING ---
+# --- SEO INSTANT INDEXING (PING SERVICES) ---
 def ping_search_engines(blog_name, blog_url):
-    print("🚀 SEO Pinging Google, Bing & directories...")
+    print("🚀 SEO Pinging Google, Bing & directories for instant ranking...")
     ping_services = [
         ("Google Blog Search", "http://blogsearch.google.com/ping/RPC2"),
         ("Bing", "http://ping.blo.gs/"),
@@ -127,12 +127,12 @@ def ping_search_engines(blog_name, blog_url):
         except Exception as e:
             print(f"⚠️ Ping to {name} failed: {e}")
 
-# --- SOCIAL SHARING ---
+# --- AUTOMATIC VIRAL SHARING ---
 def share_to_telegram(title, link):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         print("⏭️ Telegram share skipped")
         return
-    print("📢 Sharing on Telegram...")
+    print("📢 Sharing on Telegram Channel...")
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
@@ -149,7 +149,7 @@ def share_to_discord(title, link):
     if not DISCORD_WEBHOOK_URL:
         print("⏭️ Discord share skipped")
         return
-    print("📢 Sharing on Discord...")
+    print("📢 Sharing on Discord Server...")
     payload = {
         "content": f"🚨 **BREAKING NEWS** 🚨\n\n**{title}**\n\n👇 Read full story here:\n{link}"
     }
@@ -326,237 +326,145 @@ def detect_category(feed_url, title):
         return "Business"
     return "News"
 
-def generate_entertainment_content(title, full_content, category):
-    """Generate 2000+ words Entertainment specific content"""
-    today = datetime.now().strftime("%B %d, %Y")
-    clean_title = clean_and_format_title(title)
-    first_para = full_content[:800] if full_content else ""
+# --- DYNAMIC DEEP AI WRITER (GENERATES 1000-1500 WORDS IN HINGLISH) ---
+def generate_content_via_ai(title, full_content, category):
+    if not HF_TOKEN:
+        print("⚠️ HF_TOKEN missing!")
+        return None
     
-    # Extended highlights - 10 points
-    highlights = [
-        f"<li>🎬 <strong>नई सीरीज का एलान:</strong> HBO ने अपनी नई Green Lantern सीरीज 'Lanterns' की घोषणा की है।</li>",
-        f"<li>⭐ <strong>स्टार कास्ट:</strong> Kyle Chandler Hal Jordan बनेंगे, जबकि Aaron Pierre John Stewart का किरदार निभाएंगे।</li>",
-        f"<li>📅 <strong>रिलीज़ डेट:</strong> यह सीरीज आने वाले महीनों में HBO Max पर रिलीज़ होगी।</li>",
-        f"<li>🎯 <strong>कहानी:</strong> यह एक veteran और rookie Green Lantern की कहानी है, जो DC Universe को और विस्तार देगी।</li>",
-        f"<li>🎬 <strong>क्रिएटिव टीम:</strong> Chris Mundy, Tom King और Damon Lindelof ने इस सीरीज को बनाया है।</li>",
-        f"<li>📺 <strong>DC Universe:</strong> यह सीरीज DC Universe का एक महत्वपूर्ण हिस्सा होगी।</li>",
-        f"<li>🌟 <strong>फैंस की प्रतिक्रिया:</strong> सोशल मीडिया पर फैंस बहुत उत्साहित हैं।</li>",
-        f"<li>💎 <strong>बजट:</strong> इस सीरीज में बड़ा बजट लगाया गया है जो इसे भव्य बनाएगा।</li>",
+    models = [
+        "meta-llama/Meta-Llama-3-8B-Instruct",
+        "mistralai/Mistral-7B-Instruct-v0.3"
     ]
     
-    intro = f"""
-<p><strong>{clean_title}</strong></p>
+    system_prompt = """You are "Viral News AI", an advanced, professional SEO-friendly Hinglish content generator.
+Instructions:
+1. Write extremely detailed and long sections (minimum 1000-1500 words total).
+2. No incomplete words (never write "Seaso", always write "Seasons").
+3. Do not use double bullet points. Use single (•) bullet points only.
+4. Absolutely NO generic filler text. Generate real, factual summaries.
+5. For Sports: Never use business terms like "Industry Impact" or "Consumer Reaction". Use "Match Analysis" and "Fans' Reaction".
+6. Return content only in the requested HTML format."""
 
-<p>The DC Universe expands further into the cosmos this month with the addition of "Lanterns". Created by Chris Mundy, Tom King and Damon Lindelof, the superhero show sees the veteran Green Lantern Hal Jordan (played by Kyle Chandler) take rookie John Stewart (Aaron Pierre) under his wing. Wider parts of the Green Lantern Corps lore are incorporated in the story too, making this one of the most anticipated superhero shows of the year.</p>
+    user_prompt = f"""Generate a detailed Hinglish (Hindi + English) blog post for:
+Title: {title}
+Category: {category}
+Reference Content: {full_content[:1500]}
 
-<p>{first_para}</p>
-
-<p><strong>{clean_title}</strong> - यह HBO की नई Green Lantern सीरीज है जो DC Universe का एक बड़ा हिस्सा बनेगी। इस सीरीज में veteran Green Lantern Hal Jordan (Kyle Chandler) rookie John Stewart (Aaron Pierre) को अपने साथ लेकर चलते हैं। यह सीरीज DC Universe को और विस्तार देगी और फैंस को एक नया रोमांचक अनुभव प्रदान करेगी।</p>
-
-<p>इस सीरीज के बारे में सबसे खास बात यह है कि इसे Chris Mundy, Tom King और Damon Lindelof जैसे दिग्गज क्रिएटर्स ने बनाया है। इन तीनों ने मिलकर इस सीरीज को एक अनोखा अंदाज दिया है जो DC Universe के फैंस को बहुत पसंद आएगा।</p>
-"""
-    
-    analysis = f"""
-<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-
-<p>The DC Universe has been expanding rapidly across movies, television, and streaming platforms. With the addition of "Lanterns", HBO is bringing one of the most iconic superhero teams to the small screen. The Green Lantern Corps has always been a fan-favorite, and this series promises to explore the rich lore and mythology behind the intergalactic protectors.</p>
-
-<p>{full_content[:600]}...</p>
-
-<p>इस सीरीज की सबसे बड़ी खासियत यह है कि यह DC Universe को एक नई दिशा देगी। पहले Green Lantern को लेकर जो भी प्रोजेक्ट्स आए थे, वे ज्यादा सफल नहीं रहे थे। लेकिन इस बार HBO ने इस सीरीज को बहुत गंभीरता से लिया है और इसमें बड़ा बजट लगाया गया है।</p>
-
-<p>Kyle Chandler जैसे अनुभवी अभिनेता Hal Jordan का किरदार निभा रहे हैं, जो इस सीरीज की सबसे बड़ी ताकत है। Aaron Pierre जैसे नए अभिनेता को John Stewart के रूप में लेना एक साहसिक कदम है, लेकिन यह DC Universe को एक ताजगी देगा।</p>
-
-<p>इस सीरीज में Green Lantern Corps के अन्य सदस्यों को भी दिखाया जाएगा, जिससे फैंस को एक पूरी दुनिया देखने को मिलेगी। यह सीरीज न केवल Green Lantern के फैंस को खुश करेगी, बल्कि DC Universe के नए फैंस को भी अपनी ओर आकर्षित करेगी।</p>
-"""
-    
-    expert = f"""
-<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-
-<p>Entertainment industry experts and DC Universe fans are eagerly awaiting this series. The combination of an experienced cast and a talented creative team has generated significant buzz. Many believe this could be one of the best superhero shows of the decade.</p>
-
-<p>फिल्म समीक्षकों और DC Universe के फैंस इस सीरीज का बेसब्री से इंतजार कर रहे हैं। अनुभवी कलाकारों और प्रतिभाशाली क्रिएटिव टीम के संयोजन ने काफी उत्साह पैदा किया है। कई लोगों का मानना है कि यह दशक की सबसे अच्छी सुपरहीरो सीरीजों में से एक साबित हो सकती है।</p>
-
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह सीरीज DC Universe के लिए एक नई शुरुआत है। Kyle Chandler और Aaron Pierre की जोड़ी कमाल की होगी।" - Entertainment Weekly</p>
-</blockquote>
-
-<p>विशेषज्ञों का मानना है कि इस सीरीज से DC Universe को वह सफलता मिलेगी जो पिछले कुछ प्रोजेक्ट्स को नहीं मिली थी। Green Lantern Corps के फैंस के लिए यह एक सपने के सच होने जैसा है।</p>
-"""
-    
-    impact = f"""
-<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-
-<p>This series is expected to have a significant impact on the entertainment industry. It will not only boost HBO Max's subscriber base but also pave the way for more DC Universe shows on the platform. The success of "Lanterns" could lead to spin-offs and sequels, expanding the Green Lantern universe even further.</p>
-
-<p>इस सीरीज का Entertainment इंडस्ट्री पर बहुत बड़ा प्रभाव पड़ने की उम्मीद है। यह न केवल HBO Max के सब्सक्राइबर्स को बढ़ाएगी, बल्कि प्लेटफॉर्म पर और अधिक DC Universe शो के लिए रास्ता भी खोलेगी। 'Lanterns' की सफलता स्पिन-ऑफ और सीक्वल का रास्ता खोल सकती है, जिससे Green Lantern Universe और विस्तार पा सकेगा।</p>
-
-<p>आने वाले महीनों में इस सीरीज के बारे में और अधिक जानकारी सामने आने की उम्मीद है, जिसमें टीज़र, ट्रेलर और प्रमोशनल इवेंट्स शामिल हो सकते हैं। फैंस के लिए यह एक रोमांचक समय है।</p>
-"""
-    
-    conclusion = f"""
-<h3>✅ निष्कर्ष - Conclusion</h3>
-
-<p>"Lanterns" is shaping up to be one of the most exciting superhero shows in recent years. With a talented cast, an experienced creative team, and a rich source material, the series has all the ingredients for success. Whether you're a longtime DC Universe fan or new to the world of Green Lantern, this is a show that should be on your radar.</p>
-
-<p>'Lanterns' आने वाले वर्षों की सबसे रोमांचक सुपरहीरो सीरीजों में से एक साबित होने की पूरी संभावना है। प्रतिभाशाली कलाकारों, अनुभवी क्रिएटिव टीम और समृद्ध स्रोत सामग्री के साथ, इस सीरीज में सफलता के सभी गुण मौजूद हैं। चाहे आप DC Universe के लंबे समय से फैंस हों या Green Lantern की दुनिया में नए हों, यह एक ऐसा शो है जिसे आपको मिस नहीं करना चाहिए।</p>
-"""
-    
-    return f"""
-<h2>🎬 BREAKING NEWS: {clean_title}</h2>
-
-<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
-    <p><strong>📅 Published: {today}</strong></p>
-    <p><strong>📂 Category: {category}</strong></p>
-</div>
-
+Generate the output exactly in this HTML structure:
 <h3>📝 परिचय - Introduction</h3>
-{intro}
+[1 detailed Paragraph in English, followed by 1 detailed Paragraph in Hindi]
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
-    {''.join(highlights)}
+  <li>[Point 1 with emoji]</li>
+  <li>[Point 2 with emoji]</li>
+  <li>[Point 3 with emoji]</li>
+  <li>[Point 4 with emoji]</li>
 </ul>
 
-{analysis}
+<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+[Detailed analysis paragraph in English, followed by detailed translation in Hindi]
 
-{expert}
+<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
+[Opinions in English and Hindi]
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"[A context-specific quote in Hindi/English]"</p>
+</blockquote>
 
-{impact}
+<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
+[Impact & future details in English and Hindi]
 
-{conclusion}
-
-<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
+<h3>✅ निष्कर्ष - Conclusion</h3>
+[Conclusion in English and Hindi]
 """
 
-def generate_sports_content(title, full_content, category):
-    """Generate 2000+ words Sports specific content"""
+    headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
+    
+    for model in models:
+        api_url = f"https://api-inference.huggingface.co/models/{model}/v1/chat/completions"
+        print(f"🧠 Querying Chat Completer: {model}...")
+        
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "max_tokens": 1500,  # Generates around 1000-1200 words
+            "temperature": 0.7
+        }
+        
+        for attempt in range(3):
+            try:
+                response = requests.post(api_url, headers=headers, json=payload, timeout=45)
+                res_data = response.json()
+                
+                if response.status_code == 200:
+                    text = res_data["choices"][0]["message"]["content"]
+                    if text and len(text.strip()) > 300:
+                        return text.strip()
+                
+                elif response.status_code == 503 or "loading" in str(res_data):
+                    wait_time = 25
+                    try:
+                        wait_time = int(res_data.get("estimated_time", 25))
+                    except:
+                        pass
+                    print(f"😴 Model loading. Waiting {wait_time}s (Attempt {attempt+1}/3)...")
+                    time.sleep(wait_time + 2)
+                    continue
+                else:
+                    print(f"⚠️ API status {response.status_code}: {response.text}")
+                    break
+            except Exception as e:
+                print(f"⚠️ Error with model {model}: {e}")
+                break
+                
+    return None
+
+# --- FALLBACK STATIC TEMPLATES ---
+def fallback_long_content(title, full_content, category):
     today = datetime.now().strftime("%B %d, %Y")
     clean_title = clean_and_format_title(title)
-    first_para = full_content[:800] if full_content else ""
+    first_para = full_content[:400] if full_content else ""
     
     highlights = [
-        f"<li>🏏 <strong>ऐतिहासिक जीत:</strong> टीम ने शानदार प्रदर्शन करते हुए ऐतिहासिक जीत हासिल की।</li>",
-        f"<li>⭐ <strong>स्टार प्रदर्शन:</strong> खिलाड़ियों ने बेहतरीन प्रदर्शन करते हुए टीम को जीत दिलाई।</li>",
-        f"<li>📊 <strong>मैच विश्लेषण:</strong> पूरे मैच का गहन विश्लेषण।</li>",
-        f"<li>🎯 <strong>रणनीति:</strong> टीम की रणनीति और गेम प्लान।</li>",
-        f"<li>📈 <strong>आंकड़े:</strong> मैच के महत्वपूर्ण आंकड़े और रिकॉर्ड।</li>",
-        f"<li>🤝 <strong>साझेदारी:</strong> खिलाड़ियों के बीच शानदार साझेदारी।</li>",
+        f"<li><strong>🔴 मुख्य खबर:</strong> {clean_title[:50]}</li>",
+        f"<li><strong>📂 Category:</strong> {category}</li>",
+        f"<li><strong>📊 विश्लेषण:</strong> विशेषज्ञों की राय</li>",
+        f"<li><strong>🔮 आगे क्या:</strong> आने वाले अपडेट</li>",
     ]
     
     intro = f"""
-<p><strong>{clean_title}</strong></p>
-
-<p>{first_para}</p>
-
-<p>{clean_title} - यह खेल जगत की सबसे बड़ी खबर है। इस मैच में खिलाड़ियों ने जिस तरह का प्रदर्शन किया, वह अविस्मरणीय रहेगा।</p>
+<p>{clean_title}. This is the latest news in the {category} sector.</p>
+<p>{clean_title} - यह आज की {category} सेक्टर की बड़ी खबर है।</p>
 """
-    
-    analysis = f"""
-<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>{full_content[:600]}...</p>
-<p>इस मैच में कई महत्वपूर्ण मोमेंट्स आए, जिन्होंने मैच का रुख बदल दिया।</p>
-"""
-    
     return f"""
-<h2>🏏 BREAKING NEWS: {clean_title}</h2>
-<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
-    <p><strong>📅 Published: {today}</strong></p>
-    <p><strong>📂 Category: {category}</strong></p>
-</div>
-<h3>📝 परिचय - Introduction</h3>
-{intro}
-<h3>🎯 मुख्य बातें - Key Highlights</h3>
-<ul>{''.join(highlights)}</ul>
-{analysis}
-<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
-"""
-
-def generate_technology_content(title, full_content, category):
-    """Generate 2000+ words Technology specific content"""
-    today = datetime.now().strftime("%B %d, %Y")
-    clean_title = clean_and_format_title(title)
-    first_para = full_content[:800] if full_content else ""
-    
-    highlights = [
-        f"<li>💻 <strong>नया लॉन्च:</strong> टेक जगत में बड़ा लॉन्च हुआ है।</li>",
-        f"<li>📱 <strong>नए फीचर्स:</strong> कई नए और बेहतरीन फीचर्स पेश किए गए।</li>",
-        f"<li>🔋 <strong>बैटरी लाइफ:</strong> लंबी बैटरी बैकअप दी गई है।</li>",
-        f"<li>💵 <strong>कीमत:</strong> किफायती दाम में उपलब्ध होगा।</li>",
-        f"<li>📈 <strong>प्रदर्शन:</strong> शानदार परफॉर्मेंस देगा।</li>",
-    ]
-    
-    intro = f"""
-<p><strong>{clean_title}</strong></p>
-<p>{first_para}</p>
-<p>{clean_title} - यह टेक्नोलॉजी सेक्टर की सबसे बड़ी खबर है।</p>
-"""
-    
-    analysis = f"""
-<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>{full_content[:600]}...</p>
-"""
-    
-    return f"""
-<h2>💻 BREAKING NEWS: {clean_title}</h2>
-<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
-    <p><strong>📅 Published: {today}</strong></p>
-    <p><strong>📂 Category: {category}</strong></p>
-</div>
-<h3>📝 परिचय - Introduction</h3>
-{intro}
-<h3>🎯 मुख्य बातें - Key Highlights</h3>
-<ul>{''.join(highlights)}</ul>
-{analysis}
-<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
-"""
-
-def generate_long_content(title, full_content, category):
-    """Generate 2000+ words content based on category"""
-    
-    if category == "Entertainment":
-        return generate_entertainment_content(title, full_content, category)
-    elif category == "Sports":
-        return generate_sports_content(title, full_content, category)
-    elif category == "Technology":
-        return generate_technology_content(title, full_content, category)
-    else:
-        # For other categories - Gaming, Space, Music, Business
-        today = datetime.now().strftime("%B %d, %Y")
-        clean_title = clean_and_format_title(title)
-        first_para = full_content[:600] if full_content else ""
-        
-        highlights = [
-            f"<li>🔴 <strong>मुख्य खबर:</strong> {clean_title[:50]}</li>",
-            f"<li>📂 <strong>Category:</strong> {category}</li>",
-            f"<li>📊 <strong>विश्लेषण:</strong> विशेषज्ञों की राय</li>",
-            f"<li>🔮 <strong>आगे क्या:</strong> आने वाले अपडेट</li>",
-            f"<li>📈 <strong>प्रभाव:</strong> इस सेक्टर पर प्रभाव</li>",
-        ]
-        
-        intro = f"""
 <h2>🚨 BREAKING NEWS: {clean_title}</h2>
 <div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
     <p><strong>📅 Published: {today}</strong></p>
     <p><strong>📂 Category: {category}</strong></p>
 </div>
 <h3>📝 परिचय - Introduction</h3>
-<p>{clean_title}. This is the latest news in the {category} sector.</p>
-<p>{first_para}</p>
-<p>{clean_title} - यह आज की {category} सेक्टर की सबसे बड़ी खबर है।</p>
+{intro}
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>{''.join(highlights)}</ul>
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
 <p>{first_para}</p>
-<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं।</p>
-<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-<p>विशेषज्ञों का मानना है कि इस विकास का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ेगा।</p>
-<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है।</p>
 <h3>✅ निष्कर्ष - Conclusion</h3>
-<p>यह एक महत्वपूर्ण विकास है जो {category} सेक्टर के भविष्य को आकार देगा।</p>
+<p>This is an important development in the {category} field.</p>
 """
-        return intro
+
+def generate_long_content(title, full_content, category):
+    # Dynamically generated AI content as primary output
+    print("🤖 Triggering Dynamic AI Writer...")
+    ai_content = generate_content_via_ai(title, full_content, category)
+    if ai_content:
+        return ai_content
+    else:
+        print("⚠️ AI generation failed. Using fallback template.")
+        return fallback_long_content(title, full_content, category)
 
 def post_to_blogger(access_token, title, content, category):
     try:
@@ -571,6 +479,7 @@ def post_to_blogger(access_token, title, content, category):
         }
         post_res = requests.post(post_url, headers=headers, json=post_body, timeout=20)
         if post_res.status_code in [200, 201]:
+            # Returns the created post's live URL
             return post_res.json().get("url")
     except Exception as e:
         print(f"❌ Error: {e}")
@@ -766,6 +675,7 @@ def main():
         print("\n✅✅✅ POSTED SUCCESSFULLY! ✅✅✅")
         print(f"🔗 Blog Post URL: {post_url}")
         
+        # SEO & Social distribution
         ping_search_engines("Viral News AI", post_url)
         share_to_telegram(title, post_url)
         share_to_discord(title, post_url)
