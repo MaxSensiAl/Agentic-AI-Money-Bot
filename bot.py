@@ -112,7 +112,7 @@ def save_recent_category(category):
 
 # --- SEO INSTANT INDEXING (PING SERVICES) ---
 def ping_search_engines(blog_name, blog_url):
-    print("🚀 SEO Pinging Google, Bing & directories for instant ranking...")
+    print("🚀 SEO Pinging Google, Bing & directories...")
     ping_services = [
         ("Google Blog Search", "http://blogsearch.google.com/ping/RPC2"),
         ("Bing", "http://ping.blo.gs/"),
@@ -334,12 +334,13 @@ def generate_content_via_ai(title, full_content, category):
     
     models = [
         "meta-llama/Meta-Llama-3-8B-Instruct",
-        "mistralai/Mistral-7B-Instruct-v0.3"
+        "mistralai/Mistral-7B-Instruct-v0.3",
+        "Qwen/Qwen2.5-72B-Instruct"
     ]
     
-    system_prompt = """You are "Viral News AI", an advanced, professional SEO-friendly Hinglish content generator.
+    system_prompt = """You are "Viral News AI", an elite world-class journalist and professional Hinglish content generator.
 Instructions:
-1. Write extremely detailed and long sections (minimum 1000-1500 words total).
+1. Write extremely detailed and long sections (minimum 1000-1500 words total). Do not write short summaries. Write multiple long, descriptive paragraphs for each section.
 2. No incomplete words (never write "Seaso", always write "Seasons").
 3. Do not use double bullet points. Use single (•) bullet points only.
 4. Absolutely NO generic filler text. Generate real, factual summaries.
@@ -349,9 +350,9 @@ Instructions:
     user_prompt = f"""Generate a detailed Hinglish (Hindi + English) blog post for:
 Title: {title}
 Category: {category}
-Reference Content: {full_content[:1500]}
+Reference Content: {full_content[:2000]}
 
-Generate the output exactly in this HTML structure:
+Generate the output exactly in this HTML structure with very long, detailed paragraphs:
 <h3>📝 परिचय - Introduction</h3>
 [1 detailed Paragraph in English, followed by 1 detailed Paragraph in Hindi]
 
@@ -381,8 +382,10 @@ Generate the output exactly in this HTML structure:
 
     headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
     
+    # CORRECT HUGGING FACE CHAT COMPLETIONS ENDPOINT
+    api_url = "https://api-inference.huggingface.co/v1/chat/completions"
+    
     for model in models:
-        api_url = f"https://api-inference.huggingface.co/models/{model}/v1/chat/completions"
         print(f"🧠 Querying Chat Completer: {model}...")
         
         payload = {
