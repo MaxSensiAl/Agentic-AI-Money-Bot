@@ -7,6 +7,7 @@ import feedparser
 import re
 from datetime import datetime, timedelta
 import socket
+import xmlrpc.client
 
 # --- DNS FIX ---
 def fix_dns():
@@ -23,6 +24,11 @@ HF_TOKEN = os.getenv('HF_TOKEN')
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
+
+# --- SOCIAL SHARING TOKENS (OPTIONAL) ---
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL')
 
 # --- RSS FEEDS ---
 RSS_FEEDS = [
@@ -83,7 +89,6 @@ def save_posted_news(title):
     except:
         pass
 
-# --- CATEGORY ROTATION SYSTEMS ---
 def load_recent_categories():
     try:
         if os.path.exists(CATEGORIES_TRACKER):
@@ -99,11 +104,60 @@ def save_recent_category(category):
         if category in recent:
             recent.remove(category)
         recent.insert(0, category)
-        recent = recent[:3]  # Remember last 3 categories to force rotation
+        recent = recent[:3]
         with open(CATEGORIES_TRACKER, 'w') as f:
             json.dump(recent, f)
     except:
         pass
+
+# --- SEO PINGING ---
+def ping_search_engines(blog_name, blog_url):
+    print("🚀 SEO Pinging Google, Bing & directories...")
+    ping_services = [
+        ("Google Blog Search", "http://blogsearch.google.com/ping/RPC2"),
+        ("Bing", "http://ping.blo.gs/"),
+        ("Pingomatic", "http://rpc.pingomatic.com/"),
+        ("Weblogs.com", "http://rpc.weblogs.com/RPC2")
+    ]
+    for name, url in ping_services:
+        try:
+            server = xmlrpc.client.ServerProxy(url)
+            result = server.weblogUpdates.ping(blog_name, blog_url)
+            print(f"✅ Pinged {name} successfully")
+        except Exception as e:
+            print(f"⚠️ Ping to {name} failed: {e}")
+
+# --- SOCIAL SHARING ---
+def share_to_telegram(title, link):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("⏭️ Telegram share skipped")
+        return
+    print("📢 Sharing on Telegram...")
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": f"🚨 *BREAKING NEWS* 🚨\n\n📢 *{title}*\n\n👇 Read the full story here:\n{link}",
+        "parse_mode": "Markdown"
+    }
+    try:
+        requests.post(url, json=payload, timeout=10)
+        print("✅ Posted on Telegram!")
+    except Exception as e:
+        print(f"⚠️ Telegram error: {e}")
+
+def share_to_discord(title, link):
+    if not DISCORD_WEBHOOK_URL:
+        print("⏭️ Discord share skipped")
+        return
+    print("📢 Sharing on Discord...")
+    payload = {
+        "content": f"🚨 **BREAKING NEWS** 🚨\n\n**{title}**\n\n👇 Read full story here:\n{link}"
+    }
+    try:
+        requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=10)
+        print("✅ Posted on Discord!")
+    except Exception as e:
+        print(f"⚠️ Discord error: {e}")
 
 # --- FUNCTIONS ---
 
@@ -254,7 +308,7 @@ def detect_category(feed_url, title):
     
     if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla", "eonline"]):
         return "Entertainment"
-    if any(x in title_lower for x in ["spider-man", "movie", "film", "hollywood", "box office", "marvel", "dc", "drag race", "rupaul", "series", "episode"]):
+    if any(x in title_lower for x in ["movie", "film", "hollywood", "box office", "marvel", "dc", "drag race", "rupaul"]):
         return "Entertainment"
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
@@ -264,119 +318,115 @@ def detect_category(feed_url, title):
         return "Gaming"
     if any(x in feed_lower for x in ["rollingstone"]):
         return "Music"
-    if "cric" in feed_lower or any(x in title_lower for x in ["cricket", "century", "wicket", "odi", "test", "match", "football", "goal"]):
+    if "cric" in feed_lower or any(x in title_lower for x in ["cricket", "century", "wicket", "odi", "test", "match"]):
         return "Sports"
     if any(x in feed_lower for x in ["bloomberg", "reuters"]):
         return "Business"
-    
     return "News"
 
-# --- DYNAMIC AI GENERATION WITH LOADING DETECTION & BACKUP ---
+# --- AI CONTENT GENERATION ---
 def generate_content_via_ai(title, full_content, category):
     if not HF_TOKEN:
         print("⚠️ HF_TOKEN missing!")
         return None
     
     models = [
-        "meta-llama/Meta-Llama-3-8B-Instruct",
-        "mistralai/Mistral-7B-Instruct-v0.3"
+        "mistralai/Mistral-7B-Instruct-v0.1",
+        "meta-llama/Llama-2-7b-chat-hf"
     ]
     
-    system_prompt = """You are "Viral News AI", an advanced, professional SEO-friendly Hinglish content generator.
+    system_prompt = """You are "Viral News AI", a professional SEO-friendly Hinglish content generator.
 Rules:
-1. No incomplete words (never write "Seaso", always write "Seasons").
-2. Do not use double bullet points. Use single (•) bullet points only.
-3. Absolutely NO generic filler text. Generate real, factual summaries.
-4. For Sports: Never use business terms like "Industry Impact" or "Consumer Reaction". Use "Match Analysis" and "Fans' Reaction".
-5. Return content only in the requested HTML format."""
+1. Write detailed sections (1000-1500 words total).
+2. No incomplete words (write "Seasons", not "Seaso").
+3. Single bullet points (•) only.
+4. No generic filler text.
+5. For Sports: Use "Match Analysis", not "Industry Impact".
+6. Return content in HTML format."""
 
-    user_prompt = f"""Generate a detailed Hinglish (Hindi + English) blog post for:
+    user_prompt = f"""Generate a detailed Hinglish blog post for:
 Title: {title}
 Category: {category}
-Reference Content: {full_content[:1500]}
+Reference: {full_content[:1500]}
 
-Generate the output exactly in this HTML structure:
+Output structure:
 <h3>📝 परिचय - Introduction</h3>
-[1 Paragraph in English, followed by 1 Paragraph in Hindi]
+[English paragraph + Hindi paragraph]
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
-  <li>[Point 1 with emoji]</li>
-  <li>[Point 2 with emoji]</li>
-  <li>[Point 3 with emoji]</li>
-  <li>[Point 4 with emoji]</li>
+  <li>• Point 1</li>
+  <li>• Point 2</li>
+  <li>• Point 3</li>
+  <li>• Point 4</li>
 </ul>
 
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-[Detailed analysis paragraph in English, followed by detailed translation in Hindi]
+[English + Hindi paragraphs]
 
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-[Opinions in English and Hindi]
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"[A context-specific quote in Hindi/English]"</p>
-</blockquote>
+[English + Hindi with quote]
 
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-[Impact & future details in English and Hindi]
+[English + Hindi]
 
 <h3>✅ निष्कर्ष - Conclusion</h3>
-[Conclusion in English and Hindi]
+[English + Hindi]
 """
 
     headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
     
     for model in models:
-        api_url = f"https://api-inference.huggingface.co/models/{model}"
-        print(f"🧠 Trying AI Model: {model}...")
+        api_url = f"https://api-inference.huggingface.co/models/{model}/v1/chat/completions"
+        print(f"🧠 Trying: {model}...")
         
         payload = {
-            "inputs": f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{system_prompt}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{user_prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
-            "parameters": {"max_new_tokens": 1000, "temperature": 0.7}
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "max_tokens": 1500,
+            "temperature": 0.7
         }
         
         for attempt in range(3):
             try:
-                response = requests.post(api_url, headers=headers, json=payload, timeout=40)
+                response = requests.post(api_url, headers=headers, json=payload, timeout=60)
                 res_data = response.json()
                 
                 if response.status_code == 200:
-                    if isinstance(res_data, list) and len(res_data) > 0:
-                        text = res_data[0].get('generated_text', '')
-                        if "<|start_header_id|>assistant<|end_header_id|>\n\n" in text:
-                            text = text.split("<|start_header_id|>assistant<|end_header_id|>\n\n")[-1]
+                    text = res_data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    if text and len(text.strip()) > 300:
                         return text.strip()
                 
-                elif response.status_code == 503 or (isinstance(res_data, dict) and "currently loading" in res_data.get("error", "")):
-                    wait_time = int(res_data.get("estimated_time", 20))
-                    print(f"😴 Model is loading. Waiting {wait_time} seconds (Attempt {attempt+1}/3)...")
-                    time.sleep(wait_time + 2)
+                elif response.status_code == 503:
+                    wait = int(res_data.get("estimated_time", 25))
+                    print(f"⏳ Model loading, waiting {wait}s...")
+                    time.sleep(wait + 5)
                     continue
                 else:
-                    print(f"⚠️ API returned status {response.status_code}: {response.text}")
+                    print(f"⚠️ Status {response.status_code}")
                     break
             except Exception as e:
-                print(f"⚠️ Connection error with {model}: {e}")
+                print(f"⚠️ Error: {e}")
                 break
                 
     return None
 
-# --- FALLBACK STATIC TEMPLATES ---
+# --- FALLBACK CONTENT ---
 def fallback_long_content(title, full_content, category):
     today = datetime.now().strftime("%B %d, %Y")
     clean_title = clean_and_format_title(title)
     first_para = full_content[:400] if full_content else ""
     
     highlights = [
-        f"<li><strong>🔴 मुख्य खबर:</strong> {clean_title[:50]}</li>",
-        f"<li><strong>📂 Category:</strong> {category}</li>",
-        f"<li><strong>📊 विश्लेषण:</strong> विशेषज्ञों की राय</li>",
-        f"<li><strong>🔮 आगे क्या:</strong> आने वाले अपडेट</li>",
+        f"<li>• <strong>{clean_title[:50]}</strong> - आज की बड़ी खबर</li>",
+        f"<li>• <strong>{category}</strong> सेक्टर में बड़ा बदलाव</li>",
+        f"<li>• विशेषज्ञों की राय - Expert insights</li>",
+        f"<li>• आगे क्या होगा - What's next</li>",
     ]
     
-    intro = f"""
-<p>{clean_title}. This is the latest news in the {category} sector.</p>
-<p>{clean_title} - यह आज की {category} सेक्टर की बड़ी खबर है।</p>
-"""
     return f"""
 <h2>🚨 BREAKING NEWS: {clean_title}</h2>
 <div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
@@ -384,11 +434,16 @@ def fallback_long_content(title, full_content, category):
     <p><strong>📂 Category: {category}</strong></p>
 </div>
 <h3>📝 परिचय - Introduction</h3>
-{intro}
+<p>{clean_title}. This is the latest news in the {category} sector.</p>
+<p>{clean_title} - यह आज की {category} सेक्टर की बड़ी खबर है।</p>
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>{''.join(highlights)}</ul>
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
 <p>{first_para}</p>
+<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
+<p>Experts believe this will have a significant impact on the {category} sector.</p>
+<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
+<p>More updates are expected in the coming days.</p>
 <h3>✅ निष्कर्ष - Conclusion</h3>
 <p>This is an important development in the {category} field.</p>
 """
@@ -405,15 +460,16 @@ def post_to_blogger(access_token, title, content, category):
             "labels": ["Breaking News", category, "Hinglish", datetime.now().strftime("%Y")]
         }
         post_res = requests.post(post_url, headers=headers, json=post_body, timeout=20)
-        return post_res.status_code in [200, 201]
+        if post_res.status_code in [200, 201]:
+            return post_res.json().get("url")
     except Exception as e:
         print(f"❌ Error: {e}")
-        return False
+    return None
 
 # --- MAIN ---
 
 def main():
-    print("🤖 Starting Blogger Bot...")
+    print("🤖 Starting Viral News AI Blogger Bot...")
     print(f"📅 {datetime.now().strftime('%B %d, %Y')}")
     fix_dns()
     
@@ -435,12 +491,12 @@ def main():
             all_loaded = False
     
     if not all_loaded:
-        print("\n❌ Secrets missing!")
+        print("\n❌ Secrets missing! Please add all required secrets.")
         return
     
     access_token = get_blogger_access_token()
     if not access_token:
-        print("❌ Invalid token!")
+        print("❌ Invalid token! Check OAuth credentials.")
         return
     
     existing_titles = get_all_blogger_titles(access_token)
@@ -449,7 +505,7 @@ def main():
     print(f"\n📊 Total tracked posts: {len(all_posted)}")
     
     recent_categories = load_recent_categories()
-    print(f"🔄 Recent posted categories to rotate/avoid: {recent_categories}")
+    print(f"🔄 Recent categories: {recent_categories}")
     
     found_news = False
     entry = None
@@ -459,8 +515,8 @@ def main():
     shuffled_feeds = RSS_FEEDS.copy()
     random.shuffle(shuffled_feeds)
     
-    # --- PASS 1: SEARCH WITH CATEGORY ROTATION (EXCLUDING RECENT CATEGORIES) ---
-    print("\n🔍 Searching for new news (Pass 1: Category Rotation)...")
+    # Pass 1: Category Rotation
+    print("\n🔍 Searching with category rotation...")
     for feed_url in shuffled_feeds:
         try:
             response = requests.get(feed_url, timeout=15)
@@ -480,7 +536,6 @@ def main():
                     
                     category = detect_category(feed_url, temp_title)
                     
-                    # SKIP if the category has been posted very recently
                     if category in recent_categories:
                         continue
                     
@@ -490,16 +545,16 @@ def main():
                         entry = temp_entry
                         selected_feed = feed_url
                         found_news = True
-                        print(f"✅ NEW news found in Category '{category}' (Not in recent list)!")
+                        print(f"✅ Found in '{category}' (Rotation)!")
                         break
                 if found_news:
                     break
         except Exception as e:
             print(f"⚠️ Error: {e}")
-            
-    # --- PASS 2: FALLBACK (IF NO NEW NEWS IN OTHER CATEGORIES, ACCEPT ANY) ---
+    
+    # Pass 2: Fallback
     if not found_news:
-        print("\n🔍 No new news in other categories. Running Pass 2 (Allowing all categories)...")
+        print("\n🔍 Pass 2: All categories allowed...")
         for feed_url in shuffled_feeds:
             try:
                 response = requests.get(feed_url, timeout=15)
@@ -512,7 +567,7 @@ def main():
                         if hasattr(temp_entry, 'published_parsed'):
                             pub_date = datetime(*temp_entry.published_parsed[:6])
                             if pub_date.date() < datetime.now().date() - timedelta(days=2):
-                                                    continue
+                                continue
                         
                         if is_duplicate_title(temp_title, all_posted):
                             continue
@@ -524,7 +579,7 @@ def main():
                             entry = temp_entry
                             selected_feed = feed_url
                             found_news = True
-                            print(f"✅ NEW news found in Category '{category}' (Fallback)!")
+                            print(f"✅ Found in '{category}' (Fallback)!")
                             break
                     if found_news:
                         break
@@ -557,7 +612,7 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
-    print("🤖 Generating content via AI...")
+    print("🤖 Generating AI content...")
     ai_content = generate_content_via_ai(title, full_content, category)
     if not ai_content:
         print("⚠️ AI generation failed. Using fallback template.")
@@ -574,7 +629,7 @@ def main():
     </div>
     """
     
-    actual_word_count = len(full_content.split()) + 150
+    actual_word_count = len(full_content.split()) + 200
     
     final_content = f"""
     {image_html}
@@ -596,13 +651,23 @@ def main():
     """
     
     print(f"\n📝 Posting to Blogger...")
-    if post_to_blogger(access_token, title, final_content, category):
+    post_url = post_to_blogger(access_token, title, final_content, category)
+    
+    if post_url:
         save_posted_news(title)
-        save_recent_category(category) # <--- Save the category to rotation list!
-        print("\n✅✅✅ COMPLETED SUCCESSFULLY! ✅✅✅")
-        print(f"📰 Title: {title}")
+        save_recent_category(category)
+        print("\n✅✅✅ POSTED SUCCESSFULLY! ✅✅✅")
+        print(f"🔗 Blog Post URL: {post_url}")
+        
+        # SEO Pinging
+        ping_search_engines("Viral News AI", post_url)
+        
+        # Social Sharing
+        share_to_telegram(title, post_url)
+        share_to_discord(title, post_url)
+        
+        print(f"\n📰 Title: {title}")
         print(f"📂 Category: {category}")
-        print(f"🖼️ Image: ✅ HD Quality")
         print(f"🔗 Short Link: {short_link}")
         print(f"📝 Words: {actual_word_count}")
     else:
