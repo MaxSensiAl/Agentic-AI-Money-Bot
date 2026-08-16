@@ -103,6 +103,17 @@ def apply_global_dns_patch():
 # Apply DNS patch globally at startup
 apply_global_dns_patch()
 
+# --- ✅ FIXED: DNS Function ---
+def fix_dns():
+    """DNS fix function - already applied globally"""
+    print("✅ DNS patch already applied globally")
+    # Just verify connection to Hugging Face
+    try:
+        socket.gethostbyname('api-inference.huggingface.co')
+        print("✅ Hugging Face API reachable")
+    except:
+        print("⚠️ Hugging Face API not reachable, but DNS patch is active")
+
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
@@ -483,7 +494,7 @@ Generate the output exactly in this HTML structure with very long, detailed para
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            "max_tokens": 2500,  # Generates around 1500-2000 words
+            "max_tokens": 2500,
             "temperature": 0.7
         }
         
@@ -521,7 +532,6 @@ def fallback_long_content(title, full_content, category):
     clean_title = clean_and_format_title(title)
     first_para = full_content[:800] if full_content else ""
     
-    # Extended highlights
     highlights = [
         f"<li>🔴 <strong>मुख्य खबर:</strong> {clean_title[:60]}</li>",
         f"<li>📂 <strong>Category:</strong> {category}</li>",
@@ -657,7 +667,7 @@ def main():
     print("🤖 Starting Viral News AI Blogger Bot...")
     print(f"📅 {datetime.now().strftime('%B %d, %Y')}")
     
-    # Apply Smart DNS Patch
+    # ✅ FIXED: Call fix_dns()
     fix_dns()
     
     # Check secrets
@@ -722,7 +732,6 @@ def main():
                     
                     category = detect_category(feed_url, temp_title)
                     
-                    # Check category rotation
                     if category in recent_categories:
                         continue
                     
@@ -840,7 +849,6 @@ def main():
         print("\n✅✅✅ POSTED SUCCESSFULLY! ✅✅✅")
         print(f"🔗 Blog Post URL: {post_url}")
         
-        # SEO & Social distribution
         ping_search_engines("Viral News AI", post_url)
         share_to_telegram(title, post_url)
         share_to_discord(title, post_url)
