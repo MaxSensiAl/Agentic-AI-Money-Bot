@@ -61,7 +61,10 @@ def clean_and_format_title(title):
     clean = re.sub(r'\s+', ' ', title).strip()
     clean = re.sub(r'202[0-9]\s*[-|]\s*202[0-9]', '', clean)
     clean = re.sub(r'\s*[-|]\s*$', '', clean)
-    return clean[:70].strip()
+    # Title cut-off boundary check to prevent words like "into" becoming "int"
+    if len(clean) > 120:
+        clean = clean[:120].rsplit(' ', 1)[0]
+    return clean
 
 def load_posted_news():
     try:
@@ -186,20 +189,18 @@ def get_entry_image(entry):
 
 def generate_hd_image_with_text(title, category):
     try:
-        print("🎨 Generating HD image...")
+        print("🎨 Generating HD image URL...")
         clean = title.replace('"', '').replace("'", '')[:60]
         prompt = f"{clean} {category} news"
         url = f"https://image.pollinations.ai/prompt/{prompt.replace(' ', '%20')}?width=1200&height=630&nologo=true&seed={random.randint(1, 9999)}"
-        response = requests.head(url, timeout=10)
-        if response.status_code == 200:
-            return url
+        # Removed requests.head checking to prevent broken image errors
+        return url
     except:
         pass
     return None
 
 def get_hd_image_strict(entry, title, category):
     print("📸 Getting HD image...")
-    
     image = get_entry_image(entry)
     if image and image.startswith('http') and 'logo' not in image.lower():
         print("✅ RSS image found!")
@@ -230,247 +231,97 @@ def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
     
-    # Entertainment
     if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla", "eonline"]):
         return "Entertainment"
     if any(x in title_lower for x in ["spider-man", "movie", "film", "hollywood", "box office", "marvel", "dc", "drag race", "rupaul", "series", "episode"]):
         return "Entertainment"
-    
-    # Space
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
-    
-    # Technology
     if any(x in feed_lower for x in ["tech", "verge", "cnet"]):
         return "Technology"
-    
-    # Gaming
     if any(x in feed_lower for x in ["gamespot", "ign"]):
         return "Gaming"
-    
-    # Music
     if any(x in feed_lower for x in ["rollingstone"]):
         return "Music"
-    
-    # Sports
     if "cric" in feed_lower or any(x in title_lower for x in ["cricket", "century", "wicket", "odi", "test", "match", "football", "goal"]):
         return "Sports"
-    
-    # Business
     if any(x in feed_lower for x in ["bloomberg", "reuters"]):
         return "Business"
     
     return "News"
 
-def generate_entertainment_content(title, full_content, category):
-    """Generate Entertainment specific content"""
-    today = datetime.now().strftime("%B %d, %Y")
-    clean_title = clean_and_format_title(title)
-    first_para = full_content[:400] if full_content else ""
+# --- DYNAMIC AI GENERATION USING HUGGING FACE ---
+def generate_content_via_ai(title, full_content, category):
+    if not HF_TOKEN:
+        print("⚠️ HF_TOKEN is missing! Using static fallback.")
+        return None
     
-    highlights = [
-        f"<li><strong>🎬 नई घोषणा:</strong> {clean_title[:50]} - Entertainment इंडस्ट्री में बड़ी खबर</li>",
-        f"<li><strong>🌟 स्टार कास्ट:</strong> बड़े सितारे इस प्रोजेक्ट का हिस्सा</li>",
-        f"<li><strong>📅 रिलीज़ डेट:</strong> आने वाले महीनों में रिलीज़ होगी</li>",
-        f"<li><strong>🍿 फैंस की प्रतिक्रिया:</strong> सोशल मीडिया पर उत्साह</li>",
-    ]
+    print("🧠 Contacting Hugging Face Meta-Llama API...")
+    api_url = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
+    headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
     
-    intro = f"""
-<p>{clean_title}. This exciting announcement has created a buzz in the entertainment industry, with fans eagerly waiting for more details.</p>
+    system_prompt = """You are "Viral News AI", an advanced, highly professional SEO-friendly Hinglish content generator.
+Instructions:
+1. No incomplete words (never write "Seaso", always write "Seasons").
+2. Do not use double bullet points. Use single (•) bullet points only.
+3. Absolutely NO generic filler text. Generate real, factual summaries.
+4. For Sports: Never use business terms like "Industry Impact" or "Consumer Reaction". Use "Match Analysis" and "Fans' Reaction".
+5. For Space/History: Do not treat old events as live breaking news.
+6. Return content only in the requested HTML format."""
 
-<p>{clean_title} - Entertainment इंडस्ट्री में यह एक बड़ी घोषणा है। फैंस इस प्रोजेक्ट का बेसब्री से इंतजार कर रहे हैं और सोशल मीडिया पर इसकी चर्चा जोरों पर है।</p>
-"""
-    
-    analysis = f"""
-<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>{first_para}</p>
-<p>यह प्रोजेक्ट Entertainment इंडस्ट्री के लिए एक महत्वपूर्ण कदम है। इसमें बड़े सितारे शामिल हैं और इसके रिलीज़ होने की उम्मीद है।</p>
+    user_prompt = f"""Generate a detailed Hinglish (Hindi + English) blog post for:
+Title: {title}
+Category: {category}
+Reference Content: {full_content[:1500]}
 
-<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-<p>Film critics and industry experts are praising this announcement as a game-changer for the entertainment industry.</p>
-<p>फिल्म समीक्षकों और इंडस्ट्री विशेषज्ञों का मानना है कि यह घोषणा Entertainment जगत के लिए एक गेम-चेंजर साबित होगी।</p>
-
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह Entertainment इंडस्ट्री के लिए एक नई शुरुआत है।"</p>
-</blockquote>
-
-<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>This announcement is expected to create a significant impact on the entertainment landscape. Fans can expect more updates in the coming weeks.</p>
-<p>इस घोषणा का Entertainment इंडस्ट्री पर बड़ा प्रभाव पड़ेगा। आने वाले हफ्तों में और अपडेट आने की उम्मीद है।</p>
-
-<h3>✅ निष्कर्ष - Conclusion</h3>
-<p>This is a major development in the entertainment world that will be remembered for years to come.</p>
-<p>यह Entertainment जगत का एक बड़ा विकास है जो आने वाले वर्षों में याद रखा जाएगा।</p>
-"""
-    
-    return f"""
-<h2>🎬 BREAKING NEWS: {clean_title}</h2>
-
-<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
-    <p><strong>📅 Published: {today}</strong></p>
-    <p><strong>📂 Category: {category}</strong></p>
-</div>
-
+Generate the output exactly in this HTML structure:
 <h3>📝 परिचय - Introduction</h3>
-{intro}
+[1 Paragraph in English, followed by 1 Paragraph in Hindi]
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
-    {''.join(highlights)}
+  <li>[Point 1 with emoji]</li>
+  <li>[Point 2 with emoji]</li>
+  <li>[Point 3 with emoji]</li>
+  <li>[Point 4 with emoji]</li>
 </ul>
 
-{analysis}
-
-<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
-"""
-
-def generate_technology_content(title, full_content, category):
-    """Generate Technology specific content"""
-    today = datetime.now().strftime("%B %d, %Y")
-    clean_title = clean_and_format_title(title)
-    first_para = full_content[:400] if full_content else ""
-    
-    highlights = [
-        f"<li><strong>💻 नया लॉन्च:</strong> {clean_title[:50]} - टेक जगत में बड़ी खबर</li>",
-        f"<li><strong>📱 नए फीचर्स:</strong> बेहतरीन स्पेक्स और कीमत</li>",
-        f"<li><strong>🔋 बैटरी लाइफ:</strong> लंबी बैटरी बैकअप</li>",
-        f"<li><strong>💵 कीमत:</strong> किफायती दाम में मिलेगा</li>",
-    ]
-    
-    intro = f"""
-<p>{clean_title}. This new launch is set to revolutionize the technology sector with its innovative features and competitive pricing.</p>
-
-<p>{clean_title} - टेक्नोलॉजी सेक्टर में यह एक बड़ा लॉन्च है। इसके नए फीचर्स और किफायती कीमत ने सभी का ध्यान खींचा है।</p>
-"""
-    
-    analysis = f"""
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>{first_para}</p>
-<p>इस नए प्रोडक्ट में कई बेहतरीन फीचर्स हैं जो इसे कंपटीशन से अलग बनाते हैं। इसकी कीमत भी काफी आकर्षक है।</p>
+[Detailed analysis paragraph in English, followed by detailed translation in Hindi]
 
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-<p>Tech reviewers and industry experts are impressed by the specifications and pricing of this new product.</p>
-<p>टेक रिव्यूअर्स और इंडस्ट्री विशेषज्ञ इस नए प्रोडक्ट के स्पेक्स और कीमत से काफी प्रभावित हैं।</p>
-
+[Opinions in English and Hindi]
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह प्रोडक्ट टेक्नोलॉजी सेक्टर में एक नया मानक स्थापित करेगा।"</p>
+    <p style="font-style:italic;font-size:16px;">"[A context-specific quote in Hindi/English]"</p>
 </blockquote>
 
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>This launch is expected to set new benchmarks in the technology sector. More updates and reviews will follow in the coming days.</p>
-<p>इस लॉन्च से टेक्नोलॉजी सेक्टर में नए मानक स्थापित होने की उम्मीद है। आने वाले दिनों में और रिव्यू आएंगे।</p>
+[Impact & future details in English and Hindi]
 
 <h3>✅ निष्कर्ष - Conclusion</h3>
-<p>This is a significant development in the technology sector that will impact consumers and competitors alike.</p>
-<p>यह टेक्नोलॉजी सेक्टर का एक महत्वपूर्ण विकास है जो कंज्यूमर्स और कंपटीटर्स दोनों को प्रभावित करेगा।</p>
-"""
-    
-    return f"""
-<h2>💻 BREAKING NEWS: {clean_title}</h2>
-
-<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
-    <p><strong>📅 Published: {today}</strong></p>
-    <p><strong>📂 Category: {category}</strong></p>
-</div>
-
-<h3>📝 परिचय - Introduction</h3>
-{intro}
-
-<h3>🎯 मुख्य बातें - Key Highlights</h3>
-<ul>
-    {''.join(highlights)}
-</ul>
-
-{analysis}
-
-<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
+[Conclusion in English and Hindi]
 """
 
-def generate_sports_content(title, full_content, category):
-    """Generate SPORTS specific content"""
-    today = datetime.now().strftime("%B %d, %Y")
-    clean_title = title.replace("Afg", "Afghanistan")
-    if "seals" in clean_title.lower():
-        clean_title = clean_title.replace("seals", "Seals")
+    payload = {
+        "inputs": f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{system_prompt}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n{user_prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+        "parameters": {"max_new_tokens": 1000, "temperature": 0.7}
+    }
     
-    first_para = full_content[:400] if full_content else ""
-    
-    highlights = [
-        f"<li><strong>🏏 ऐतिहासिक जीत:</strong> यह वनडे क्रिकेट के इतिहास में अफगानिस्तान का अब तक का सबसे बड़ा और सफल रन चेज है।</li>",
-        f"<li><strong>🌟 रहमत शाह का शतक:</strong> रहमत शाह ने जिम्मेदारी से बल्लेबाजी करते हुए टीम के लिए एक बेहतरीन मैच जिताऊ शतक लगाया।</li>",
-        f"<li><strong>🤝 201 रनों की साझेदारी:</strong> तीसरे विकेट के लिए सिद्दीकुल्लाह अटल और रहमत शाह के बीच हुई 201 रनों की साझेदारी ने जीत पक्की की।</li>",
-        f"<li><strong>💪 मजबूत बल्लेबाजी:</strong> 299 रनों के मुश्किल लक्ष्य का पीछा करते हुए अफगान बल्लेबाजों ने गजब का संयम और आक्रामकता दिखाई।</li>",
-    ]
-    
-    intro = f"""
-<p>Rahmat Shah's brilliant century, along with a historic 201-run partnership with Sediqullah Atal, guided Afghanistan to their highest-ever successful run chase in ODI cricket. The team successfully chased down the target of 299 runs to register a memorable victory.</p>
+    try:
+        response = requests.post(api_url, headers=headers, json=payload, timeout=30)
+        if response.status_code == 200:
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                text = result[0].get('generated_text', '')
+                if "<|start_header_id|>assistant<|end_header_id|>\n\n" in text:
+                    text = text.split("<|start_header_id|>assistant<|end_header_id|>\n\n")[-1]
+                return text.strip()
+    except Exception as e:
+        print(f"⚠️ AI API Error: {e}")
+    return None
 
-<p>अफगानिस्तान क्रिकेट टीम ने वनडे इतिहास में अपना सबसे बड़ा रन चेज (Run Chase) हासिल करके एक नया इतिहास रच दिया है। स्टार बल्लेबाज रहमत शाह (Rahmat Shah) के शानदार शतक और सिद्दीकुल्लाह अटल (Sediqullah Atal) के साथ उनकी बेहतरीन साझेदारी की बदौलत टीम ने 299 रनों के बड़े लक्ष्य को सफलतापूर्वक हासिल कर लिया।</p>
-"""
-    
-    analysis = f"""
-<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>This historic chase showcases the immense growth of Afghanistan's batting lineup on the international stage. Facing a challenging target of 299, the batsmen showed incredible maturity and composure, proving that Afghanistan is now a complete and dangerous ODI team.</p>
-
-<p>इस ऐतिहासिक जीत ने यह साबित कर दिया है कि अफगानिस्तान की टीम अब केवल अपनी विश्व स्तरीय गेंदबाजी पर निर्भर नहीं है। 299 रनों का पीछा करते हुए खिलाड़ियों ने जिस तरह का धैर्य और अनुशासन दिखाया, वह काबिले-तारीफ है। यह जीत दर्शाती है कि टीम अब दुनिया की किसी भी मजबूत टीम के खिलाफ बड़ा स्कोर चेज करने का दम रखती है।</p>
-
-<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-<p>Cricket pundits and experts are praising this chase as a landmark moment in Afghanistan's ODI history, showcasing their transition into a highly balanced team.</p>
-
-<p>क्रिकेट विश्लेषकों का मानना है कि यह जीत अफगानिस्तान क्रिकेट के लिए एक नया अध्याय है। यह प्रदर्शन दिखाता है कि टीम अब खेल के हर विभाग में परिपक्व हो चुकी है।</p>
-
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह जीत अफगानिस्तान क्रिकेट के इतिहास में एक मील का पत्थर है।"</p>
-</blockquote>
-
-<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>This victory has sent a strong message to the cricketing world. Afghanistan has proven they can chase down big totals against strong opponents. This will boost their confidence for upcoming tournaments.</p>
-
-<p>इस जीत ने क्रिकेट जगत को एक मजबूत संदेश दिया है। अफगानिस्तान ने साबित कर दिया है कि वे बड़े लक्ष्य का पीछा करने की क्षमता रखते हैं। इससे आगामी टूर्नामेंट्स के लिए टीम का आत्मविश्वास बढ़ेगा।</p>
-
-<h3>✅ निष्कर्ष - Conclusion</h3>
-<p>This victory is a monumental milestone for Afghanistan cricket. It not only boosts the team's confidence for future tournaments but also solidifies their position as a formidable force in ODI cricket.</p>
-
-<p>यह जीत अफगानिस्तान क्रिकेट के सफर में एक मील का पत्थर है। इस शानदार प्रदर्शन से न केवल टीम का मनोबल बढ़ेगा, बल्कि विरोधी टीमों के लिए भी यह एक कड़ा संदेश है।</p>
-"""
-    
-    return f"""
-<h2>🏏 HISTORIC WIN: {clean_title}</h2>
-
-<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
-    <p><strong>📅 Published: {today}</strong></p>
-    <p><strong>📂 Category: {category}</strong></p>
-</div>
-
-<h3>📝 परिचय - Introduction</h3>
-{intro}
-
-<h3>🎯 मुख्य बातें - Key Highlights</h3>
-<ul>
-    {''.join(highlights)}
-</ul>
-
-{analysis}
-
-<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
-"""
-
-def generate_long_content(title, full_content, category):
-    """Generate content based on category"""
-    
-    # For Entertainment
-    if category == "Entertainment":
-        return generate_entertainment_content(title, full_content, category)
-    
-    # For Sports/Cricket
-    if category == "Sports" or "cricket" in title.lower() or "century" in title.lower():
-        return generate_sports_content(title, full_content, category)
-    
-    # For Technology
-    if category == "Technology":
-        return generate_technology_content(title, full_content, category)
-    
-    # For other categories (Gaming, Space, Music, Business, News)
+# --- FALLBACK STATIC TEMPLATES (ONLY IF AI API FAILS) ---
+def fallback_long_content(title, full_content, category):
     today = datetime.now().strftime("%B %d, %Y")
     clean_title = clean_and_format_title(title)
     first_para = full_content[:400] if full_content else ""
@@ -483,52 +334,23 @@ def generate_long_content(title, full_content, category):
     ]
     
     intro = f"""
-<p>{clean_title}. This is the biggest news in the {category} sector today.</p>
-
-<p>{clean_title} - यह आज की {category} सेक्टर की सबसे बड़ी खबर है।</p>
+<p>{clean_title}. This is the latest news in the {category} sector.</p>
+<p>{clean_title} - यह आज की {category} सेक्टर की बड़ी खबर है।</p>
 """
-    
-    analysis = f"""
-<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>{first_para}</p>
-<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं।</p>
-
-<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-<p>Experts believe this development will have a significant impact on the {category} sector.</p>
-<p>विशेषज्ञों का मानना है कि इस विकास का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ेगा।</p>
-
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर के लिए एक महत्वपूर्ण मोड़ है।"</p>
-</blockquote>
-
-<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>This news is expected to have a significant impact on the {category} sector. More updates will follow in the coming days.</p>
-<p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है। आने वाले दिनों में और अपडेट आएंगे।</p>
-
-<h3>✅ निष्कर्ष - Conclusion</h3>
-<p>This is a significant development that will shape the future of the {category} sector.</p>
-<p>यह एक महत्वपूर्ण विकास है जो {category} सेक्टर के भविष्य को आकार देगा।</p>
-"""
-    
     return f"""
 <h2>🚨 BREAKING NEWS: {clean_title}</h2>
-
 <div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
     <p><strong>📅 Published: {today}</strong></p>
     <p><strong>📂 Category: {category}</strong></p>
 </div>
-
 <h3>📝 परिचय - Introduction</h3>
 {intro}
-
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
-<ul>
-    {''.join(highlights)}
-</ul>
-
-{analysis}
-
-<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
+<ul>{''.join(highlights)}</ul>
+<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+<p>{first_para}</p>
+<h3>✅ निष्कर्ष - Conclusion</h3>
+<p>This is an important development in the {category} field.</p>
 """
 
 def post_to_blogger(access_token, title, content, category):
@@ -654,8 +476,11 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
-    print("🤖 Generating content...")
-    ai_content = generate_long_content(title, full_content, category)
+    print("🤖 Generating content via AI...")
+    ai_content = generate_content_via_ai(title, full_content, category)
+    if not ai_content:
+        print("⚠️ AI generation failed. Using fallback template.")
+        ai_content = fallback_long_content(title, full_content, category)
     
     earning_button = f"""
     <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
