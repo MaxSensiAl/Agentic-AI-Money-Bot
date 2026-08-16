@@ -7,48 +7,69 @@ import feedparser
 import re
 from datetime import datetime, timedelta
 import socket
-import xmlrpc.client
+import xmlrpc.client  # Used for Instant SEO Google/Bing indexing
+import urllib3
 
-# --- SMART GLOBAL DNS PATCH (DNS-over-HTTPS) ---
-def smart_dns_resolve(hostname):
-    """
-    यदि सिस्टम DNS विफल हो जाए, तो Cloudflare (1.1.1.1) के माध्यम से
-    hostname का IP पता प्राप्त करें और सॉकेट कनेक्शन के लिए इसका उपयोग करें।
-    """
-    try:
-        # पहले सामान्य DNS अटेम्प्ट करें
-        return socket.gethostbyname(hostname)
-    except socket.gaierror:
-        print(f"⚠️ सिस्टम DNS विफल, Cloudflare DNS (1.1.1.1) से {hostname} ढूंढा जा रहा है...")
-        try:
-            # DNS-over-HTTPS क्वेरी
-            url = f"https://cloudflare-dns.com/dns-query?name={hostname}&type=A"
-            headers = {"Accept": "application/dns-json"}
-            response = requests.get(url, headers=headers, timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                for answer in data.get("Answer", []):
-                    if answer.get("type") == 1:  # A रिकॉर्ड
-                        ip = answer.get("data")
-                        if ip:
-                            print(f"✅ {hostname} -> {ip} (Cloudflare DNS)")
-                            return ip
-        except Exception as e:
-            print(f"⚠️ DNS-over-HTTPS विफल: {e}")
+# --- SMART GLOBAL DNS PATCH (Bypasses Broken GitHub Runner DNS) ---
+def apply_global_dns_patch():
+    print("🌐 Initializing Smart Global DNS Patch (DNS-over-HTTPS via Direct IP)...")
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     
-    # अंतिम विकल्प: 1.1.1.1 (Cloudflare) का उपयोग करें
-    print(f"⚠️ फॉलबैक: {hostname} के लिए Cloudflare IP (1.1.1.1) का उपयोग")
-    return "1.1.1.1"
+    original_getaddrinfo = socket.getaddrinfo
+    dns_cache = {}
 
-# --- DNS FIX ---
-def fix_dns():
-    try:
-        # Hugging Face के लिए IP पता प्राप्त करें
-        hf_ip = smart_dns_resolve('api-inference.huggingface.co')
-        if hf_ip:
-            print(f"✅ Hugging Face API IP: {hf_ip}")
-    except:
-        print("DNS fix applied")
+    # Standard public DNS IPs (No Domain Name Lookup Needed)
+    doh_resolvers = [
+        "https://1.1.1.1/dns-query",
+        "https://1.0.0.1/dns-query",
+        "https://8.8.8.8/resolve",
+        "https://8.8.4.4/resolve"
+    ]
+
+    def resolve_via_doh(hostname):
+        if hostname in dns_cache:
+            return dns_cache[hostname]
+        
+        print(f"🔍 Resolving '{hostname}' over direct IP DoH (Bypassing System DNS)...")
+        for resolver in doh_resolvers:
+            try:
+                url = f"{resolver}?name={hostname}&type=A"
+                if "dns-query" in resolver:
+                    headers = {"Accept": "application/dns-json"}
+                    res = requests.get(url, headers=headers, timeout=5, verify=False)
+                else:
+                    res = requests.get(url, timeout=5, verify=False)
+                
+                if res.status_code == 200:
+                    data = res.json()
+                    answers = data.get("Answer", [])
+                    for ans in answers:
+                        if ans.get("type") == 1:  # A Record
+                            ip = ans.get("data")
+                            if ip:
+                                print(f"✅ Resolved '{hostname}' -> '{ip}' via {resolver}")
+                                dns_cache[hostname] = ip
+                                return ip
+            except Exception as e:
+                pass
+        return None
+
+    def patched_getaddrinfo(*args, **kwargs):
+        hostname = args[0]
+        try:
+            # Try default system resolver first
+            return original_getaddrinfo(*args, **kwargs)
+        except socket.gaierror:
+            # If system DNS fails, fallback to direct Cloudflare/Google IP DoH lookup
+            ip = resolve_via_doh(hostname)
+            if ip:
+                return original_getaddrinfo(ip, *args[1:], **kwargs)
+            raise socket.gaierror(-5, f"NameResolutionError: Failed to resolve {hostname}")
+
+    socket.getaddrinfo = patched_getaddrinfo
+
+# Apply DNS patch globally at startup
+apply_global_dns_patch()
 
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
@@ -360,7 +381,7 @@ def detect_category(feed_url, title):
         return "Business"
     return "News"
 
-# --- DYNAMIC DEEP AI WRITER (2000+ WORDS) ---
+# --- DYNAMIC DEEP AI WRITER (2000-3000 WORDS IN HINGLISH) ---
 def generate_content_via_ai(title, full_content, category):
     if not HF_TOKEN:
         print("⚠️ HF_TOKEN missing!")
@@ -368,60 +389,61 @@ def generate_content_via_ai(title, full_content, category):
     
     models = [
         "meta-llama/Meta-Llama-3-8B-Instruct",
-        "mistralai/Mistral-7B-Instruct-v0.3"
+        "mistralai/Mistral-7B-Instruct-v0.3",
+        "Qwen/Qwen2.5-72B-Instruct"
     ]
     
-    system_prompt = """You are "Viral News AI", an elite world-class journalist and professional Hinglish content generator.
+    system_prompt = """You are "Viral News AI", an elite world-class news editor and professional Hinglish content generator.
+Instructions:
+1. Write extremely detailed and long sections (minimum 2000-3000 words total). Do not write short summaries. Write 5-6 long, descriptive paragraphs for each section.
+2. No incomplete words (never write "Seaso", always write "Seasons").
+3. Do not use double bullet points. Use single (•) bullet points only.
+4. Absolutely NO generic filler text. Generate real, factual summaries.
+5. For Sports: Never use business terms like "Industry Impact" or "Consumer Reaction". Use "Match Analysis" and "Fans' Reaction".
+6. Return content only in the requested HTML format."""
 
-CRITICAL RULES:
-1. Write EXTREMELY LONG content (minimum 2000-3000 words total). Write 5-6 detailed paragraphs per section.
-2. No incomplete words (write "Seasons", not "Seaso").
-3. Single bullet points (•) only.
-4. NO generic filler text. Write actual facts, analysis, quotes.
-5. For Sports: Use "Match Analysis" and "Fans' Reaction" (not "Industry Impact").
-6. Return content ONLY in the requested HTML format.
-7. Make it engaging, professional, and SEO-friendly.
-8. Write in Hinglish (English paragraphs followed by detailed Hindi translations)."""
-
-    user_prompt = f"""Generate a DETAILED Hinglish blog post (2000+ words) for:
+    user_prompt = f"""Write a massive, detailed, and highly engaging magazine-style feature article (minimum 2500 words) for:
 Title: {title}
 Category: {category}
 Reference Content: {full_content[:2000]}
 
-OUTPUT STRUCTURE (With LONG, DETAILED paragraphs):
+Generate the output exactly in this HTML structure with very long, detailed paragraphs:
 <h3>📝 परिचय - Introduction</h3>
-[3-4 detailed paragraphs in English + 3-4 detailed paragraphs in Hindi]
+[Write a massive, engaging narrative paragraph in English (minimum 300 words) detailing the background, context, and immediate news. Then, write a rich, highly detailed paragraph in Hindi/Hinglish (minimum 300 words) explaining the same with deep emotion and excitement.]
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
-  <li>[8-10 key points with emojis]</li>
+  <li>[Highly detailed point 1 with emoji]</li>
+  <li>[Highly detailed point 2 with emoji]</li>
+  <li>[Highly detailed point 3 with emoji]</li>
+  <li>[Highly detailed point 4 with emoji]</li>
+  <li>[Highly detailed point 5 with emoji]</li>
+  <li>[Highly detailed point 6 with emoji]</li>
 </ul>
 
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-[5-6 detailed paragraphs in English + 5-6 detailed paragraphs in Hindi]
+[Write a comprehensive, deep-dive analysis paragraph in English (minimum 400 words). Go into technical specs, gameplay, strategies, or background history. Then, write a corresponding highly detailed, long paragraph in Hindi/Hinglish (minimum 400 words) to fully explain the depth of the event.]
 
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-[3-4 detailed paragraphs in English + 3-4 detailed paragraphs in Hindi]
+[Write multiple detailed paragraphs in English and Hindi detailing what top analysts, reviewers, or pundits are saying.]
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"[2-3 context-specific quotes]"</p>
+    <p style="font-style:italic;font-size:16px;">"[A powerful, highly specific quote matching this exact event in Hindi/English]"</p>
 </blockquote>
 
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-[4-5 detailed paragraphs in English + 4-5 detailed paragraphs in Hindi]
+[Detailed paragraphs in English and Hindi explaining the long-term impact and future roadmap, next matches, upcoming releases, or market shifts.]
 
 <h3>✅ निष्कर्ष - Conclusion</h3>
-[3-4 detailed paragraphs in English + 3-4 detailed paragraphs in Hindi]
-
-Make it extremely detailed, informative, and engaging. Write at least 2000-3000 words total.
+[Detailed wrapping-up conclusion in English and Hindi summarizing why this event will be remembered.]
 """
 
     headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
     
-    # Hugging Face Chat Completions Endpoint
+    # UNIFIED CHAT COMPLETION ENDPOINT
     api_url = "https://api-inference.huggingface.co/v1/chat/completions"
     
     for model in models:
-        print(f"🧠 AI Writer: {model} (Generating 2000+ words)...")
+        print(f"🧠 Querying Chat Completer: {model} (Generating 2000+ words)...")
         
         payload = {
             "model": model,
@@ -429,37 +451,35 @@ Make it extremely detailed, informative, and engaging. Write at least 2000-3000 
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            "max_tokens": 3000,
-            "temperature": 0.8
+            "max_tokens": 2500,  # Generates around 1500-2000 words
+            "temperature": 0.7
         }
         
         for attempt in range(3):
             try:
-                response = requests.post(api_url, headers=headers, json=payload, timeout=90)
+                response = requests.post(api_url, headers=headers, json=payload, timeout=50)
                 res_data = response.json()
                 
                 if response.status_code == 200:
                     text = res_data["choices"][0]["message"]["content"]
-                    if text and len(text.strip()) > 500:
-                        print(f"✅ AI generated {len(text)} characters!")
+                    if text and len(text.strip()) > 300:
                         return text.strip()
                 
                 elif response.status_code == 503 or "loading" in str(res_data):
-                    wait_time = 30
+                    wait_time = 25
                     try:
-                        wait_time = int(res_data.get("estimated_time", 30))
+                        wait_time = int(res_data.get("estimated_time", 25))
                     except:
                         pass
-                    print(f"⏳ Model loading, waiting {wait_time}s...")
-                    time.sleep(wait_time + 5)
+                    print(f"😴 Model loading. Waiting {wait_time}s (Attempt {attempt+1}/3)...")
+                    time.sleep(wait_time + 2)
                     continue
                 else:
-                    print(f"⚠️ API Error {response.status_code}")
+                    print(f"⚠️ API status {response.status_code}: {response.text}")
                     break
             except Exception as e:
-                print(f"⚠️ Error: {e}")
-                time.sleep(5)
-                continue
+                print(f"⚠️ Error with model {model}: {e}")
+                break
                 
     return None
 
@@ -572,9 +592,7 @@ def fallback_long_content(title, full_content, category):
 
 def generate_long_content(title, full_content, category):
     """Generate 2000-3000 words content"""
-    print("🤖 Generating 2000-3000 words content...")
-    
-    # Try AI first
+    # AI first
     ai_content = generate_content_via_ai(title, full_content, category)
     if ai_content and len(ai_content) > 500:
         return ai_content
@@ -607,8 +625,8 @@ def main():
     print("🤖 Starting Viral News AI Blogger Bot...")
     print(f"📅 {datetime.now().strftime('%B %d, %Y')}")
     
-    # Apply Smart DNS Patch
-    fix_dns()
+    # 1. Apply Smart DNS Patch Before Any Network Activity
+    apply_global_dns_patch()
     
     # Check secrets
     print("\n--- Checking Secrets ---")
@@ -672,6 +690,7 @@ def main():
                     
                     category = detect_category(feed_url, temp_title)
                     
+                    # Check category rotation
                     if category in recent_categories:
                         continue
                     
@@ -688,6 +707,7 @@ def main():
         except Exception as e:
             print(f"⚠️ Error: {e}")
     
+    # Fallback - All categories allowed
     if not found_news:
         print("\n🔍 Fallback: All categories allowed...")
         for feed_url in shuffled_feeds:
