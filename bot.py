@@ -13,7 +13,7 @@ import urllib3.util.connection as urllib3_connection
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SMART TCP REDIRECT PATCH ---
+# --- SMART TCP REDIRECT PATCH (Google और अन्य Pings के लिए सुरक्षित) ---
 def apply_smart_connection_patch():
     print("🌐 Initializing Smart TCP Connection Redirect Patch...")
     original_create_connection = urllib3_connection.create_connection
@@ -34,6 +34,7 @@ def apply_smart_connection_patch():
     urllib3_connection.create_connection = patched_create_connection
     print("✅ Smart TCP Connection Redirect Patch applied globally")
 
+# पैच को लागू करें
 apply_smart_connection_patch()
 
 def fix_dns():
@@ -118,6 +119,7 @@ def save_posted_news(title):
     except:
         pass
 
+# Blogger API से सीधे हालिया श्रेणियों को सिंक करने का फंक्शन
 def get_recent_blogger_categories(access_token):
     recent_categories = []
     if not access_token:
@@ -329,6 +331,7 @@ def detect_category(feed_url, title):
         return "Entertainment"
     if word_in_text("actress", title_lower) or word_in_text("disney", title_lower) or word_in_text("box office", title_lower):
         return "Entertainment"
+    # ✅ Star Cast, Pop Star, Rock Star - Entertainment not Space
     if word_in_text("star cast", title_lower) or word_in_text("pop star", title_lower) or word_in_text("rock star", title_lower):
         return "Entertainment"
     
@@ -373,7 +376,7 @@ def detect_category(feed_url, title):
     if word_in_text("cynthia", title_lower) or word_in_text("pop star", title_lower) or word_in_text("rock star", title_lower):
         return "Music"
     
-    # ✅ Sports
+    # ✅ Sports - FIXED: Only "test match", "test cricket", "test series"
     if "cric" in feed_lower:
         return "Sports"
     if word_in_text("cricket", title_lower) or word_in_text("century", title_lower) or word_in_text("wicket", title_lower):
@@ -415,7 +418,7 @@ def detect_category(feed_url, title):
     if word_in_text("fitness", title_lower):
         return "Health"
     
-    # ✅ Automobile
+    # ✅ Automobile - Exact words only
     if "motor" in feed_lower or "auto" in feed_lower:
         return "Automobile"
     if word_in_text("car", title_lower) or word_in_text("suv", title_lower) or word_in_text("vehicle", title_lower):
@@ -429,13 +432,14 @@ def detect_category(feed_url, title):
         
     return "News"
 
-# ✅ FIXED: AI CONTENT GENERATOR (Chat endpoint - Most Stable)
+# ✅ AI CONTENT GENERATOR (Pollinations AI - LLaMA Model)
 def ask_ai_for_news(title, full_content, category):
-    """Pollinations AI से 100% Unique और Unblocked Content Generate करेगा"""
+    """Pollinations AI (LLaMA) से 100% Unique और Unblocked Content Generate करेगा"""
     print("🧠 Calling Pollinations AI for unique post-specific content...")
     try:
-        # ✅ FIXED: Using "/chat" endpoint - Most stable
-        api_url = "https://text.pollinations.ai/chat"
+        # ✅ FIX: एंडपॉइंट को "https://text.pollinations.ai/" किया गया (बिना /chat के, 404 Error Fixed)
+        api_url = "https://text.pollinations.ai/"
+        model = "openai"  # GPT-4o-Mini (Most Intelligent)
         
         prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
 Write a highly engaging, SEO-friendly news article based on this news:
@@ -490,7 +494,8 @@ Strict Instructions:
                 {"role": "system", "content": "You are a professional news editor writing detailed HTML output in Hinglish. Write EXTREMELY LONG and DETAILED paragraphs."},
                 {"role": "user", "content": prompt}
             ],
-            "model": "openai"  # ✅ FIXED: Using "openai" model (most stable)
+            "model": model,
+            "jsonMode": False
         }
         
         res = requests.post(api_url, json=payload, timeout=60)
@@ -755,6 +760,7 @@ def main():
     print("\n--- Checking Secrets ---")
     secrets = {
         "BLOG_ID": BLOG_ID,
+        "HF_TOKEN": HF_TOKEN,
         "SHRINKME_API": SHRINKME_API,
         "BC_CLIENT_ID": BC_CLIENT_ID,
         "BC_CLIENT_SECRET": BC_CLIENT_SECRET,
@@ -879,7 +885,8 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
-    print("🤖 Generating detailed content...")
+    # Generate DYNAMIC content
+    print("🤖 Generating dynamic content...")
     ai_content = generate_long_content(title, full_content, category)
     
     # ✅ Earning Button with ShrinkMe Link
