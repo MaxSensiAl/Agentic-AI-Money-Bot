@@ -309,41 +309,115 @@ def get_short_url(long_url):
     except:
         return long_url
 
+# ✅ FIXED: Word Boundary Function
+def word_in_text(word, text):
+    """Check if whole word exists in text (not as substring)"""
+    if not text:
+        return False
+    return bool(re.search(rf'\b{re.escape(word)}\b', text, re.IGNORECASE))
+
+# ✅ FIXED: Category Detection with Whole-Word Matching
 def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
     
+    # ✅ Entertainment
     if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla", "eonline"]):
         return "Entertainment"
-    if any(x in title_lower for x in ["movie", "film", "hollywood", "box office", "marvel", "dc", "disney", "lands", "rides", "spider-man", "spiderman", "actor", "actress"]):
+    if word_in_text("movie", title_lower) or word_in_text("film", title_lower) or word_in_text("hollywood", title_lower):
         return "Entertainment"
+    if word_in_text("marvel", title_lower) or word_in_text("dc", title_lower) or word_in_text("actor", title_lower):
+        return "Entertainment"
+    if word_in_text("actress", title_lower) or word_in_text("disney", title_lower) or word_in_text("box office", title_lower):
+        return "Entertainment"
+    
+    # ✅ Space - Only exact words
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
-    if any(x in title_lower for x in ["galaxy", "planet", "star", "moon", "mars", "universe", "cosmos", "astronaut"]):
+    if word_in_text("galaxy", title_lower) or word_in_text("planet", title_lower) or word_in_text("star", title_lower):
         return "Space"
+    if word_in_text("moon", title_lower) or word_in_text("mars", title_lower) or word_in_text("universe", title_lower):
+        return "Space"
+    if word_in_text("cosmos", title_lower) or word_in_text("astronaut", title_lower):
+        return "Space"
+    
+    # ✅ Technology
     if any(x in feed_lower for x in ["tech", "verge", "cnet", "techcrunch"]):
         return "Technology"
-    if any(x in title_lower for x in ["smartphone", "apple", "samsung", "software", "google ai", "artificial intelligence", "chatgpt"]):
+    if word_in_text("smartphone", title_lower) or word_in_text("apple", title_lower) or word_in_text("samsung", title_lower):
         return "Technology"
+    if word_in_text("software", title_lower) or word_in_text("artificial intelligence", title_lower) or word_in_text("chatgpt", title_lower):
+        return "Technology"
+    
+    # ✅ Gaming
     if "gaming" in feed_lower or any(x in feed_lower for x in ["gamespot", "ign"]):
         return "Gaming"
-    if any(x in title_lower for x in ["nintendo", "xbox", "playstation", "ps5", "gta", "gamer", "gaming"]):
+    if word_in_text("nintendo", title_lower) or word_in_text("xbox", title_lower) or word_in_text("playstation", title_lower):
         return "Gaming"
+    if word_in_text("ps5", title_lower) or word_in_text("gta", title_lower) or word_in_text("gamer", title_lower):
+        return "Gaming"
+    
+    # ✅ Music
     if any(x in feed_lower for x in ["rollingstone"]):
         return "Music"
-    if any(x in title_lower for x in ["album", "song", "singer", "concert", "tour", "ariana", "cynthia"]):
+    if word_in_text("album", title_lower) or word_in_text("song", title_lower) or word_in_text("singer", title_lower):
         return "Music"
-    if "cric" in feed_lower or any(x in title_lower for x in ["cricket", "century", "wicket", "odi", "test", "match", "football", "goal", "fifa", "olympics"]):
+    if word_in_text("concert", title_lower) or word_in_text("tour", title_lower) or word_in_text("ariana", title_lower):
+        return "Music"
+    if word_in_text("cynthia", title_lower):
+        return "Music"
+    
+    # ✅ Sports - Exact words only
+    if "cric" in feed_lower:
         return "Sports"
+    if word_in_text("cricket", title_lower) or word_in_text("century", title_lower) or word_in_text("wicket", title_lower):
+        return "Sports"
+    if word_in_text("odi", title_lower) or word_in_text("test", title_lower) or word_in_text("match", title_lower):
+        return "Sports"
+    if word_in_text("football", title_lower) or word_in_text("goal", title_lower) or word_in_text("fifa", title_lower):
+        return "Sports"
+    if word_in_text("olympics", title_lower) or word_in_text("player", title_lower):
+        return "Sports"
+    
+    # ✅ Business
     if any(x in feed_lower for x in ["bloomberg", "reuters", "markets"]):
         return "Business"
-    if any(x in title_lower for x in ["stocks", "inflation", "market", "economy", "trade"]):
+    if word_in_text("stocks", title_lower) or word_in_text("inflation", title_lower) or word_in_text("market", title_lower):
         return "Business"
-    if "politics" in feed_lower or any(x in title_lower for x in ["election", "biden", "trump", "modi", "parliament", "politics", "minister", "senate", "congress"]):
+    if word_in_text("economy", title_lower) or word_in_text("trade", title_lower):
+        return "Business"
+    
+    # ✅ Politics
+    if "politics" in feed_lower:
         return "Politics"
-    if "health" in feed_lower or "medical" in feed_lower or any(x in title_lower for x in ["health", "mental", "doctor", "cancer", "vaccine", "disease", "fitness"]):
+    if word_in_text("election", title_lower) or word_in_text("biden", title_lower) or word_in_text("trump", title_lower):
+        return "Politics"
+    if word_in_text("modi", title_lower) or word_in_text("parliament", title_lower) or word_in_text("minister", title_lower):
+        return "Politics"
+    if word_in_text("senate", title_lower) or word_in_text("congress", title_lower):
+        return "Politics"
+    
+    # ✅ Health
+    if "health" in feed_lower or "medical" in feed_lower:
         return "Health"
-    if "motor" in feed_lower or "auto" in feed_lower or any(x in title_lower for x in ["car", "suv", "vehicle", "electric vehicle", "ev", "tesla", "engine", "motorcycle", "bike"]):
+    if word_in_text("health", title_lower) or word_in_text("mental", title_lower) or word_in_text("doctor", title_lower):
+        return "Health"
+    if word_in_text("cancer", title_lower) or word_in_text("vaccine", title_lower) or word_in_text("disease", title_lower):
+        return "Health"
+    if word_in_text("fitness", title_lower):
+        return "Health"
+    
+    # ✅ Automobile - Exact words only (NOT "career", "every", "event")
+    if "motor" in feed_lower or "auto" in feed_lower:
+        return "Automobile"
+    if word_in_text("car", title_lower) or word_in_text("suv", title_lower) or word_in_text("vehicle", title_lower):
+        return "Automobile"
+    if word_in_text("electric vehicle", title_lower) or word_in_text("ev", title_lower) or word_in_text("tesla", title_lower):
+        return "Automobile"
+    if word_in_text("engine", title_lower) or word_in_text("motorcycle", title_lower) or word_in_text("bike", title_lower):
+        return "Automobile"
+    # ✅ Exact match for Polestar (not "star")
+    if word_in_text("polestar", title_lower):
         return "Automobile"
         
     return "News"
@@ -488,6 +562,30 @@ def generate_dynamic_content(title, full_content, category):
 <p>{first_para}</p>
 <p>{more_content}</p>
 <p>इस प्रदर्शन ने संगीत प्रेमियों के दिलों को छू लिया। Cynthia Erivo और Ariana Grande की जोड़ी ने मंच पर जादू बिखेरा और लंदन के O2 एरेना में मौजूद हजारों दर्शकों को मंत्रमुग्ध कर दिया।</p>
+"""
+    
+    elif category == "Automobile":
+        highlights = [
+            f"<li>🚗 <strong>{clean_title[:50]}</strong> - ऑटोमोबाइल जगत की बड़ी खबर</li>",
+            f"<li>⚡ <strong>इंजन और स्पेक्स:</strong> {first_para[:60]}...</li>",
+            f"<li>🔋 <strong>इलेक्ट्रिक व्हीकल (EV) ट्रेंड:</strong> पर्यावरण के अनुकूल तकनीक</li>",
+            f"<li>🛠️ <strong>सुरक्षा और फीचर्स:</strong> आधुनिक सुरक्षा मानकों से लैस</li>",
+            f"<li>🏁 <strong>लॉन्च:</strong> कार प्रेमियों के लिए बड़ी खबर</li>",
+            f"<li>⚖️ <strong>कानूनी मामला:</strong> {more_content[:60]}...</li>",
+            f"<li>💰 <strong>कीमत:</strong> बाजार में प्रतिस्पर्धी दाम</li>",
+            f"<li>🌍 <strong>ग्लोबल इंपैक्ट:</strong> दुनिया भर में प्रभाव</li>",
+        ]
+        expert_quote = """
+<p>Auto industry experts and legal analysts are closely watching this development. The outcome of this lawsuit could reshape how international automakers operate in the US market.</p>
+<p>ऑटो उद्योग विशेषज्ञों और कानूनी विश्लेषकों की नजर इस मामले पर टिकी है। इस मुकदमे के नतीजे से अमेरिकी बाजार में अंतरराष्ट्रीय ऑटो निर्माताओं के कारोबार करने के तरीके में बदलाव आ सकता है।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह मामला ऑटोमोबाइल उद्योग और कानूनी प्रणाली दोनों के लिए महत्वपूर्ण है।"</p>
+</blockquote>
+"""
+        analysis_detail = f"""
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>यह कानूनी मामला Polestar और US डीलरों के बीच चल रहा है। इसका नतीजा न केवल Polestar बल्कि अन्य इलेक्ट्रिक व्हीकल निर्माताओं के लिए भी अहम होगा।</p>
 """
     
     else:
@@ -732,7 +830,6 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
-    # Generate DETAILED content
     print("🤖 Generating detailed content...")
     ai_content = generate_long_content(title, full_content, category)
     
