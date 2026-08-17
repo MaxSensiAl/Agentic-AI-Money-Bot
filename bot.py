@@ -329,11 +329,10 @@ def detect_category(feed_url, title):
         return "Entertainment"
     if word_in_text("actress", title_lower) or word_in_text("disney", title_lower) or word_in_text("box office", title_lower):
         return "Entertainment"
-    # ✅ Star Cast, Pop Star, Rock Star - Entertainment not Space
     if word_in_text("star cast", title_lower) or word_in_text("pop star", title_lower) or word_in_text("rock star", title_lower):
         return "Entertainment"
     
-    # ✅ Space - Only exact words, NOT "star" alone (to avoid Polestar, Star Cast)
+    # ✅ Space
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
     if word_in_text("galaxy", title_lower) or word_in_text("planet", title_lower):
@@ -342,9 +341,9 @@ def detect_category(feed_url, title):
         return "Space"
     if word_in_text("cosmos", title_lower) or word_in_text("astronaut", title_lower):
         return "Space"
-    # ✅ Only "star" if it's about astronomy (not celebrity)
-    if word_in_text("star", title_lower) and not word_in_text("star cast", title_lower) and not word_in_text("pop star", title_lower):
-        # Check if it's about space/astronomy
+    if word_in_text("corona", title_lower) or word_in_text("eclipse", title_lower) or word_in_text("solar", title_lower):
+        return "Space"
+    if word_in_text("star", title_lower) and not word_in_text("star cast", title_lower):
         if word_in_text("astronomy", title_lower) or word_in_text("constellation", title_lower) or word_in_text("night sky", title_lower):
             return "Space"
     
@@ -371,12 +370,10 @@ def detect_category(feed_url, title):
         return "Music"
     if word_in_text("concert", title_lower) or word_in_text("tour", title_lower) or word_in_text("ariana", title_lower):
         return "Music"
-    if word_in_text("cynthia", title_lower):
-        return "Music"
-    if word_in_text("pop star", title_lower) or word_in_text("rock star", title_lower):
+    if word_in_text("cynthia", title_lower) or word_in_text("pop star", title_lower) or word_in_text("rock star", title_lower):
         return "Music"
     
-    # ✅ Sports - FIXED: Only "test match", "test cricket", "test series"
+    # ✅ Sports
     if "cric" in feed_lower:
         return "Sports"
     if word_in_text("cricket", title_lower) or word_in_text("century", title_lower) or word_in_text("wicket", title_lower):
@@ -387,8 +384,6 @@ def detect_category(feed_url, title):
         return "Sports"
     if word_in_text("fifa", title_lower) or word_in_text("olympics", title_lower) or word_in_text("player", title_lower):
         return "Sports"
-    # ❌ REMOVED: standalone "test" word (causes Politics → Sports)
-    # if word_in_text("test", title_lower):  # ← REMOVED!
     
     # ✅ Business
     if any(x in feed_lower for x in ["bloomberg", "reuters", "markets"]):
@@ -420,7 +415,7 @@ def detect_category(feed_url, title):
     if word_in_text("fitness", title_lower):
         return "Health"
     
-    # ✅ Automobile - Exact words only
+    # ✅ Automobile
     if "motor" in feed_lower or "auto" in feed_lower:
         return "Automobile"
     if word_in_text("car", title_lower) or word_in_text("suv", title_lower) or word_in_text("vehicle", title_lower):
@@ -434,14 +429,13 @@ def detect_category(feed_url, title):
         
     return "News"
 
-# ✅ AI CONTENT GENERATOR (Pollinations AI - LLaMA Model)
+# ✅ FIXED: AI CONTENT GENERATOR (Chat endpoint - Most Stable)
 def ask_ai_for_news(title, full_content, category):
     """Pollinations AI से 100% Unique और Unblocked Content Generate करेगा"""
     print("🧠 Calling Pollinations AI for unique post-specific content...")
     try:
-        # ✅ FIXED: Changed from "mistral" to "llama" (Llama-3-70B - Stable & Online)
-        model = "llama"  # Llama-3-70B
-        api_url = "https://text.pollinations.ai/"
+        # ✅ FIXED: Using "/chat" endpoint - Most stable
+        api_url = "https://text.pollinations.ai/chat"
         
         prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
 Write a highly engaging, SEO-friendly news article based on this news:
@@ -496,8 +490,7 @@ Strict Instructions:
                 {"role": "system", "content": "You are a professional news editor writing detailed HTML output in Hinglish. Write EXTREMELY LONG and DETAILED paragraphs."},
                 {"role": "user", "content": prompt}
             ],
-            "model": model,
-            "jsonMode": False
+            "model": "openai"  # ✅ FIXED: Using "openai" model (most stable)
         }
         
         res = requests.post(api_url, json=payload, timeout=60)
@@ -529,7 +522,31 @@ def generate_dynamic_content(title, full_content, category):
     more_content = full_content[500:1000] if len(full_content) > 500 else ""
     
     # ✅ Category-wise DETAILED Highlights (8 points)
-    if category == "Politics":
+    if category == "Space":
+        highlights = [
+            f"<li>🚀 <strong>{clean_title[:50]}</strong> - अंतरिक्ष की बड़ी खबर</li>",
+            f"<li>🌌 <strong>खोज:</strong> {first_para[:60]}...</li>",
+            f"<li>🛰️ <strong>मिशन अपडेट:</strong> नई जानकारी</li>",
+            f"<li>🔭 <strong>रिसर्च:</strong> वैज्ञानिकों की खोज</li>",
+            f"<li>📡 <strong>सिग्नल:</strong> अंतरिक्ष से नए संकेत</li>",
+            f"<li>🌞 <strong>सूर्य:</strong> {more_content[:60]}...</li>",
+            f"<li>🌍 <strong>पृथ्वी:</strong> अंतरिक्ष से दृश्य</li>",
+            f"<li>⭐ <strong>तारे:</strong> नई खोज</li>",
+        ]
+        expert_quote = """
+<p>Astronomers and space scientists are calling this discovery a significant milestone in our understanding of the cosmos.</p>
+<p>खगोलविदों और अंतरिक्ष वैज्ञानिकों का मानना है कि यह खोज ब्रह्मांड की हमारी समझ में एक महत्वपूर्ण मील का पत्थर है।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह खोज अंतरिक्ष विज्ञान के इतिहास में एक नया अध्याय जोड़ती है।"</p>
+</blockquote>
+"""
+        analysis_detail = f"""
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>इस अंतरिक्ष घटना ने वैज्ञानिकों को नई जानकारी दी है और आने वाले शोध के लिए नए रास्ते खोले हैं।</p>
+"""
+    
+    elif category == "Politics":
         highlights = [
             f"<li>🏛️ <strong>{clean_title[:50]}</strong> - राजनीति की बड़ी खबर</li>",
             f"<li>👥 <strong>मुख्य मुद्दे:</strong> {first_para[:60]}...</li>",
@@ -592,7 +609,7 @@ def generate_dynamic_content(title, full_content, category):
 <p>Music critics and industry experts are calling this performance a historic moment. The collaboration between Cynthia Erivo and Ariana Grande has created waves in the music industry worldwide.</p>
 <p>संगीत समीक्षकों और उद्योग विशेषज्ञों का मानना है कि यह प्रदर्शन एक ऐतिहासिक क्षण है। Cynthia Erivo और Ariana Grande के बीच इस सहयोग ने दुनिया भर में संगीत उद्योग में हलचल मचा दी है।</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह प्रदर्शन संगीत इतिहास में एक मील का पत्थर साबित होगा。"</p>
+    <p style="font-style:italic;font-size:16px;">"यह प्रदर्शन संगीत इतिहास में एक मील का पत्थर साबित होगा।"</p>
 </blockquote>
 """
         analysis_detail = f"""
@@ -649,7 +666,6 @@ def generate_dynamic_content(title, full_content, category):
 <p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं। यह {category} सेक्टर के लिए एक बड़ा बदलाव ला सकता है।</p>
 """
     
-    # ✅ DETAILED Introduction
     intro = f"""
 <h3>📝 परिचय - Introduction</h3>
 <p><strong>{clean_title}</strong></p>
@@ -658,27 +674,23 @@ def generate_dynamic_content(title, full_content, category):
 <p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है। यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
 """
 
-    # ✅ DETAILED Analysis
     analysis = f"""
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
 {analysis_detail}
 <p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है। विशेषज्ञों का मानना है कि इस {category} सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
 """
 
-    # ✅ DETAILED Expert
     expert = f"""
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
 {expert_quote}
 """
 
-    # ✅ DETAILED Impact
     impact = f"""
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
 <p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है। आने वाले दिनों में और अपडेट आने की संभावना है। विशेषज्ञों का मानना है कि इस घटना के दीर्घकालिक प्रभाव आने वाले महीनों में देखने को मिलेंगे।</p>
 <p>कंपनियां अपनी रणनीतियों को इस नई जानकारी के अनुसार ढाल रही हैं। पूरी दुनिया में इस खबर पर चर्चा हो रही है और आने वाले समय में इससे जुड़ी और जानकारी सामने आएगी।</p>
 """
 
-    # ✅ DETAILED Conclusion
     conclusion = f"""
 <h3>✅ निष्कर्ष - Conclusion</h3>
 <p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है। इसका प्रभाव आने वाले समय में और स्पष्ट होगा।</p>
