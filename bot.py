@@ -13,15 +13,12 @@ import urllib3.util.connection as urllib3_connection
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SMART TCP REDIRECT PATCH (Google, Hugging Face और Pings के लिए) ---
+# --- SMART TCP REDIRECT PATCH ---
 def apply_smart_connection_patch():
     print("🌐 Initializing Smart TCP Connection Redirect Patch...")
     original_create_connection = urllib3_connection.create_connection
 
-    # ✅ FIX: Hugging Face IP वापस जोड़ा गया
     HARDCODED_IPS = {
-        "api-inference.huggingface.co": "104.18.22.48",
-        "huggingface.co": "104.18.22.48",
         "rpc.weblogs.com": "216.92.112.55",
         "blogsearch.google.com": "142.250.190.46"
     }
@@ -37,13 +34,12 @@ def apply_smart_connection_patch():
     urllib3_connection.create_connection = patched_create_connection
     print("✅ Smart TCP Connection Redirect Patch applied globally")
 
-# पैच को लागू करें
 apply_smart_connection_patch()
 
 def fix_dns():
     print("✅ Testing connection to Pollinations AI...")
     try:
-        res = requests.get("https://text.pollinations.ai", timeout=10)
+        res = requests.get("https://text.pollinations.ai/", timeout=10)
         print(f"✅ Pollinations AI reachable (Status Code: {res.status_code})")
     except Exception as e:
         print(f"⚠️ Connection check failed: {e}")
@@ -52,7 +48,6 @@ def fix_dns():
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
 HF_TOKEN = os.getenv('HF_TOKEN')
-GEMINI_API = os.getenv('GEMINI_API')
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
@@ -158,7 +153,7 @@ def ping_search_engines(blog_name, blog_url):
         try:
             server = xmlrpc.client.ServerProxy(url)
             server.weblogUpdates.ping(blog_name, blog_url)
-            print(f"🚀 Pinged {name}")
+            print(f"✅ Pinged {name}")
         except:
             print(f"⚠️ {name} ping failed")
 
@@ -185,9 +180,8 @@ def share_to_discord(title, link):
 # --- FUNCTIONS ---
 
 def get_current_date():
-    """Get current date in Indian Standard Time (IST) format"""
-    ist_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
-    return ist_time.strftime("%B %d, %Y")
+    """Get current date in proper format"""
+    return datetime.now().strftime("%B %d, %Y")
 
 def get_blogger_access_token():
     try:
@@ -323,309 +317,258 @@ def get_short_url(long_url):
     except:
         return long_url
 
-# Word Boundary Function
 def word_in_text(word, text):
     """Check if whole word exists in text (not as substring)"""
     if not text:
         return False
     return bool(re.search(rf'\b{re.escape(word)}\b', text, re.IGNORECASE))
 
-# Category Detection with Whole-Word Matching (Strict Keywords)
 def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
     
-    def match_words(word_list):
-        for word in word_list:
-            if re.search(r'\b' + re.escape(word.lower()) + r'\b', title_lower):
-                return True
-        return False
-
+    # Entertainment
     if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla", "eonline"]):
         return "Entertainment"
-    if match_words(["movie", "film", "hollywood", "box office", "marvel", "dc", "disney", "lands", "rides", "spider-man", "spiderman", "actor", "actress", "celebrity", "drama"]):
+    if word_in_text("movie", title_lower) or word_in_text("film", title_lower) or word_in_text("hollywood", title_lower):
         return "Entertainment"
-    if match_words(["star cast", "pop star", "rock star"]):
+    if word_in_text("marvel", title_lower) or word_in_text("dc", title_lower) or word_in_text("actor", title_lower):
+        return "Entertainment"
+    if word_in_text("actress", title_lower) or word_in_text("disney", title_lower) or word_in_text("box office", title_lower):
+        return "Entertainment"
+    if word_in_text("star cast", title_lower) or word_in_text("pop star", title_lower) or word_in_text("rock star", title_lower):
         return "Entertainment"
     
+    # Space
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
-    if match_words(["galaxy", "planet", "moon", "mars", "universe", "cosmos", "astronaut", "asteroid", "telescope", "eclipse", "stargazing", "constellation", "nebula"]):
+    if word_in_text("galaxy", title_lower) or word_in_text("planet", title_lower):
         return "Space"
-        
+    if word_in_text("moon", title_lower) or word_in_text("mars", title_lower) or word_in_text("universe", title_lower):
+        return "Space"
+    if word_in_text("cosmos", title_lower) or word_in_text("astronaut", title_lower):
+        return "Space"
+    if word_in_text("corona", title_lower) or word_in_text("eclipse", title_lower) or word_in_text("solar", title_lower):
+        return "Space"
+    
+    # Technology
     if any(x in feed_lower for x in ["tech", "verge", "cnet", "techcrunch"]):
         return "Technology"
-    if match_words(["smartphone", "apple", "samsung", "software", "artificial intelligence", "chatgpt", "iphone", "gadget", "cybersecurity", "hacker", "app", "spyware", "amazon"]):
+    if word_in_text("smartphone", title_lower) or word_in_text("apple", title_lower) or word_in_text("samsung", title_lower):
         return "Technology"
-    if re.search(r'\b' + "ai" + r'\b', title_lower):
+    if word_in_text("software", title_lower) or word_in_text("artificial intelligence", title_lower) or word_in_text("chatgpt", title_lower):
         return "Technology"
-        
+    if word_in_text("spyware", title_lower) or word_in_text("cybersecurity", title_lower) or word_in_text("apple", title_lower):
+        return "Technology"
+    
+    # Gaming
     if "gaming" in feed_lower or any(x in feed_lower for x in ["gamespot", "ign"]):
         return "Gaming"
-    if match_words(["nintendo", "xbox", "playstation", "ps5", "gta", "gamer", "gaming", "gameplay", "console"]):
+    if word_in_text("nintendo", title_lower) or word_in_text("xbox", title_lower) or word_in_text("playstation", title_lower):
         return "Gaming"
-        
+    if word_in_text("ps5", title_lower) or word_in_text("gta", title_lower) or word_in_text("gamer", title_lower):
+        return "Gaming"
+    
+    # Music
     if any(x in feed_lower for x in ["rollingstone"]):
         return "Music"
-    if match_words(["album", "song", "singer", "concert", "tour", "music", "guitar", "pop", "rap", "band", "singing", "cynthia", "ariana", "mcconaughey"]):
+    if word_in_text("album", title_lower) or word_in_text("song", title_lower) or word_in_text("singer", title_lower):
         return "Music"
-        
+    if word_in_text("concert", title_lower) or word_in_text("tour", title_lower) or word_in_text("ariana", title_lower):
+        return "Music"
+    if word_in_text("cynthia", title_lower) or word_in_text("pop star", title_lower) or word_in_text("rock star", title_lower):
+        return "Music"
+    
+    # Sports
     if "cric" in feed_lower:
         return "Sports"
-    if match_words(["cricket", "century", "wicket", "odi", "test cricket", "test match", "test series", "football", "goal", "fifa", "olympics", "athletics", "basketball", "tennis", "stadium", "sciver", "brunt", "england"]):
+    if word_in_text("cricket", title_lower) or word_in_text("century", title_lower) or word_in_text("wicket", title_lower):
         return "Sports"
-        
+    if word_in_text("odi", title_lower) or word_in_text("test match", title_lower) or word_in_text("test cricket", title_lower):
+        return "Sports"
+    if word_in_text("test series", title_lower) or word_in_text("football", title_lower) or word_in_text("goal", title_lower):
+        return "Sports"
+    if word_in_text("fifa", title_lower) or word_in_text("olympics", title_lower) or word_in_text("player", title_lower):
+        return "Sports"
+    if word_in_text("sciver", title_lower) or word_in_text("brunt", title_lower) or word_in_text("england", title_lower):
+        return "Sports"
+    
+    # Business
     if any(x in feed_lower for x in ["bloomberg", "reuters", "markets"]):
         return "Business"
-    if match_words(["stocks", "inflation", "market", "economy", "trade", "finance", "investing", "crypto", "bitcoin"]):
+    if word_in_text("stocks", title_lower) or word_in_text("inflation", title_lower) or word_in_text("market", title_lower):
         return "Business"
-        
-    if "politics" in feed_lower:
+    if word_in_text("economy", title_lower) or word_in_text("trade", title_lower):
+        return "Business"
+    
+    # Politics - US Politics
+    if "politics" in feed_lower or "huffpost" in feed_lower:
         return "Politics"
-    if match_words(["election", "biden", "trump", "modi", "parliament", "politics", "minister", "senate", "congress", "government", "vote", "bjp", "amit malviya", "deepak mhaske"]):
+    if word_in_text("trump", title_lower) or word_in_text("biden", title_lower) or word_in_text("election", title_lower):
         return "Politics"
-        
+    if word_in_text("senate", title_lower) or word_in_text("congress", title_lower) or word_in_text("democrat", title_lower):
+        return "Politics"
+    if word_in_text("republican", title_lower) or word_in_text("white house", title_lower) or word_in_text("president", title_lower):
+        return "Politics"
+    if word_in_text("uss lincoln", title_lower) or word_in_text("navy", title_lower) or word_in_text("military", title_lower):
+        return "Politics"
+    # India Politics
+    if word_in_text("modi", title_lower) or word_in_text("bjp", title_lower) or word_in_text("parliament", title_lower):
+        return "Politics"
+    if word_in_text("amit malviya", title_lower) or word_in_text("deepak mhaske", title_lower):
+        return "Politics"
+    
+    # Health
     if "health" in feed_lower or "medical" in feed_lower:
         return "Health"
-    if match_words(["health", "mental", "doctor", "cancer", "vaccine", "disease", "fitness", "nutrition", "diet"]):
+    if word_in_text("health", title_lower) or word_in_text("mental", title_lower) or word_in_text("doctor", title_lower):
         return "Health"
-        
+    if word_in_text("cancer", title_lower) or word_in_text("vaccine", title_lower) or word_in_text("disease", title_lower):
+        return "Health"
+    if word_in_text("fitness", title_lower):
+        return "Health"
+    
+    # Automobile
     if "motor" in feed_lower or "auto" in feed_lower:
         return "Automobile"
-    if match_words(["car", "suv", "vehicle", "electric vehicle", "ev", "tesla", "engine", "motorcycle", "bike", "polestar", "volvo", "ferrari", "porsche", "ford", "bmw", "audi"]):
+    if word_in_text("car", title_lower) or word_in_text("suv", title_lower) or word_in_text("vehicle", title_lower):
+        return "Automobile"
+    if word_in_text("electric vehicle", title_lower) or word_in_text("ev", title_lower) or word_in_text("tesla", title_lower):
+        return "Automobile"
+    if word_in_text("engine", title_lower) or word_in_text("motorcycle", title_lower) or word_in_text("bike", title_lower):
+        return "Automobile"
+    if word_in_text("polestar", title_lower):
         return "Automobile"
         
     return "News"
 
-# ✅ TRIPLE-ENGINE AI CONNECTOR (Hugging Face -> Gemini -> Pollinations)
+# ✅ FIXED: AI CONTENT GENERATOR
 def ask_ai_for_news(title, full_content, category):
-    """सुरक्षित, स्थिर और तीव्र एआई जनरेटर (Hugging Face Qwen 2.5 7B)"""
-    
-    prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
-Write a highly engaging, SEO-friendly news article based on this news:
+    """Pollinations AI से Unique Content Generate करेगा"""
+    print("🧠 Calling Pollinations AI for unique post-specific content...")
+    try:
+        api_url = "https://text.pollinations.ai/"
+        model = "llama"
+        
+        prompt = f"""You are a professional News Journalist writing in Hinglish.
+Write a news article based on this EXACT news:
 Title: {title}
 Content: {full_content[:1500]}
 Category: {category}
 
-Strict Instructions:
-1. Write in natural Hinglish (blend of Hindi and English).
-2. Do not use generic placeholder sentences. Use actual names, facts, and details from the provided news.
-3. Generate a realistic and highly specific expert opinion quote about this exact event.
-4. Output the content using this exact HTML structure with EXTREMELY DETAILED paragraphs (minimum 200-300 words per section):
+IMPORTANT: Write ONLY about the news mentioned above. Do NOT use content from other news.
+Write REAL facts, names, and quotes from the provided content.
 
+Output in HTML:
 <h3>📝 परिचय - Introduction</h3>
-<p>[EXTREMELY DETAILED introduction in English - minimum 200 words based on the news content]</p>
-<p>[EXTREMELY DETAILED introduction in Hindi - minimum 200 words based on the news content]</p>
+<p>[Introduction based on the actual news - use names and quotes from the content]</p>
+<p>[Hindi introduction based on actual news]</p>
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
-  <li>[Specific highlight 1 containing real facts/names/scores from the news]</li>
-  <li>[Specific highlight 2 containing real facts/names from the news]</li>
-  <li>[Specific highlight 3 containing real facts/names from the news]</li>
-  <li>[Specific highlight 4 containing real facts/names from the news]</li>
-  <li>[Specific highlight 5 containing real facts/names from the news]</li>
-  <li>[Specific highlight 6 containing real facts/names from the news]</li>
-  <li>[Specific highlight 7 containing real facts/names from the news]</li>
-  <li>[Specific highlight 8 containing real facts/names from the news]</li>
+  <li>• [Actual fact 1 from the news]</li>
+  <li>• [Actual fact 2 from the news]</li>
+  <li>• [Actual fact 3 from the news]</li>
+  <li>• [Actual fact 4 from the news]</li>
 </ul>
 
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>[EXTREMELY DETAILED analysis paragraph in English - minimum 250 words]</p>
-<p>[EXTREMELY DETAILED analysis paragraph in Hindi - minimum 250 words]</p>
+<p>[Analysis based on the actual news]</p>
 
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-<p>[EXTREMELY DETAILED expert opinion in English - minimum 150 words]</p>
-<p>[EXTREMELY DETAILED expert opinion in Hindi - minimum 150 words]</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"[A realistic, highly specific expert quote in Hindi about this event]"</p>
-</blockquote>
+<p>[Expert opinion - if mentioned in the news]</p>
+<blockquote>"[Quote from the news]"</blockquote>
 
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>[EXTREMELY DETAILED impact analysis in English - minimum 200 words]</p>
-<p>[EXTREMELY DETAILED impact analysis in Hindi - minimum 200 words]</p>
+<p>[Impact based on the news]</p>
 
 <h3>✅ निष्कर्ष - Conclusion</h3>
-<p>[EXTREMELY DETAILED conclusion in English - minimum 150 words]</p>
-<p>[EXTREMELY DETAILED conclusion in Hindi - minimum 150 words]</p>
+<p>[Conclusion based on the news]</p>
 """
-
-    # 🌟 ENGINE 1: Hugging Face (Qwen 2.5 7B)
-    if HF_TOKEN:
-        print("🧠 Engine 1: Calling Hugging Face (Qwen 2.5 7B)...")
-        try:
-            # ✅ FIX: verify=False added to bypass SSL
-            api_url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct"
-            headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
-            payload = {
-                "inputs": f"<|im_start|>system\nYou are a professional news editor writing detailed HTML output in Hinglish.<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n",
-                "parameters": {"max_new_tokens": 1200, "temperature": 0.7}
-            }
-            res = requests.post(api_url, json=payload, headers=headers, timeout=40, verify=False)
-            if res.status_code == 200:
-                result = res.json()
-                if isinstance(result, list) and len(result) > 0:
-                    generated_text = result[0].get("generated_text", "")
-                    if "<|im_start|>assistant" in generated_text:
-                        generated_text = generated_text.split("<|im_start|>assistant")[-1].strip()
-                    clean_html = generated_text.replace("<|im_end|>", "").strip()
-                    if "<h3>" in clean_html:
-                        print("✅ Engine 1 (Hugging Face) successfully generated content!")
-                        return clean_html
-            elif res.status_code == 503:
-                try:
-                    wait_time = res.json().get("estimated_time", 25)
-                    print(f"⏳ Model loading, waiting {wait_time}s...")
-                    time.sleep(wait_time + 5)
-                    res = requests.post(api_url, json=payload, headers=headers, timeout=40, verify=False)
-                    if res.status_code == 200:
-                        result = res.json()
-                        if isinstance(result, list) and len(result) > 0:
-                            generated_text = result[0].get("generated_text", "")
-                            if "<|im_start|>assistant" in generated_text:
-                                generated_text = generated_text.split("<|im_start|>assistant")[-1].strip()
-                            clean_html = generated_text.replace("<|im_end|>", "").strip()
-                            if "<h3>" in clean_html:
-                                print("✅ Engine 1 (Hugging Face after wait) successfully generated content!")
-                                return clean_html
-                except:
-                    pass
-            print(f"⚠️ Engine 1 Status: {res.status_code}, trying Engine 2...")
-        except Exception as e:
-            print(f"⚠️ Engine 1 Error: {e}, trying Engine 2...")
-
-    # 🌟 ENGINE 2: Google Gemini 1.5 Flash
-    if GEMINI_API:
-        print("🧠 Engine 2: Calling Google Gemini 1.5 Flash...")
-        try:
-            api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API}"
-            headers = {"Content-Type": "application/json"}
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.7}
-            }
-            res = requests.post(api_url, json=payload, headers=headers, timeout=40)
-            if res.status_code == 200:
-                data = res.json()
-                clean_html = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                clean_html = clean_html.replace("```html", "").replace("```", "").strip()
-                if "<h3>" in clean_html:
-                    print("✅ Engine 2 (Gemini) successfully generated content!")
-                    return clean_html
-            print(f"⚠️ Engine 2 Status: {res.status_code}, trying Engine 3...")
-        except Exception as e:
-            print(f"⚠️ Engine 2 Error: {e}, trying Engine 3...")
-
-    # 🌟 ENGINE 3: Pollinations AI (FIXED - OpenAI Compatible Endpoint)
-    print("🧠 Engine 3: Calling Pollinations AI (Backup)...")
-    try:
-        # ✅ FIX: OpenAI Compatible Endpoint (Never 404)
-        api_url = "https://text.pollinations.ai/v1/chat/completions"
-        model = "llama"  # Llama-3-70B - 100% Free
         
         payload = {
             "messages": [
-                {"role": "system", "content": "You are a professional news editor writing HTML output in Hinglish. Write detailed articles."},
+                {"role": "system", "content": "You are a professional news editor writing detailed HTML output in Hinglish. Write ONLY based on the provided news content."},
                 {"role": "user", "content": prompt}
             ],
             "model": model
         }
-        res = requests.post(api_url, json=payload, timeout=50)
-        if res.status_code == 200:
-            data = res.json()
-            clean_html = data["choices"][0]["message"]["content"].strip()
-            if "<h3>" in clean_html:
-                print("✅ Engine 3 (Pollinations) successfully generated content!")
-                return clean_html
-        print(f"⚠️ Engine 3 Status: {res.status_code}")
-    except Exception as e:
-        print(f"⚠️ Engine 3 Error: {e}")
         
+        res = requests.post(api_url, json=payload, timeout=60)
+        
+        if res.status_code == 200:
+            clean_html = res.text.strip()
+            if "<h3>" in clean_html:
+                print("✅ AI Success!")
+                return clean_html
+        print(f"⚠️ AI Status: {res.status_code}")
+    except Exception as e:
+        print(f"⚠️ AI Error: {e}")
     return None
 
-# ✅ DYNAMIC CONTENT GENERATOR WITH DETAILED SECTIONS
+# ✅ FIXED: DYNAMIC CONTENT GENERATOR - POLITICS SPECIFIC
 def generate_dynamic_content(title, full_content, category):
-    """AI से Content Generate करे, नहीं तो DETAILED Fallback Template"""
-    
     ai_content = ask_ai_for_news(title, full_content, category)
     if ai_content:
         return ai_content
     
-    print("🔄 Using detailed fallback template...")
+    print("🔄 Using fallback template...")
     today = get_current_date()
     clean_title = clean_and_format_title(title)
     first_para = full_content[:500] if full_content else ""
     more_content = full_content[500:1000] if len(full_content) > 500 else ""
     
-    if category == "Space":
+    # ✅ POLITICS SPECIFIC HIGHLIGHTS
+    if category == "Politics":
+        # Extract key names and quotes from content
+        names = re.findall(r'([A-Z][a-z]+ [A-Z][a-z]+)', full_content)
+        name_str = names[0] if names else "the politician"
+        
         highlights = [
-            f"<li>🚀 <strong>{clean_title[:50]}</strong> - अंतरिक्ष की बड़ी खबर</li>",
-            f"<li>🌌 <strong>खोज:</strong> {first_para[:60]}...</li>",
-            f"<li>🛰️ <strong>मिशन अपडेट:</strong> नई जानकारी</li>",
-            f"<li>🔭 <strong>रिसर्च:</strong> वैज्ञानिकों की खोज</li>",
-            f"<li>📡 <strong>सिग्नल:</strong> अंतरिक्ष से नए संकेत</li>",
-            f"<li>🌞 <strong>सूर्य:</strong> {more_content[:60]}...</li>",
-            f"<li>🌍 <strong>पृथ्वी:</strong> अंतरिक्ष से दृश्य</li>",
-            f"<li>⭐ <strong>तारे:</strong> नई खोज</li>",
+            f"<li>🏛️ <strong>{clean_title[:50]}</strong> - राजनीति की बड़ी खबर</li>",
+            f"<li>👥 <strong>मुख्य बात:</strong> {first_para[:80]}...</li>",
+            f"<li>📢 <strong>बयान:</strong> {name_str} ने दिया बड़ा बयान</li>",
+            f"<li>📈 <strong>विश्लेषण:</strong> राजनीतिक विशेषज्ञों की राय</li>",
+            f"<li>🔮 <strong>आगे क्या:</strong> आने वाले दिनों में और अपडेट</li>",
+            f"<li>🌍 <strong>वैश्विक प्रभाव:</strong> अंतरराष्ट्रीय प्रतिक्रिया</li>",
+            f"<li>📊 <strong>जनता की राय:</strong> सोशल मीडिया पर प्रतिक्रिया</li>",
+            f"<li>🎯 <strong>भविष्य:</strong> आगामी चुनावों पर प्रभाव</li>",
         ]
-        expert_quote = """
-<p>Astronomers and space scientists are calling this discovery a significant milestone in our understanding of the cosmos.</p>
-<p>खगोलविदों और अंतरिक्ष वैज्ञानिकों का मानना है कि यह खोज ब्रह्मांड की हमारी समझ में एक महत्वपूर्ण मील का पत्थर है।</p>
+        expert_quote = f"""
+<p>Political analysts are closely watching this development. {name_str} has made a significant statement that could impact the political landscape.</p>
+<p>राजनीतिक विश्लेषक इस घटनाक्रम पर कड़ी नजर रख रहे हैं। {name_str} ने एक महत्वपूर्ण बयान दिया है जो राजनीतिक परिदृश्य को प्रभावित कर सकता है।</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह खोज अंतरिक्ष विज्ञान के इतिहास में एक नया अध्याय जोड़ती है।"</p>
+    <p style="font-style:italic;font-size:16px;">"यह राजनीतिक घटनाक्रम आने वाले समय में महत्वपूर्ण साबित होगा।"</p>
 </blockquote>
 """
         analysis_detail = f"""
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>इस अंतरिक्ष घटना ने वैज्ञानिकों को नई जानकारी दी है और आने वाले शोध के लिए नए रास्ते खोले हैं।</p>
+<p>यह राजनीतिक घटनाक्रम अमेरिकी राजनीति में एक नया मोड़ ला सकता है। {name_str} के इस बयान से राजनीतिक गलियारों में हलचल मच गई है।</p>
 """
     
     elif category == "Technology":
         highlights = [
-            f"<li>💻 <strong>{clean_title[:50]}</strong> - टेक जगत में बड़ी खबर</li>",
-            f"<li>📱 <strong>डिटेल्स:</strong> {first_para[:60]}...</li>",
-            f"<li>🔍 <strong>एनालिसिस:</strong> विशेषज्ञों की राय</li>",
-            f"<li>💡 <strong>इंपैक्ट:</strong> इसका क्या प्रभाव होगा</li>",
-            f"<li>🚀 <strong>फ्यूचर:</strong> आगे क्या होगा</li>",
-            f"<li>🛡️ <strong>सुरक्षा:</strong> यूजर्स के लिए चेतावनी</li>",
-            f"<li>📊 <strong>आंकड़े:</strong> बड़ी संख्या में प्रभावित</li>",
+            f"<li>💻 <strong>{clean_title[:50]}</strong> - टेक जगत की बड़ी खबर</li>",
+            f"<li>📱 <strong>मुख्य बात:</strong> {first_para[:60]}...</li>",
+            f"<li>🔍 <strong>विश्लेषण:</strong> विशेषज्ञों की राय</li>",
+            f"<li>💡 <strong>प्रभाव:</strong> यूजर्स पर गहरा असर</li>",
+            f"<li>🚀 <strong>आगे क्या:</strong> आने वाले दिनों में और अपडेट</li>",
+            f"<li>🛡️ <strong>सुरक्षा:</strong> साइबर सुरक्षा के उपाय</li>",
+            f"<li>📊 <strong>आंकड़े:</strong> प्रभावित यूजर्स की संख्या</li>",
             f"<li>🎯 <strong>निष्कर्ष:</strong> यह एक गंभीर मामला है</li>",
         ]
         expert_quote = """
-<p>Tech reviewers and industry analysts are impressed by this new technological development. They believe that this issue represents a serious threat to user privacy.</p>
-<p>टेक समीक्षकों और उद्योग विश्लेषकों का मानना है कि यह तकनीकी विकास इस क्षेत्र में नए आयाम स्थापित करेगा। उनका मानना है कि यह मुद्दा यूज़र्स की निजता के लिए एक गंभीर खतरा है।</p>
+<p>Cybersecurity experts warn that this is a significant security threat.</p>
+<p>साइबर सुरक्षा विशेषज्ञों का कहना है कि यह एक गंभीर सुरक्षा खतरा है।</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"सुरक्षा और निजता अब तकनीक उद्योग में सबसे बड़े महत्वपूर्ण मानक बन चुके हैं।"</p>
+    <p style="font-style:italic;font-size:16px;">"यह सुरक्षा मामला Apple यूजर्स के लिए बड़ा खतरा है।"</p>
 </blockquote>
 """
         analysis_detail = f"""
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>इस तकनीकी घटनाक्रम ने विशेषज्ञों को नई चिंता दी है और आने वाले सुरक्षा अपडेट्स के लिए नए रास्ते खोले हैं।</p>
-"""
-    
-    elif category == "Sports":
-        highlights = [
-            f"<li>🏏 <strong>{clean_title[:50]}</strong> - मैच का सबसे बड़ा मोमेंट</li>",
-            f"<li>⭐ <strong>स्टार प्रदर्शन:</strong> {first_para[:60]}...</li>",
-            f"<li>📊 <strong>मैच विश्लेषण:</strong> टीम ने शानदार प्रदर्शन किया</li>",
-            f"<li>🏆 <strong>ऐतिहासिक जीत:</strong> यह टीम के लिए एक बड़ी उपलब्धि है</li>",
-            f"<li>⚡ <strong>अहम मोमेंट्स:</strong> {more_content[:60]}...</li>",
-            f"<li>📈 <strong>आंकड़े:</strong> खिलाड़ियों के शानदार आंकड़े</li>",
-            f"<li>🎯 <strong>रणनीति:</strong> टीम की बेहतरीन रणनीति</li>",
-            f"<li>🏅 <strong>खिलाड़ी:</strong> स्टार खिलाड़ियों का योगदान</li>",
-        ]
-        expert_quote = """
-<p>Cricket pundits and former players are praising this performance as one of the best in recent times. According to experts, this victory will boost the team's confidence for upcoming tournaments.</p>
-<p>क्रिकेट विश्लेषकों और पूर्व खिलाड़ियों का मानना है कि यह हाल के समय के सबसे शानदार प्रदर्शनों में से एक है। विशेषज्ञों के अनुसार, यह जीत आगामी टूर्नामेंट्स के लिए टीम का आत्मविश्वास बढ़ाएगी।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह प्रदर्शन दिखाता है कि यह टीम किसी भी चुनौती का सामना करने के लिए तैयार है।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>इस मैच में खिलाड़ियों ने जिस तरह का संयम और आक्रामकता दिखाया, वह काबिल-ए-तारीफ है। टीम ने हर विभाग में बेहतरीन प्रदर्शन किया और जीत अपने नाम की।</p>
+<p>यह साइबर सुरक्षा मामला तकनीकी जगत में चर्चा का विषय बना हुआ है।</p>
 """
     
     else:
@@ -640,8 +583,8 @@ def generate_dynamic_content(title, full_content, category):
             f"<li>🎯 <strong>फ्यूचर:</strong> आने वाला भविष्य</li>",
         ]
         expert_quote = f"""
-<p>Experts from around the world are weighing in on this significant development. This event is expected to reshape the future of the {category} sector.</p>
-<p>दुनिया भर के विशेषज्ञ इस महत्वपूर्ण विकास पर अपनी राय दे रहे हैं। इस घटना से {category} सेक्टर का भविष्य बदलने की उम्मीद है।</p>
+<p>Experts from around the world are weighing in on this significant development.</p>
+<p>दुनिया भर के विशेषज्ञ इस महत्वपूर्ण विकास पर अपनी राय दे रहे हैं।</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
     <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर के इतिहास में एक महत्वपूर्ण मोड़ है।"</p>
 </blockquote>
@@ -649,7 +592,7 @@ def generate_dynamic_content(title, full_content, category):
         analysis_detail = f"""
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं। यह {category} सेक्टर के लिए एक बड़ा बदलाव ला सकता है।</p>
+<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं।</p>
 """
     
     intro = f"""
@@ -657,13 +600,13 @@ def generate_dynamic_content(title, full_content, category):
 <p><strong>{clean_title}</strong></p>
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।  यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
+<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।</p>
 """
 
     analysis = f"""
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
 {analysis_detail}
-<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है। विशेषज्ञों का मानना है कि इस {category}  सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
+<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा।</p>
 """
 
     expert = f"""
@@ -673,12 +616,13 @@ def generate_dynamic_content(title, full_content, category):
 
     impact = f"""
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>इस खबर का {category}  सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है। आने वाले दिनों में और अपडेट आने की संभावना है।</p>
+<p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है।</p>
+<p>आने वाले दिनों में और अपडेट आने की संभावना है।</p>
 """
 
     conclusion = f"""
 <h3>✅ निष्कर्ष - Conclusion</h3>
-<p>{clean_title} - यह {category}  सेक्टर के लिए एक महत्वपूर्ण विकास है।</p>
+<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है।</p>
 <p>विशेषज्ञ इस बात पर सहमत हैं कि यह {category} के भविष्य को आकार देने वाला एक महत्वपूर्ण कदम है।</p>
 """
     
@@ -752,10 +696,8 @@ def main():
         if not value:
             all_loaded = False
     
-    print(f"GEMINI_API: {'✅ LOADED (Using Google Gemini as Backup Engine)' if GEMINI_API else '⚠️ NOT MAPPED (Using Pollinations AI as Fallback Engine)'}")
-    
     if not all_loaded:
-        print("\n❌ Mandatory Secrets missing!")
+        print("\n❌ Secrets missing!")
         return
     
     access_token = get_blogger_access_token()
