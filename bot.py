@@ -38,17 +38,17 @@ def apply_smart_connection_patch():
 apply_smart_connection_patch()
 
 def fix_dns():
-    print("✅ Testing connection to Pollinations AI...")
+    print("✅ Testing connection to Google Gemini API...")
     try:
-        res = requests.get("https://text.pollinations.ai", timeout=10)
-        print(f"✅ Pollinations AI reachable (Status Code: {res.status_code})")
+        res = requests.get("https://generativelanguage.googleapis.com/", timeout=10)
+        print(f"✅ Google API reachable (Status Code: {res.status_code})")
     except Exception as e:
         print(f"⚠️ Connection check failed: {e}")
 
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
-HF_TOKEN = os.getenv('HF_TOKEN')
+GEMINI_API = os.getenv('GEMINI_API')  # ✅ LOADED: जेमिनी एपीआई की को लोड किया गया
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
@@ -180,7 +180,7 @@ def share_to_discord(title, link):
 
 # --- FUNCTIONS ---
 
-# ✅ FIX: गिटहब सर्वर के यूटीसी समय को भारतीय समय (IST) के अनुसार सिंक करने का फंक्शन
+# गिटहब सर्वर के यूटीसी समय को भारतीय समय (IST) के अनुसार सिंक करने का फंक्शन
 def get_current_date():
     """Get current date in Indian Standard Time (IST) format"""
     ist_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
@@ -320,143 +320,104 @@ def get_short_url(long_url):
     except:
         return long_url
 
-# ✅ Word Boundary Function
+# Word Boundary Function
 def word_in_text(word, text):
     """Check if whole word exists in text (not as substring)"""
     if not text:
         return False
     return bool(re.search(rf'\b{re.escape(word)}\b', text, re.IGNORECASE))
 
-# ✅ Category Detection with Whole-Word Matching (Strict Keywords)
+# Category Detection with Whole-Word Matching (Strict Keywords)
 def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
     
-    # ✅ Entertainment
+    # कोडिंग टकराव (Collisions) रोकने के लिए हेल्पर फंक्शन
+    def match_words(word_list):
+        for word in word_list:
+            if re.search(r'\b' + re.escape(word.lower()) + r'\b', title_lower):
+                return True
+        return False
+
+    # Entertainment (मनोरंजन)
     if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla", "eonline"]):
         return "Entertainment"
-    if word_in_text("movie", title_lower) or word_in_text("film", title_lower) or word_in_text("hollywood", title_lower):
+    if match_words(["movie", "film", "hollywood", "box office", "marvel", "dc", "disney", "lands", "rides", "spider-man", "spiderman", "actor", "actress", "celebrity", "drama"]):
         return "Entertainment"
-    if word_in_text("marvel", title_lower) or word_in_text("dc", title_lower) or word_in_text("actor", title_lower):
-        return "Entertainment"
-    if word_in_text("actress", title_lower) or word_in_text("disney", title_lower) or word_in_text("box office", title_lower):
-        return "Entertainment"
-    if word_in_text("star cast", title_lower) or word_in_text("pop star", title_lower) or word_in_text("rock star", title_lower):
+    if match_words(["star cast", "pop star", "rock star"]):
         return "Entertainment"
     
-    # ✅ Space (star शब्द हटाया गया है)
+    # Space (अंतरिक्ष) - 'star' शब्द को यहाँ से हटा दिया गया है ताकि "Pop Star" जैसी खबरें स्पेस में न जाएं।
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
-    if word_in_text("galaxy", title_lower) or word_in_text("planet", title_lower):
+    if match_words(["galaxy", "planet", "moon", "mars", "universe", "cosmos", "astronaut", "asteroid", "telescope", "eclipse", "stargazing", "constellation", "nebula"]):
         return "Space"
-    if word_in_text("moon", title_lower) or word_in_text("mars", title_lower) or word_in_text("universe", title_lower):
-        return "Space"
-    if word_in_text("cosmos", title_lower) or word_in_text("astronaut", title_lower):
-        return "Space"
-    if word_in_text("corona", title_lower) or word_in_text("eclipse", title_lower) or word_in_text("solar", title_lower):
-        return "Space"
-    if word_in_text("star", title_lower) and not word_in_text("star cast", title_lower):
-        if word_in_text("astronomy", title_lower) or word_in_text("constellation", title_lower) or word_in_text("night sky", title_lower):
-            return "Space"
-    
-    # ✅ Technology
+        
+    # Technology (तकनीक)
     if any(x in feed_lower for x in ["tech", "verge", "cnet", "techcrunch"]):
         return "Technology"
-    if word_in_text("smartphone", title_lower) or word_in_text("apple", title_lower) or word_in_text("samsung", title_lower):
+    if match_words(["smartphone", "apple", "samsung", "software", "artificial intelligence", "chatgpt", "iphone", "gadget", "cybersecurity", "hacker", "app", "spyware"]):
         return "Technology"
-    if word_in_text("software", title_lower) or word_in_text("artificial intelligence", title_lower) or word_in_text("chatgpt", title_lower):
+    # "AI" को स्वतंत्र शब्द के रूप में मैच करें
+    if re.search(r'\b' + "ai" + r'\b', title_lower):
         return "Technology"
-    if word_in_text("spyware", title_lower) or word_in_text("cybersecurity", title_lower):
-        return "Technology"
-    
-    # ✅ Gaming
+        
+    # Gaming (गेमिंग)
     if "gaming" in feed_lower or any(x in feed_lower for x in ["gamespot", "ign"]):
         return "Gaming"
-    if word_in_text("nintendo", title_lower) or word_in_text("xbox", title_lower) or word_in_text("playstation", title_lower):
+    if match_words(["nintendo", "xbox", "playstation", "ps5", "gta", "gamer", "gaming", "gameplay", "console"]):
         return "Gaming"
-    if word_in_text("ps5", title_lower) or word_in_text("gta", title_lower) or word_in_text("gamer", title_lower):
-        return "Gaming"
-    
-    # ✅ Music
+        
+    # Music (संगीत)
     if any(x in feed_lower for x in ["rollingstone"]):
         return "Music"
-    if word_in_text("album", title_lower) or word_in_text("song", title_lower) or word_in_text("singer", title_lower):
+    if match_words(["album", "song", "singer", "concert", "tour", "music", "guitar", "pop", "rap", "band", "singing", "cynthia", "ariana", "mcconaughey"]):
         return "Music"
-    if word_in_text("concert", title_lower) or word_in_text("tour", title_lower) or word_in_text("ariana", title_lower):
-        return "Music"
-    if word_in_text("cynthia", title_lower) or word_in_text("pop star", title_lower) or word_in_text("rock star", title_lower):
-        return "Music"
-    if word_in_text("matthew mcconaughey", title_lower) or word_in_text("life in songs", title_lower):
-        return "Music"
-    
-    # ✅ Sports (test की जगह test match, test cricket किया गया है)
+        
+    # Sports (खेल) - 'test' की जगह 'test cricket', 'test match' किया गया है।
     if "cric" in feed_lower:
         return "Sports"
-    if word_in_text("cricket", title_lower) or word_in_text("century", title_lower) or word_in_text("wicket", title_lower):
+    if match_words(["cricket", "century", "wicket", "odi", "test cricket", "test match", "test series", "football", "goal", "fifa", "olympics", "athletics", "basketball", "tennis", "stadium", "sciver", "brunt", "england"]):
         return "Sports"
-    if word_in_text("odi", title_lower) or word_in_text("test match", title_lower) or word_in_text("test cricket", title_lower) or word_in_text("test series", title_lower) or word_in_text("match", title_lower):
-        return "Sports"
-    if word_in_text("football", title_lower) or word_in_text("goal", title_lower) or word_in_text("fifa", title_lower):
-        return "Sports"
-    if word_in_text("olympics", title_lower) or word_in_text("player", title_lower):
-        return "Sports"
-    if word_in_text("sciver", title_lower) or word_in_text("brunt", title_lower) or word_in_text("england", title_lower):
-        return "Sports"
-    
-    # ✅ Business
+        
+    # Business (व्यापार)
     if any(x in feed_lower for x in ["bloomberg", "reuters", "markets"]):
         return "Business"
-    if word_in_text("stocks", title_lower) or word_in_text("inflation", title_lower) or word_in_text("market", title_lower):
+    if match_words(["stocks", "inflation", "market", "economy", "trade", "finance", "investing", "crypto", "bitcoin"]):
         return "Business"
-    if word_in_text("economy", title_lower) or word_in_text("trade", title_lower):
-        return "Business"
-    
-    # ✅ Politics
+        
+    # Politics (राजनीति)
     if "politics" in feed_lower:
         return "Politics"
-    if word_in_text("election", title_lower) or word_in_text("biden", title_lower) or word_in_text("trump", title_lower):
+    if match_words(["election", "biden", "trump", "modi", "parliament", "politics", "minister", "senate", "congress", "government", "vote", "bjp", "amit malviya", "deepak mhaske"]):
         return "Politics"
-    if word_in_text("modi", title_lower) or word_in_text("parliament", title_lower) or word_in_text("minister", title_lower):
-        return "Politics"
-    if word_in_text("senate", title_lower) or word_in_text("congress", title_lower):
-        return "Politics"
-    if word_in_text("federal", title_lower) or word_in_text("state officials", title_lower):
-        return "Politics"
-    if word_in_text("bjp", title_lower) or word_in_text("amit malviya", title_lower) or word_in_text("deepak mhaske", title_lower):
-        return "Politics"
-    
-    # ✅ Health
+        
+    # Health (स्वास्थ्य)
     if "health" in feed_lower or "medical" in feed_lower:
         return "Health"
-    if word_in_text("health", title_lower) or word_in_text("mental", title_lower) or word_in_text("doctor", title_lower):
+    if match_words(["health", "mental", "doctor", "cancer", "vaccine", "disease", "fitness", "nutrition", "diet"]):
         return "Health"
-    if word_in_text("cancer", title_lower) or word_in_text("vaccine", title_lower) or word_in_text("disease", title_lower):
-        return "Health"
-    if word_in_text("fitness", title_lower):
-        return "Health"
-    
-    # ✅ Automobile
+        
+    # Automobile (ऑटोमोबाइल)
     if "motor" in feed_lower or "auto" in feed_lower:
         return "Automobile"
-    if word_in_text("car", title_lower) or word_in_text("suv", title_lower) or word_in_text("vehicle", title_lower):
-        return "Automobile"
-    if word_in_text("electric vehicle", title_lower) or word_in_text("ev", title_lower) or word_in_text("tesla", title_lower):
-        return "Automobile"
-    if word_in_text("engine", title_lower) or word_in_text("motorcycle", title_lower) or word_in_text("bike", title_lower):
-        return "Automobile"
-    if word_in_text("polestar", title_lower):
+    if match_words(["car", "suv", "vehicle", "electric vehicle", "ev", "tesla", "engine", "motorcycle", "bike", "polestar", "volvo", "ferrari", "porsche", "ford", "bmw", "audi"]):
         return "Automobile"
         
     return "News"
 
-# ✅ AI CONTENT GENERATOR (Pollinations AI - Meta Llama-3-70B)
+# ✅ AI CONTENT GENERATOR (Google Gemini 1.5 Flash API - 100% Unblocked & Stable)
 def ask_ai_for_news(title, full_content, category):
-    """Pollinations AI से 100% Unique और Unblocked Content Generate करेगा"""
-    print("🧠 Calling Pollinations AI for unique post-specific content...")
+    """Google Gemini API (Gemini 1.5 Flash) का उपयोग करके 100% Unique और Professional Content Generate करेगा"""
+    if not GEMINI_API:
+        print("⚠️ GEMINI_API secret is missing in GitHub! Falling back to template...")
+        return None
+    
+    print("🧠 Calling Gemini 1.5 Flash API for high-quality content...")
     try:
-        # ✅ FIX: एंडपॉइंट को "https://text.pollinations.ai" किया गया (बिना /chat या आखिरी स्लैश के, 404 Error Fixed)
-        api_url = "https://text.pollinations.ai"
-        model = "openai"  # GPT-4o-Mini
+        # Google का बीटा-एपीआई जो बिना किसी अतिरिक्त लाइब्रेरी के काम करता है
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API}"
+        headers = {"Content-Type": "application/json"}
         
         prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
 Write a highly engaging, SEO-friendly news article based on this news:
@@ -507,24 +468,30 @@ Strict Instructions:
 """
         
         payload = {
-            "messages": [
-                {"role": "system", "content": "You are a professional news editor writing detailed HTML output in Hinglish. Write EXTREMELY LONG and DETAILED paragraphs."},
-                {"role": "user", "content": prompt}
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt}
+                    ]
+                }
             ],
-            "model": model,
-            "jsonMode": False
+            "generationConfig": {
+                "temperature": 0.7
+            }
         }
         
-        res = requests.post(api_url, json=payload, timeout=60)
-        
+        res = requests.post(api_url, json=payload, headers=headers, timeout=50)
         if res.status_code == 200:
-            clean_html = res.text.strip()
+            data = res.json()
+            clean_html = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            # जेमिनी कई बार रिस्पॉन्स में ```html ... ``` ब्लॉक जोड़ देता है, उसे साफ़ करें
+            clean_html = clean_html.replace("```html", "").replace("```", "").strip()
             if "<h3>" in clean_html:
-                print("✅ AI successfully generated unique content via Pollinations!")
+                print("✅ Gemini successfully generated unique content!")
                 return clean_html
-        print(f"⚠️ AI API Status: {res.status_code}, using fallback...")
+        print(f"⚠️ Gemini API Status: {res.status_code}, using fallback...")
     except Exception as e:
-        print(f"⚠️ AI Error: {e}")
+        print(f"⚠️ Gemini Error: {e}")
     return None
 
 # ✅ DYNAMIC CONTENT GENERATOR WITH DETAILED SECTIONS
@@ -733,7 +700,7 @@ def main():
     print("\n--- Checking Secrets ---")
     secrets = {
         "BLOG_ID": BLOG_ID,
-        "HF_TOKEN": HF_TOKEN,
+        "GEMINI_API": GEMINI_API,  # ✅ Blogger सिंक में जेमिनी एपीआई की जाँच की जा रही है
         "SHRINKME_API": SHRINKME_API,
         "BC_CLIENT_ID": BC_CLIENT_ID,
         "BC_CLIENT_SECRET": BC_CLIENT_SECRET,
@@ -861,6 +828,7 @@ def main():
     print("🤖 Generating detailed content...")
     ai_content = generate_long_content(title, full_content, category)
     
+    # ✅ Earning Button with ShrinkMe Link
     earning_button = f"""
     <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
         <a href="{short_link}" target="_blank" style="background:linear-gradient(135deg,#ff5722,#ff6f00);color:white;padding:20px 60px;text-decoration:none;font-size:22px;font-weight:bold;border-radius:50px;display:inline-block;text-transform:uppercase;box-shadow:0 4px 15px rgba(255,87,34,0.3);">
