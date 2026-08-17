@@ -48,6 +48,7 @@ def fix_dns():
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
+HF_TOKEN = os.getenv('HF_TOKEN') # ✅ RE-ADDED: NameError फिक्स करने के लिए पुनः जोड़ा गया
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
@@ -437,9 +438,9 @@ def ask_ai_for_news(title, full_content, category):
     """Pollinations AI (LLaMA) से 100% Unique और Unblocked Content Generate करेगा"""
     print("🧠 Calling Pollinations AI for unique post-specific content...")
     try:
-        # ✅ FIX: एंडपॉइंट को "https://text.pollinations.ai/" किया गया (बिना /chat के, 404 Error Fixed)
+        # ✅ FIXED: एंडपॉइंट को "https://text.pollinations.ai/" किया गया (बिना /chat के, 404 Error Fixed)
         api_url = "https://text.pollinations.ai/"
-        model = "openai"  # GPT-4o-Mini (Most Intelligent)
+        model = "llama"  # Meta Llama-3-70B
         
         prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
 Write a highly engaging, SEO-friendly news article based on this news:
@@ -676,7 +677,7 @@ def generate_dynamic_content(title, full_content, category):
 <p><strong>{clean_title}</strong></p>
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है। यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
+<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।  यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
 """
 
     analysis = f"""
