@@ -13,8 +13,14 @@ import threading
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SMART DNS PATCH ---
+# --- SMART DNS PATCH (GitHub Actions के लिए FIXED) ---
 def apply_global_dns_patch():
+    """DNS Patch - सिर्फ local development के लिए, GitHub Actions में नहीं"""
+    # ✅ FIX: GitHub Actions में DNS Patch SKIP करो
+    if os.getenv('GITHUB_ACTIONS') == 'true':
+        print("🐙 GitHub Actions environment detected. Bypassing DNS Patch to prevent SSL Handshake errors...")
+        return
+    
     print("🌐 Initializing Anti-Recursion Smart DNS Patch...")
     original_getaddrinfo = socket.getaddrinfo
     dns_cache = {}
@@ -74,7 +80,11 @@ def apply_global_dns_patch():
 
     socket.getaddrinfo = patched_getaddrinfo
 
-apply_global_dns_patch()
+# ✅ FIX: GitHub Actions में DNS Patch SKIP करो
+if os.getenv('GITHUB_ACTIONS') == 'true':
+    print("🐙 GitHub Actions detected. DNS Patch SKIPPED.")
+else:
+    apply_global_dns_patch()
 
 def fix_dns():
     print("✅ DNS patch applied globally")
@@ -282,7 +292,7 @@ def get_full_content(entry):
 def get_entry_image(entry):
     try:
         media_content = entry.get('media_content')
-        if media_content& isinstance(media_content, list):
+        if media_content and isinstance(media_content, list):
             for media in media_content:
                 if 'url' in media:
                     return media['url']
@@ -375,8 +385,8 @@ def ask_ai_for_news(title, full_content, category):
     
     print("🧠 Calling AI for unique post-specific content...")
     try:
-        # Qwen 2.5-7B - Best for Hinglish
-        model = "Qwen/Qwen2.5-7B-Instruct"
+        # ✅ FIX: Mistral Model use करो (Qwen से ज्यादा stable)
+        model = "mistralai/Mistral-7B-Instruct-v0.1"
         api_url = f"https://api-inference.huggingface.co/models/{model}"
         headers = {"Authorization": f"Bearer {HF_TOKEN}"}
         
@@ -426,18 +436,16 @@ Strict Instructions:
 """
         
         payload = {
-            "inputs": f"<|im_start|>system\nYou are a professional news editor writing HTML output in Hinglish.<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n",
-            "parameters": {"max_new_tokens": 1200, "temperature": 0.7}
+            "inputs": prompt,
+            "parameters": {"max_new_tokens": 1500, "temperature": 0.7}
         }
         
-        res = requests.post(api_url, json=payload, headers=headers, timeout=30)
+        res = requests.post(api_url, json=payload, headers=headers, timeout=60)
         if res.status_code == 200:
             result = res.json()
             if isinstance(result, list) and len(result) > 0:
                 generated_text = result[0].get("generated_text", "")
-                if "<|im_start|>assistant" in generated_text:
-                    generated_text = generated_text.split("<|im_start|>assistant")[-1].strip()
-                clean_html = generated_text.replace("<|im_end|>", "").strip()
+                clean_html = generated_text.replace(prompt, "").strip()
                 if "<h3>" in clean_html:
                     print("✅ AI successfully generated unique content!")
                     return clean_html
@@ -446,7 +454,7 @@ Strict Instructions:
         print(f"⚠️ AI Error: {e}")
     return None
 
-# ✅ DYNAMIC CONTENT GENERATOR
+# ✅ DYNAMIC CONTENT GENERATOR (FIXED - No generic text)
 def generate_dynamic_content(title, full_content, category):
     """AI से Content Generate करे, नहीं तो Fallback Template"""
     
@@ -455,13 +463,13 @@ def generate_dynamic_content(title, full_content, category):
     if ai_content:
         return ai_content
     
-    # AI fail हो तो Fallback Template
+    # ✅ FIXED: Fallback Template - No generic "battery", "price", "launch"
     print("🔄 Using fallback template...")
     today = datetime.now().strftime("%B %d, %Y")
     clean_title = clean_and_format_title(title)
     first_para = full_content[:500] if full_content else ""
     
-    # Category-wise REAL Highlights
+    # Category-wise REAL Highlights (No generic text)
     if category == "Sports":
         highlights = [
             f"<li>🏏 <strong>{clean_title[:50]}</strong> - मैच का सबसे बड़ा मोमेंट</li>",
@@ -481,10 +489,18 @@ def generate_dynamic_content(title, full_content, category):
     elif category == "Technology":
         highlights = [
             f"<li>💻 <strong>{clean_title[:50]}</strong> - टेक जगत में बड़ी खबर</li>",
-            f"<li>📱 <strong>नए फीचर्स:</strong> {first_para[:60]}...</li>",
-            f"<li>🔋 <strong>बैटरी लाइफ:</strong> लंबी बैटरी बैकअप</li>",
-            f"<li>💵 <strong>कीमत:</strong> किफायती दाम में उपलब्ध</li>",
-            f"<li>🚀 <strong>लॉन्च:</strong> जल्द ही मार्केट में आएगा</li>",
+            f"<li>📱 <strong>डिटेल्स:</strong> {first_para[:60]}...</li>",
+            f"<li>🔍 <strong>एनालिसिस:</strong> विशेषज्ञों की राय</li>",
+            f"<li>💡 <strong>इंपैक्ट:</strong> इसका क्या प्रभाव होगा</li>",
+            f"<li>🚀 <strong>फ्यूचर:</strong> आगे क्या होगा</li>",
+        ]
+    elif category == "Space":
+        highlights = [
+            f"<li>🚀 <strong>{clean_title[:50]}</strong> - अंतरिक्ष में बड़ी उपलब्धि</li>",
+            f"<li>🌌 <strong>नई खोज:</strong> {first_para[:60]}...</li>",
+            f"<li>🛰️ <strong>मिशन अपडेट:</strong> नासा की नई जानकारी</li>",
+            f"<li>🔭 <strong>रिसर्च:</strong> वैज्ञानिकों की खोज</li>",
+            f"<li>📡 <strong>सिग्नल:</strong> अंतरिक्ष से नए संकेत</li>",
         ]
     else:
         highlights = [
@@ -584,7 +600,7 @@ def generate_dynamic_content(title, full_content, category):
 <p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
 """
 
-# --- DYNAMIC FUNCTIONS RE-ADDED ---
+# --- DYNAMIC FUNCTIONS ---
 def generate_long_content(title, full_content, category):
     """Generate dynamic content for every post"""
     return generate_dynamic_content(title, full_content, category)
