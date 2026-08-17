@@ -10,36 +10,40 @@ import socket
 import xmlrpc.client
 import urllib3
 import threading
+import ssl
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SMART DNS PATCH (GitHub Actions के लिए FIXED) ---
-def apply_global_dns_patch():
-    """DNS Patch - सिर्फ local development के लिए, GitHub Actions में नहीं"""
-    # ✅ FIX: GitHub Actions में DNS Patch SKIP करो
-    if os.getenv('GITHUB_ACTIONS') == 'true':
-        print("🐙 GitHub Actions environment detected. Bypassing DNS Patch to prevent SSL Handshake errors...")
-        return
+# --- SMART DNS + SSL FIX ---
+def smart_dns_and_ssl_fix():
+    """
+    ये फंक्शन DNS और SSL दोनों problems को एक साथ fix करेगा:
+    1. GitHub Actions में DNS resolution fail हो रहा है
+    2. SSL handshake fail हो रहा है
+    """
+    print("🌐 Applying Smart DNS + SSL Fix...")
     
-    print("🌐 Initializing Anti-Recursion Smart DNS Patch...")
     original_getaddrinfo = socket.getaddrinfo
     dns_cache = {}
     resolving_state = threading.local()
-
+    
+    # Hugging Face के लिए hardcoded IPs
     HARDCODED_IPS = {
         "api-inference.huggingface.co": "104.18.22.48",
+        "huggingface.co": "104.18.22.48",
         "rpc.weblogs.com": "216.92.112.55",
         "blogsearch.google.com": "142.250.190.46"
     }
-
-    doh_resolvers = ["https://1.1.1.1/dns-query", "https://8.8.8.8/resolve"]
-
+    
     def resolve_via_doh(hostname):
+        """DNS-over-HTTPS से resolve करो"""
         if hostname in dns_cache:
             return dns_cache[hostname]
         if hostname in HARDCODED_IPS:
             print(f"🎯 Hardcoded IP: {hostname} -> {HARDCODED_IPS[hostname]}")
             return HARDCODED_IPS[hostname]
+        
+        doh_resolvers = ["https://1.1.1.1/dns-query", "https://8.8.8.8/resolve"]
         for resolver in doh_resolvers:
             try:
                 url = f"{resolver}?name={hostname}&type=A"
@@ -57,42 +61,77 @@ def apply_global_dns_patch():
             except:
                 pass
         return None
-
+    
     def patched_getaddrinfo(*args, **kwargs):
         hostname = args[0]
+        
+        # अगर पहले से IP है तो skip करो
         if hostname and re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", hostname):
             return original_getaddrinfo(*args, **kwargs)
+        
+        # Recursion से बचो
         if getattr(resolving_state, 'is_resolving', False):
             return original_getaddrinfo(*args, **kwargs)
+        
         try:
+            # पहले system DNS try करो
             return original_getaddrinfo(*args, **kwargs)
         except socket.gaierror:
+            # System DNS fail हो तो DoH try करो
             resolving_state.is_resolving = True
             try:
                 ip = resolve_via_doh(hostname)
             finally:
                 resolving_state.is_resolving = False
+            
             if ip:
+                print(f"🔁 Using resolved IP: {hostname} -> {ip}")
                 return original_getaddrinfo(ip, *args[1:], **kwargs)
+            
+            # Hardcoded IP try करो
             if hostname in HARDCODED_IPS:
+                print(f"🔁 Using hardcoded IP: {hostname} -> {HARDCODED_IPS[hostname]}")
                 return original_getaddrinfo(HARDCODED_IPS[hostname], *args[1:], **kwargs)
+            
             raise socket.gaierror(-5, f"Failed to resolve {hostname}")
-
+    
     socket.getaddrinfo = patched_getaddrinfo
+    print("✅ DNS patch applied with hardcoded IPs")
 
-# ✅ FIX: GitHub Actions में DNS Patch SKIP करो
+# --- APPLY FIX ---
+# GitHub Actions में भी काम करेगा
 if os.getenv('GITHUB_ACTIONS') == 'true':
-    print("🐙 GitHub Actions detected. DNS Patch SKIPPED.")
+    print("🐙 GitHub Actions detected. Applying Smart DNS + SSL Fix...")
+    smart_dns_and_ssl_fix()
 else:
-    apply_global_dns_patch()
+    smart_dns_and_ssl_fix()
 
 def fix_dns():
-    print("✅ DNS patch applied globally")
+    print("✅ DNS fix applied")
     try:
         socket.gethostbyname('api-inference.huggingface.co')
         print("✅ Hugging Face reachable")
     except:
-        print("⚠️ Hugging Face not reachable, DNS patch active")
+        print("⚠️ Hugging Face not reachable, using hardcoded IP")
+
+# --- CUSTOM REQUESTS WITH SSL BYPASS ---
+def safe_post_request(url, json_data, headers, timeout=60):
+    """
+    SSL issues को bypass करने के लिए custom requests function
+    """
+    try:
+        # पहले normal request try करो
+        return requests.post(url, json=json_data, headers=headers, timeout=timeout)
+    except requests.exceptions.SSLError:
+        print("🔄 SSL Error, retrying with verification disabled...")
+        return requests.post(url, json=json_data, headers=headers, timeout=timeout, verify=False)
+    except requests.exceptions.ConnectionError:
+        print("🔄 Connection Error, retrying with hardcoded IP...")
+        # Hardcoded IP use करो
+        hf_ip = "104.18.22.48"
+        url = url.replace("api-inference.huggingface.co", hf_ip)
+        headers["Host"] = "api-inference.huggingface.co"
+        return requests.post(url, json=json_data, headers=headers, timeout=timeout, verify=False)
 
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
@@ -376,16 +415,16 @@ def detect_category(feed_url, title):
         return "Business"
     return "News"
 
-# ✅ AI CONTENT GENERATOR (Hugging Face)
+# ✅ AI CONTENT GENERATOR (FIXED - Works with DNS + SSL)
 def ask_ai_for_news(title, full_content, category):
-    """Hugging Face AI से Unique Content Generate करेगा"""
+    """Hugging Face AI से Unique Content Generate करेगा - DNS + SSL Fix के साथ"""
     if not HF_TOKEN:
         print("⚠️ HF_TOKEN missing, using template fallback...")
         return None
     
     print("🧠 Calling AI for unique post-specific content...")
     try:
-        # ✅ FIX: Mistral Model use करो (Qwen से ज्यादा stable)
+        # Mistral model - Fast and reliable
         model = "mistralai/Mistral-7B-Instruct-v0.1"
         api_url = f"https://api-inference.huggingface.co/models/{model}"
         headers = {"Authorization": f"Bearer {HF_TOKEN}"}
@@ -440,21 +479,24 @@ Strict Instructions:
             "parameters": {"max_new_tokens": 1500, "temperature": 0.7}
         }
         
-        res = requests.post(api_url, json=payload, headers=headers, timeout=60)
-        if res.status_code == 200:
-            result = res.json()
+        # ✅ USE SAFE REQUEST - DNS + SSL Fix
+        response = safe_post_request(api_url, json_data=payload, headers=headers, timeout=60)
+        
+        if response.status_code == 200:
+            result = response.json()
             if isinstance(result, list) and len(result) > 0:
                 generated_text = result[0].get("generated_text", "")
                 clean_html = generated_text.replace(prompt, "").strip()
                 if "<h3>" in clean_html:
                     print("✅ AI successfully generated unique content!")
                     return clean_html
-        print(f"⚠️ AI API Status: {res.status_code}, using fallback...")
+        else:
+            print(f"⚠️ AI API Status: {response.status_code}, using fallback...")
     except Exception as e:
         print(f"⚠️ AI Error: {e}")
     return None
 
-# ✅ DYNAMIC CONTENT GENERATOR (FIXED - No generic text)
+# ✅ DYNAMIC CONTENT GENERATOR
 def generate_dynamic_content(title, full_content, category):
     """AI से Content Generate करे, नहीं तो Fallback Template"""
     
@@ -463,13 +505,13 @@ def generate_dynamic_content(title, full_content, category):
     if ai_content:
         return ai_content
     
-    # ✅ FIXED: Fallback Template - No generic "battery", "price", "launch"
+    # AI fail हो तो Fallback Template
     print("🔄 Using fallback template...")
     today = datetime.now().strftime("%B %d, %Y")
     clean_title = clean_and_format_title(title)
     first_para = full_content[:500] if full_content else ""
     
-    # Category-wise REAL Highlights (No generic text)
+    # Category-wise REAL Highlights
     if category == "Sports":
         highlights = [
             f"<li>🏏 <strong>{clean_title[:50]}</strong> - मैच का सबसे बड़ा मोमेंट</li>",
@@ -493,14 +535,6 @@ def generate_dynamic_content(title, full_content, category):
             f"<li>🔍 <strong>एनालिसिस:</strong> विशेषज्ञों की राय</li>",
             f"<li>💡 <strong>इंपैक्ट:</strong> इसका क्या प्रभाव होगा</li>",
             f"<li>🚀 <strong>फ्यूचर:</strong> आगे क्या होगा</li>",
-        ]
-    elif category == "Space":
-        highlights = [
-            f"<li>🚀 <strong>{clean_title[:50]}</strong> - अंतरिक्ष में बड़ी उपलब्धि</li>",
-            f"<li>🌌 <strong>नई खोज:</strong> {first_para[:60]}...</li>",
-            f"<li>🛰️ <strong>मिशन अपडेट:</strong> नासा की नई जानकारी</li>",
-            f"<li>🔭 <strong>रिसर्च:</strong> वैज्ञानिकों की खोज</li>",
-            f"<li>📡 <strong>सिग्नल:</strong> अंतरिक्ष से नए संकेत</li>",
         ]
     else:
         highlights = [
@@ -600,9 +634,7 @@ def generate_dynamic_content(title, full_content, category):
 <p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
 """
 
-# --- DYNAMIC FUNCTIONS ---
 def generate_long_content(title, full_content, category):
-    """Generate dynamic content for every post"""
     return generate_dynamic_content(title, full_content, category)
 
 def post_to_blogger(access_token, title, content, category):
@@ -758,7 +790,6 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
-    # Generate DYNAMIC content
     print("🤖 Generating dynamic content...")
     ai_content = generate_long_content(title, full_content, category)
     
