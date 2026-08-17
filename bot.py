@@ -48,7 +48,7 @@ def fix_dns():
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
-HF_TOKEN = os.getenv('HF_TOKEN') # ✅ RE-ADDED: NameError फिक्स करने के लिए पुनः जोड़ा गया
+HF_TOKEN = os.getenv('HF_TOKEN')
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
@@ -332,7 +332,6 @@ def detect_category(feed_url, title):
         return "Entertainment"
     if word_in_text("actress", title_lower) or word_in_text("disney", title_lower) or word_in_text("box office", title_lower):
         return "Entertainment"
-    # ✅ Star Cast, Pop Star, Rock Star - Entertainment not Space
     if word_in_text("star cast", title_lower) or word_in_text("pop star", title_lower) or word_in_text("rock star", title_lower):
         return "Entertainment"
     
@@ -433,12 +432,12 @@ def detect_category(feed_url, title):
         
     return "News"
 
-# ✅ AI CONTENT GENERATOR (Pollinations AI - LLaMA Model)
+# ✅ AI CONTENT GENERATOR (Pollinations AI - Meta Llama-3-70B)
 def ask_ai_for_news(title, full_content, category):
     """Pollinations AI (LLaMA) से 100% Unique और Unblocked Content Generate करेगा"""
     print("🧠 Calling Pollinations AI for unique post-specific content...")
     try:
-        # ✅ FIXED: एंडपॉइंट को "https://text.pollinations.ai/" किया गया (बिना /chat के, 404 Error Fixed)
+        # ✅ एंडपॉइंट को "https://text.pollinations.ai/" किया गया (404 Error Fixed)
         api_url = "https://text.pollinations.ai/"
         model = "llama"  # Meta Llama-3-70B
         
@@ -672,6 +671,7 @@ def generate_dynamic_content(title, full_content, category):
 <p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं। यह {category} सेक्टर के लिए एक बड़ा बदलाव ला सकता है।</p>
 """
     
+    # ✅ DETAILED Introduction
     intro = f"""
 <h3>📝 परिचय - Introduction</h3>
 <p><strong>{clean_title}</strong></p>
@@ -680,23 +680,27 @@ def generate_dynamic_content(title, full_content, category):
 <p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।  यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
 """
 
+    # ✅ DETAILED Analysis
     analysis = f"""
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
 {analysis_detail}
-<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है। विशेषज्ञों का मानना है कि इस {category} सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
+<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है। विशेषज्ञों का मानना है कि इस {category}  सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
 """
 
+    # ✅ DETAILED Expert
     expert = f"""
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
 {expert_quote}
 """
 
+    # ✅ DETAILED Impact
     impact = f"""
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
 <p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है। आने वाले दिनों में और अपडेट आने की संभावना है। विशेषज्ञों का मानना है कि इस घटना के दीर्घकालिक प्रभाव आने वाले महीनों में देखने को मिलेंगे।</p>
 <p>कंपनियां अपनी रणनीतियों को इस नई जानकारी के अनुसार ढाल रही हैं। पूरी दुनिया में इस खबर पर चर्चा हो रही है और आने वाले समय में इससे जुड़ी और जानकारी सामने आएगी।</p>
 """
 
+    # ✅ DETAILED Conclusion
     conclusion = f"""
 <h3>✅ निष्कर्ष - Conclusion</h3>
 <p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है। इसका प्रभाव आने वाले समय में और स्पष्ट होगा।</p>
@@ -841,8 +845,7 @@ def main():
                 if response.status_code == 200:
                     feed = feedparser.parse(response.content)
                     for i in range(min(15, len(feed.entries))):
-                        temp_entry = feed.entries[i]
-                        temp_title = temp_entry.title
+                        temp_entry = temp_entry_title = temp_entry.title
                         if hasattr(temp_entry, 'published_parsed'):
                             pub_date = datetime(*temp_entry.published_parsed[:6])
                             if pub_date.date() < datetime.now().date() - timedelta(days=2):
