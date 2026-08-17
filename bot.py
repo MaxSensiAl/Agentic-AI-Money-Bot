@@ -18,8 +18,10 @@ def apply_smart_connection_patch():
     print("🌐 Initializing Smart TCP Connection Redirect Patch...")
     original_create_connection = urllib3_connection.create_connection
 
+    # ✅ FIX: Hugging Face के IPs को वापस जोड़ा गया ताकि SSL एरर न आए
     HARDCODED_IPS = {
         "api-inference.huggingface.co": "104.18.22.48",
+        "huggingface.co": "104.18.22.48",
         "rpc.weblogs.com": "216.92.112.55",
         "blogsearch.google.com": "142.250.190.46"
     }
@@ -35,7 +37,7 @@ def apply_smart_connection_patch():
     urllib3_connection.create_connection = patched_create_connection
     print("✅ Smart TCP Connection Redirect Patch applied globally")
 
-# पैच को लागू करें (इससे Hugging Face SSL एरर नहीं देगा)
+# पैच को लागू करें
 apply_smart_connection_patch()
 
 def fix_dns():
@@ -49,8 +51,8 @@ def fix_dns():
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
-HF_TOKEN = os.getenv('HF_TOKEN')  # हगिंगफेस का मुख्य टोकन
-GEMINI_API = os.getenv('GEMINI_API')  # जेमिनी बैकअप टोकन
+HF_TOKEN = os.getenv('HF_TOKEN')
+GEMINI_API = os.getenv('GEMINI_API')
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
@@ -329,7 +331,7 @@ def word_in_text(word, text):
         return False
     return bool(re.search(rf'\b{re.escape(word)}\b', text, re.IGNORECASE))
 
-# Category Detection with Whole-Word Matching
+# Category Detection with Whole-Word Matching (Strict Keywords)
 def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
@@ -649,14 +651,14 @@ def generate_dynamic_content(title, full_content, category):
 <p><strong>{clean_title}</strong></p>
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है। यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
+<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।  यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
 """
 
     # DETAILED Analysis
     analysis = f"""
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
 {analysis_detail}
-<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है। विशेषज्ञों का मानना है कि इस {category} सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
+<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है। विशेषज्ञों का मानना है कि इस {category}  सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
 """
 
     # DETAILED Expert
