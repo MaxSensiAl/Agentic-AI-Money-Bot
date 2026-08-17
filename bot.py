@@ -13,12 +13,15 @@ import urllib3.util.connection as urllib3_connection
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SMART TCP REDIRECT PATCH (Google और अन्य Pings के लिए सुरक्षित) ---
+# --- SMART TCP REDIRECT PATCH (Google, Hugging Face और Pings के लिए) ---
 def apply_smart_connection_patch():
     print("🌐 Initializing Smart TCP Connection Redirect Patch...")
     original_create_connection = urllib3_connection.create_connection
 
+    # ✅ FIX: Hugging Face IP वापस जोड़ा गया
     HARDCODED_IPS = {
+        "api-inference.huggingface.co": "104.18.22.48",
+        "huggingface.co": "104.18.22.48",
         "rpc.weblogs.com": "216.92.112.55",
         "blogsearch.google.com": "142.250.190.46"
     }
@@ -181,7 +184,6 @@ def share_to_discord(title, link):
 
 # --- FUNCTIONS ---
 
-# गिटहब सर्वर के यूटीसी समय को भारतीय समय (IST) के अनुसार सिंक करने का फंक्शन
 def get_current_date():
     """Get current date in Indian Standard Time (IST) format"""
     ist_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
@@ -333,14 +335,12 @@ def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
     
-    # कोडिंग टकराव (Collisions) रोकने के लिए हेल्पर फंक्शन
     def match_words(word_list):
         for word in word_list:
             if re.search(r'\b' + re.escape(word.lower()) + r'\b', title_lower):
                 return True
         return False
 
-    # Entertainment (मनोरंजन)
     if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla", "eonline"]):
         return "Entertainment"
     if match_words(["movie", "film", "hollywood", "box office", "marvel", "dc", "disney", "lands", "rides", "spider-man", "spiderman", "actor", "actress", "celebrity", "drama"]):
@@ -348,58 +348,48 @@ def detect_category(feed_url, title):
     if match_words(["star cast", "pop star", "rock star"]):
         return "Entertainment"
     
-    # Space (अंतरिक्ष) - 'star' शब्द को यहाँ से हटा दिया गया है।
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
     if match_words(["galaxy", "planet", "moon", "mars", "universe", "cosmos", "astronaut", "asteroid", "telescope", "eclipse", "stargazing", "constellation", "nebula"]):
         return "Space"
         
-    # Technology (तकनीक)
     if any(x in feed_lower for x in ["tech", "verge", "cnet", "techcrunch"]):
         return "Technology"
-    if match_words(["smartphone", "apple", "samsung", "software", "artificial intelligence", "chatgpt", "iphone", "gadget", "cybersecurity", "hacker", "app", "spyware"]):
+    if match_words(["smartphone", "apple", "samsung", "software", "artificial intelligence", "chatgpt", "iphone", "gadget", "cybersecurity", "hacker", "app", "spyware", "amazon"]):
         return "Technology"
-    # "AI" को स्वतंत्र शब्द के रूप में मैच करें
     if re.search(r'\b' + "ai" + r'\b', title_lower):
         return "Technology"
         
-    # Gaming (गेमिंग)
     if "gaming" in feed_lower or any(x in feed_lower for x in ["gamespot", "ign"]):
         return "Gaming"
     if match_words(["nintendo", "xbox", "playstation", "ps5", "gta", "gamer", "gaming", "gameplay", "console"]):
         return "Gaming"
         
-    # Music (संगीत)
     if any(x in feed_lower for x in ["rollingstone"]):
         return "Music"
     if match_words(["album", "song", "singer", "concert", "tour", "music", "guitar", "pop", "rap", "band", "singing", "cynthia", "ariana", "mcconaughey"]):
         return "Music"
         
-    # Sports (खेल) - 'test' की जगह 'test cricket', 'test match' किया गया है।
     if "cric" in feed_lower:
         return "Sports"
     if match_words(["cricket", "century", "wicket", "odi", "test cricket", "test match", "test series", "football", "goal", "fifa", "olympics", "athletics", "basketball", "tennis", "stadium", "sciver", "brunt", "england"]):
         return "Sports"
         
-    # Business (व्यापार)
     if any(x in feed_lower for x in ["bloomberg", "reuters", "markets"]):
         return "Business"
     if match_words(["stocks", "inflation", "market", "economy", "trade", "finance", "investing", "crypto", "bitcoin"]):
         return "Business"
         
-    # Politics (राजनीति)
     if "politics" in feed_lower:
         return "Politics"
     if match_words(["election", "biden", "trump", "modi", "parliament", "politics", "minister", "senate", "congress", "government", "vote", "bjp", "amit malviya", "deepak mhaske"]):
         return "Politics"
         
-    # Health (स्वास्थ्य)
     if "health" in feed_lower or "medical" in feed_lower:
         return "Health"
     if match_words(["health", "mental", "doctor", "cancer", "vaccine", "disease", "fitness", "nutrition", "diet"]):
         return "Health"
         
-    # Automobile (ऑटोमोबाइल)
     if "motor" in feed_lower or "auto" in feed_lower:
         return "Automobile"
     if match_words(["car", "suv", "vehicle", "electric vehicle", "ev", "tesla", "engine", "motorcycle", "bike", "polestar", "volvo", "ferrari", "porsche", "ford", "bmw", "audi"]):
@@ -459,17 +449,18 @@ Strict Instructions:
 <p>[EXTREMELY DETAILED conclusion in Hindi - minimum 150 words]</p>
 """
 
-    # 🌟 ENGINE 1: Hugging Face (Qwen 2.5 7B Instruct - सुपर फ़ास्ट और स्टेबल)
+    # 🌟 ENGINE 1: Hugging Face (Qwen 2.5 7B)
     if HF_TOKEN:
         print("🧠 Engine 1: Calling Hugging Face (Qwen 2.5 7B)...")
         try:
+            # ✅ FIX: verify=False added to bypass SSL
             api_url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct"
             headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
             payload = {
                 "inputs": f"<|im_start|>system\nYou are a professional news editor writing detailed HTML output in Hinglish.<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n",
                 "parameters": {"max_new_tokens": 1200, "temperature": 0.7}
             }
-            res = requests.post(api_url, json=payload, headers=headers, timeout=40)
+            res = requests.post(api_url, json=payload, headers=headers, timeout=40, verify=False)
             if res.status_code == 200:
                 result = res.json()
                 if isinstance(result, list) and len(result) > 0:
@@ -480,11 +471,29 @@ Strict Instructions:
                     if "<h3>" in clean_html:
                         print("✅ Engine 1 (Hugging Face) successfully generated content!")
                         return clean_html
+            elif res.status_code == 503:
+                try:
+                    wait_time = res.json().get("estimated_time", 25)
+                    print(f"⏳ Model loading, waiting {wait_time}s...")
+                    time.sleep(wait_time + 5)
+                    res = requests.post(api_url, json=payload, headers=headers, timeout=40, verify=False)
+                    if res.status_code == 200:
+                        result = res.json()
+                        if isinstance(result, list) and len(result) > 0:
+                            generated_text = result[0].get("generated_text", "")
+                            if "<|im_start|>assistant" in generated_text:
+                                generated_text = generated_text.split("<|im_start|>assistant")[-1].strip()
+                            clean_html = generated_text.replace("<|im_end|>", "").strip()
+                            if "<h3>" in clean_html:
+                                print("✅ Engine 1 (Hugging Face after wait) successfully generated content!")
+                                return clean_html
+                except:
+                    pass
             print(f"⚠️ Engine 1 Status: {res.status_code}, trying Engine 2...")
         except Exception as e:
             print(f"⚠️ Engine 1 Error: {e}, trying Engine 2...")
 
-    # 🌟 ENGINE 2: Google Gemini 1.5 Flash (अनब्लॉक बैकअप)
+    # 🌟 ENGINE 2: Google Gemini 1.5 Flash
     if GEMINI_API:
         print("🧠 Engine 2: Calling Google Gemini 1.5 Flash...")
         try:
@@ -506,14 +515,13 @@ Strict Instructions:
         except Exception as e:
             print(f"⚠️ Engine 2 Error: {e}, trying Engine 3...")
 
-    # 🌟 ENGINE 3: Pollinations AI (मुफ़्त बैकअप - OpenAI-संगत एंडपॉइंट पर आधारित, 404/402 FIXED)
+    # 🌟 ENGINE 3: Pollinations AI (FIXED - OpenAI Compatible Endpoint)
     print("🧠 Engine 3: Calling Pollinations AI (Backup)...")
     try:
-        # ✅ एंडपॉइंट को /v1/chat/completions किया गया ताकि कभी भी 404 एरर न आए
+        # ✅ FIX: OpenAI Compatible Endpoint (Never 404)
         api_url = "https://text.pollinations.ai/v1/chat/completions"
+        model = "llama"  # Llama-3-70B - 100% Free
         
-        # ✅ FIX: mistral या llama मॉडल का उपयोग जो 100% मुफ्त और अनलिमिटेड है (कभी भी 402 एरर नहीं देगा)
-        model = "llama"  # Llama-3-70B
         payload = {
             "messages": [
                 {"role": "system", "content": "You are a professional news editor writing HTML output in Hinglish. Write detailed articles."},
@@ -524,7 +532,6 @@ Strict Instructions:
         res = requests.post(api_url, json=payload, timeout=50)
         if res.status_code == 200:
             data = res.json()
-            # OpenAI संगत पार्सिंग
             clean_html = data["choices"][0]["message"]["content"].strip()
             if "<h3>" in clean_html:
                 print("✅ Engine 3 (Pollinations) successfully generated content!")
@@ -539,28 +546,49 @@ Strict Instructions:
 def generate_dynamic_content(title, full_content, category):
     """AI से Content Generate करे, नहीं तो DETAILED Fallback Template"""
     
-    # पहले AI try करो (Hugging Face -> Gemini -> Pollinations)
     ai_content = ask_ai_for_news(title, full_content, category)
     if ai_content:
         return ai_content
     
-    # AI fail हो तो DETAILED Fallback Template
     print("🔄 Using detailed fallback template...")
     today = get_current_date()
     clean_title = clean_and_format_title(title)
     first_para = full_content[:500] if full_content else ""
     more_content = full_content[500:1000] if len(full_content) > 500 else ""
     
-    # Category-wise DETAILED Highlights (8 points)
-    if category == "Technology":
+    if category == "Space":
+        highlights = [
+            f"<li>🚀 <strong>{clean_title[:50]}</strong> - अंतरिक्ष की बड़ी खबर</li>",
+            f"<li>🌌 <strong>खोज:</strong> {first_para[:60]}...</li>",
+            f"<li>🛰️ <strong>मिशन अपडेट:</strong> नई जानकारी</li>",
+            f"<li>🔭 <strong>रिसर्च:</strong> वैज्ञानिकों की खोज</li>",
+            f"<li>📡 <strong>सिग्नल:</strong> अंतरिक्ष से नए संकेत</li>",
+            f"<li>🌞 <strong>सूर्य:</strong> {more_content[:60]}...</li>",
+            f"<li>🌍 <strong>पृथ्वी:</strong> अंतरिक्ष से दृश्य</li>",
+            f"<li>⭐ <strong>तारे:</strong> नई खोज</li>",
+        ]
+        expert_quote = """
+<p>Astronomers and space scientists are calling this discovery a significant milestone in our understanding of the cosmos.</p>
+<p>खगोलविदों और अंतरिक्ष वैज्ञानिकों का मानना है कि यह खोज ब्रह्मांड की हमारी समझ में एक महत्वपूर्ण मील का पत्थर है।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह खोज अंतरिक्ष विज्ञान के इतिहास में एक नया अध्याय जोड़ती है।"</p>
+</blockquote>
+"""
+        analysis_detail = f"""
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>इस अंतरिक्ष घटना ने वैज्ञानिकों को नई जानकारी दी है और आने वाले शोध के लिए नए रास्ते खोले हैं।</p>
+"""
+    
+    elif category == "Technology":
         highlights = [
             f"<li>💻 <strong>{clean_title[:50]}</strong> - टेक जगत में बड़ी खबर</li>",
             f"<li>📱 <strong>डिटेल्स:</strong> {first_para[:60]}...</li>",
             f"<li>🔍 <strong>एनालिसिस:</strong> विशेषज्ञों की राय</li>",
             f"<li>💡 <strong>इंपैक्ट:</strong> इसका क्या प्रभाव होगा</li>",
             f"<li>🚀 <strong>फ्यूचर:</strong> आगे क्या होगा</li>",
-            f"<li>🛡️ <strong>सुरक्षा:</strong> स्पाइवेयर से बचाव के उपाय</li>",
-            f"<li>📊 <strong>आंकड़े:</strong> असामान्य रूप से अधिक यूज़र्स</li>",
+            f"<li>🛡️ <strong>सुरक्षा:</strong> यूजर्स के लिए चेतावनी</li>",
+            f"<li>📊 <strong>आंकड़े:</strong> बड़ी संख्या में प्रभावित</li>",
             f"<li>🎯 <strong>निष्कर्ष:</strong> यह एक गंभीर मामला है</li>",
         ]
         expert_quote = """
@@ -574,29 +602,6 @@ def generate_dynamic_content(title, full_content, category):
 <p>{first_para}</p>
 <p>{more_content}</p>
 <p>इस तकनीकी घटनाक्रम ने विशेषज्ञों को नई चिंता दी है और आने वाले सुरक्षा अपडेट्स के लिए नए रास्ते खोले हैं।</p>
-"""
-    elif category == "Politics":
-        highlights = [
-            f"<li>🏛️ <strong>{clean_title[:50]}</strong> - राजनीति की बड़ी खबर</li>",
-            f"<li>👥 <strong>मुख्य मुद्दे:</strong> {first_para[:60]}...</li>",
-            f"<li>📈 <strong>विशेषज्ञों की राय:</strong> नीतिगत बदलावों पर चर्चा</li>",
-            f"<li>🔮 <strong>आने वाले दिन:</strong> चुनाव और निर्णयों पर नज़र</li>",
-            f"<li>🌍 <strong>वैश्विक प्रभाव:</strong> इसका वैश्विक राजनीति पर असर</li>",
-            f"<li>⚖️ <strong>कानूनी पहलू:</strong> संवैधानिक और कानूनी निहितार्थ</li>",
-            f"<li>📊 <strong>जनता की राय:</strong> सर्वेक्षण और जनमत</li>",
-            f"<li>🎯 <strong>राजनीतिक रणनीति:</strong> आगामी चुनावी रणनीति</li>",
-        ]
-        expert_quote = """
-<p>Political analysts and constitutional experts are closely monitoring this situation. The outcome could have far-reaching implications for the political landscape.</p>
-<p>राजनीतिक विश्लेषकों और संवैधानिक विशेषज्ञों की नजर इस स्थिति पर टिकी है। इसके परिणाम राजनीतिक प्रणाली के लिए दूरगामी प्रभाव डाल सकते हैं।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह राजनीतिक स्थिति लोकतंत्र और शासन के लिए एक महत्वपूर्ण परीक्षा है।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>यह राजनीतिक घटनाक्रम राजनीति में एक नया मोड़ ला सकता है। विशेषज्ञों का मानना है कि इसका प्रभाव नीतियों पर पड़ेगा।</p>
 """
     
     elif category == "Sports":
@@ -647,7 +652,6 @@ def generate_dynamic_content(title, full_content, category):
 <p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं। यह {category} सेक्टर के लिए एक बड़ा बदलाव ला सकता है।</p>
 """
     
-    # DETAILED Introduction
     intro = f"""
 <h3>📝 परिचय - Introduction</h3>
 <p><strong>{clean_title}</strong></p>
@@ -656,26 +660,22 @@ def generate_dynamic_content(title, full_content, category):
 <p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।  यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
 """
 
-    # DETAILED Analysis
     analysis = f"""
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
 {analysis_detail}
 <p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है। विशेषज्ञों का मानना है कि इस {category}  सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
 """
 
-    # DETAILED Expert
     expert = f"""
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
 {expert_quote}
 """
 
-    # DETAILED Impact
     impact = f"""
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
 <p>इस खबर का {category}  सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है। आने वाले दिनों में और अपडेट आने की संभावना है।</p>
 """
 
-    # DETAILED Conclusion
     conclusion = f"""
 <h3>✅ निष्कर्ष - Conclusion</h3>
 <p>{clean_title} - यह {category}  सेक्टर के लिए एक महत्वपूर्ण विकास है।</p>
@@ -752,7 +752,6 @@ def main():
         if not value:
             all_loaded = False
     
-    # GEMINI_API की जाँच (वैकल्पिक)
     print(f"GEMINI_API: {'✅ LOADED (Using Google Gemini as Backup Engine)' if GEMINI_API else '⚠️ NOT MAPPED (Using Pollinations AI as Fallback Engine)'}")
     
     if not all_loaded:
@@ -867,7 +866,6 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
-    # Generate DYNAMIC content
     print("🤖 Generating dynamic content...")
     ai_content = generate_long_content(title, full_content, category)
     
