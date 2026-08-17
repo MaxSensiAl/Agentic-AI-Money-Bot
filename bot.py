@@ -13,7 +13,7 @@ import urllib3.util.connection as urllib3_connection
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SMART TCP REDIRECT PATCH (Google और अन्य Pings के लिए सुरक्षित) ---
+# --- SMART TCP REDIRECT PATCH ---
 def apply_smart_connection_patch():
     print("🌐 Initializing Smart TCP Connection Redirect Patch...")
     original_create_connection = urllib3_connection.create_connection
@@ -34,7 +34,6 @@ def apply_smart_connection_patch():
     urllib3_connection.create_connection = patched_create_connection
     print("✅ Smart TCP Connection Redirect Patch applied globally")
 
-# पैच को लागू करें
 apply_smart_connection_patch()
 
 def fix_dns():
@@ -120,7 +119,6 @@ def save_posted_news(title):
     except:
         pass
 
-# Blogger API से सीधे हालिया श्रेणियों को सिंक करने का फंक्शन
 def get_recent_blogger_categories(access_token):
     recent_categories = []
     if not access_token:
@@ -346,9 +344,6 @@ def detect_category(feed_url, title):
         return "Space"
     if word_in_text("corona", title_lower) or word_in_text("eclipse", title_lower) or word_in_text("solar", title_lower):
         return "Space"
-    if word_in_text("star", title_lower) and not word_in_text("star cast", title_lower):
-        if word_in_text("astronomy", title_lower) or word_in_text("constellation", title_lower) or word_in_text("night sky", title_lower):
-            return "Space"
     
     # ✅ Technology
     if any(x in feed_lower for x in ["tech", "verge", "cnet", "techcrunch"]):
@@ -375,8 +370,10 @@ def detect_category(feed_url, title):
         return "Music"
     if word_in_text("cynthia", title_lower) or word_in_text("pop star", title_lower) or word_in_text("rock star", title_lower):
         return "Music"
+    if word_in_text("matthew mcconaughey", title_lower) or word_in_text("life in songs", title_lower):
+        return "Music"
     
-    # ✅ Sports - FIXED: Only "test match", "test cricket", "test series"
+    # ✅ Sports
     if "cric" in feed_lower:
         return "Sports"
     if word_in_text("cricket", title_lower) or word_in_text("century", title_lower) or word_in_text("wicket", title_lower):
@@ -418,7 +415,7 @@ def detect_category(feed_url, title):
     if word_in_text("fitness", title_lower):
         return "Health"
     
-    # ✅ Automobile - Exact words only
+    # ✅ Automobile
     if "motor" in feed_lower or "auto" in feed_lower:
         return "Automobile"
     if word_in_text("car", title_lower) or word_in_text("suv", title_lower) or word_in_text("vehicle", title_lower):
@@ -432,14 +429,13 @@ def detect_category(feed_url, title):
         
     return "News"
 
-# ✅ AI CONTENT GENERATOR (Pollinations AI - Meta Llama-3-70B)
+# ✅ FIXED: AI CONTENT GENERATOR (Pollinations AI - Correct Endpoint)
 def ask_ai_for_news(title, full_content, category):
-    """Pollinations AI (LLaMA) से 100% Unique और Unblocked Content Generate करेगा"""
+    """Pollinations AI से 100% Unique और Unblocked Content Generate करेगा"""
     print("🧠 Calling Pollinations AI for unique post-specific content...")
     try:
-        # ✅ एंडपॉइंट को "https://text.pollinations.ai/" किया गया (404 Error Fixed)
+        # ✅ FIXED: Correct Pollinations AI endpoint
         api_url = "https://text.pollinations.ai/"
-        model = "llama"  # Meta Llama-3-70B
         
         prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
 Write a highly engaging, SEO-friendly news article based on this news:
@@ -451,33 +447,33 @@ Strict Instructions:
 1. Write in natural Hinglish (blend of Hindi and English).
 2. Do not use generic placeholder sentences. Use actual names, facts, and details from the provided news.
 3. Generate a realistic and highly specific expert opinion quote about this exact event.
-4. Output the content using this exact HTML structure with EXTREMELY DETAILED paragraphs (minimum 200-300 words per section):
+4. Output the content using this exact HTML structure with EXTREMELY DETAILED paragraphs:
 
 <h3>📝 परिचय - Introduction</h3>
-<p>[EXTREMELY DETAILED introduction in English - minimum 200 words based on the news content]</p>
-<p>[EXTREMELY DETAILED introduction in Hindi - minimum 200 words based on the news content]</p>
+<p>[EXTREMELY DETAILED introduction in English - minimum 200 words]</p>
+<p>[EXTREMELY DETAILED introduction in Hindi - minimum 200 words]</p>
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
-  <li>[Specific highlight 1 containing real facts/names/scores from the news]</li>
-  <li>[Specific highlight 2 containing real facts/names from the news]</li>
-  <li>[Specific highlight 3 containing real facts/names from the news]</li>
-  <li>[Specific highlight 4 containing real facts/names from the news]</li>
-  <li>[Specific highlight 5 containing real facts/names from the news]</li>
-  <li>[Specific highlight 6 containing real facts/names from the news]</li>
-  <li>[Specific highlight 7 containing real facts/names from the news]</li>
-  <li>[Specific highlight 8 containing real facts/names from the news]</li>
+  <li>[Specific highlight 1]</li>
+  <li>[Specific highlight 2]</li>
+  <li>[Specific highlight 3]</li>
+  <li>[Specific highlight 4]</li>
+  <li>[Specific highlight 5]</li>
+  <li>[Specific highlight 6]</li>
+  <li>[Specific highlight 7]</li>
+  <li>[Specific highlight 8]</li>
 </ul>
 
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>[EXTREMELY DETAILED analysis paragraph in English - minimum 250 words]</p>
-<p>[EXTREMELY DETAILED analysis paragraph in Hindi - minimum 250 words]</p>
+<p>[EXTREMELY DETAILED analysis in English - minimum 250 words]</p>
+<p>[EXTREMELY DETAILED analysis in Hindi - minimum 250 words]</p>
 
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
 <p>[EXTREMELY DETAILED expert opinion in English - minimum 150 words]</p>
 <p>[EXTREMELY DETAILED expert opinion in Hindi - minimum 150 words]</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"[A realistic, highly specific expert quote in Hindi about this event]"</p>
+    <p style="font-style:italic;font-size:16px;">"[Expert quote in Hindi]"</p>
 </blockquote>
 
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
@@ -493,11 +489,10 @@ Strict Instructions:
             "messages": [
                 {"role": "system", "content": "You are a professional news editor writing detailed HTML output in Hinglish. Write EXTREMELY LONG and DETAILED paragraphs."},
                 {"role": "user", "content": prompt}
-            ],
-            "model": model,
-            "jsonMode": False
+            ]
         }
         
+        # ✅ FIXED: No "model" parameter - Pollinations AI auto-detects
         res = requests.post(api_url, json=payload, timeout=60)
         
         if res.status_code == 200:
@@ -505,6 +500,24 @@ Strict Instructions:
             if "<h3>" in clean_html:
                 print("✅ AI successfully generated unique content via Pollinations!")
                 return clean_html
+            else:
+                if len(clean_html) > 500:
+                    print("✅ AI generated content (HTML formatting may vary)")
+                    return f"""
+<h3>📝 परिचय - Introduction</h3>
+<p>{clean_html[:500]}</p>
+<p>{clean_html[500:1000]}</p>
+<h3>🎯 मुख्य बातें - Key Highlights</h3>
+<ul>
+  <li>• {clean_html[1000:1100]}</li>
+  <li>• {clean_html[1100:1200]}</li>
+  <li>• {clean_html[1200:1300]}</li>
+</ul>
+<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+<p>{clean_html[1300:1800]}</p>
+<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
+<p>{clean_html[1800:2000]}</p>
+"""
         print(f"⚠️ AI API Status: {res.status_code}, using fallback...")
     except Exception as e:
         print(f"⚠️ AI Error: {e}")
@@ -527,7 +540,31 @@ def generate_dynamic_content(title, full_content, category):
     more_content = full_content[500:1000] if len(full_content) > 500 else ""
     
     # ✅ Category-wise DETAILED Highlights (8 points)
-    if category == "Space":
+    if category == "Music":
+        highlights = [
+            f"<li>🎵 <strong>{clean_title[:50]}</strong> - संगीत जगत की बड़ी खबर</li>",
+            f"<li>🎤 <strong>स्टार परफॉर्मेंस:</strong> {first_para[:60]}...</li>",
+            f"<li>🎶 <strong>खास गाना:</strong> स्पेशल परफॉर्मेंस</li>",
+            f"<li>📅 <strong>इवेंट:</strong> {first_para[60:120]}...</li>",
+            f"<li>🌍 <strong>फैंस की प्रतिक्रिया:</strong> दुनिया भर में उत्साह</li>",
+            f"<li>🎸 <strong>सांग:</strong> {more_content[:60]}...</li>",
+            f"<li>📈 <strong>ट्रेंड:</strong> सोशल मीडिया पर ट्रेंड</li>",
+            f"<li>🎯 <strong>इंपैक्ट:</strong> संगीत इंडस्ट्री पर प्रभाव</li>",
+        ]
+        expert_quote = """
+<p>Music critics and industry experts are calling this a historic moment in the music industry.</p>
+<p>संगीत समीक्षकों और उद्योग विशेषज्ञों का मानना है कि यह संगीत उद्योग में एक ऐतिहासिक क्षण है।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह प्रदर्शन संगीत इतिहास में एक मील का पत्थर साबित होगा।"</p>
+</blockquote>
+"""
+        analysis_detail = f"""
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>इस प्रदर्शन ने संगीत प्रेमियों के दिलों को छू लिया।</p>
+"""
+    
+    elif category == "Space":
         highlights = [
             f"<li>🚀 <strong>{clean_title[:50]}</strong> - अंतरिक्ष की बड़ी खबर</li>",
             f"<li>🌌 <strong>खोज:</strong> {first_para[:60]}...</li>",
@@ -539,8 +576,8 @@ def generate_dynamic_content(title, full_content, category):
             f"<li>⭐ <strong>तारे:</strong> नई खोज</li>",
         ]
         expert_quote = """
-<p>Astronomers and space scientists are calling this discovery a significant milestone in our understanding of the cosmos.</p>
-<p>खगोलविदों और अंतरिक्ष वैज्ञानिकों का मानना है कि यह खोज ब्रह्मांड की हमारी समझ में एक महत्वपूर्ण मील का पत्थर है।</p>
+<p>Astronomers and space scientists are calling this discovery a significant milestone.</p>
+<p>खगोलविदों और अंतरिक्ष वैज्ञानिकों का मानना है कि यह खोज एक महत्वपूर्ण मील का पत्थर है।</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
     <p style="font-style:italic;font-size:16px;">"यह खोज अंतरिक्ष विज्ञान के इतिहास में एक नया अध्याय जोड़ती है।"</p>
 </blockquote>
@@ -548,7 +585,7 @@ def generate_dynamic_content(title, full_content, category):
         analysis_detail = f"""
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>इस अंतरिक्ष घटना ने वैज्ञानिकों को नई जानकारी दी है और आने वाले शोध के लिए नए रास्ते खोले हैं।</p>
+<p>इस अंतरिक्ष घटना ने वैज्ञानिकों को नई जानकारी दी है।</p>
 """
     
     elif category == "Politics":
@@ -563,88 +600,16 @@ def generate_dynamic_content(title, full_content, category):
             f"<li>🎯 <strong>राजनीतिक रणनीति:</strong> आगामी चुनावी रणनीति</li>",
         ]
         expert_quote = """
-<p>Political analysts and constitutional experts are closely monitoring this situation. The outcome could have far-reaching implications for the American political system.</p>
-<p>राजनीतिक विश्लेषकों और संवैधानिक विशेषज्ञों की नजर इस स्थिति पर टिकी है। इसके परिणाम अमेरिकी राजनीतिक प्रणाली के लिए दूरगामी प्रभाव डाल सकते हैं।</p>
+<p>Political analysts and constitutional experts are closely monitoring this situation.</p>
+<p>राजनीतिक विश्लेषकों और संवैधानिक विशेषज्ञों की नजर इस स्थिति पर टिकी है।</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह राजनीतिक स्थिति अमेरिकी लोकतंत्र के लिए एक महत्वपूर्ण परीक्षा है।"</p>
+    <p style="font-style:italic;font-size:16px;">"यह राजनीतिक स्थिति लोकतंत्र के लिए एक महत्वपूर्ण परीक्षा है।"</p>
 </blockquote>
 """
         analysis_detail = f"""
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>यह राजनीतिक घटनाक्रम अमेरिकी राजनीति में एक नया मोड़ ला सकता है। विशेषज्ञों का मानना है कि इसका प्रभाव आने वाले चुनावों पर पड़ेगा।</p>
-"""
-    
-    elif category == "Sports":
-        highlights = [
-            f"<li>🏏 <strong>{clean_title[:50]}</strong> - मैच का सबसे बड़ा मोमेंट</li>",
-            f"<li>⭐ <strong>स्टार प्रदर्शन:</strong> {first_para[:60]}...</li>",
-            f"<li>📊 <strong>मैच विश्लेषण:</strong> टीम ने शानदार प्रदर्शन किया</li>",
-            f"<li>🏆 <strong>ऐतिहासिक जीत:</strong> यह टीम के लिए एक बड़ी उपलब्धि है</li>",
-            f"<li>⚡ <strong>अहम मोमेंट्स:</strong> {more_content[:60]}...</li>",
-            f"<li>📈 <strong>आंकड़े:</strong> खिलाड़ियों के शानदार आंकड़े</li>",
-            f"<li>🎯 <strong>रणनीति:</strong> टीम की बेहतरीन रणनीति</li>",
-            f"<li>🏅 <strong>खिलाड़ी:</strong> स्टार खिलाड़ियों का योगदान</li>",
-        ]
-        expert_quote = """
-<p>Cricket pundits and former players are praising this performance as one of the best in recent times. According to experts, this victory will boost the team's confidence for upcoming tournaments.</p>
-<p>क्रिकेट विश्लेषकों और पूर्व खिलाड़ियों का मानना है कि यह हाल के समय के सबसे शानदार प्रदर्शनों में से एक है। विशेषज्ञों के अनुसार, यह जीत आगामी टूर्नामेंट्स के लिए टीम का आत्मविश्वास बढ़ाएगी।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह प्रदर्शन दिखाता है कि यह टीम किसी भी चुनौती का सामना करने के लिए तैयार है।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>इस मैच में खिलाड़ियों ने जिस तरह का संयम और आक्रामकता दिखाया, वह काबिल-ए-तारीफ है। टीम ने हर विभाग में बेहतरीन प्रदर्शन किया और जीत अपने नाम की।</p>
-"""
-    
-    elif category == "Music":
-        highlights = [
-            f"<li>🎵 <strong>{clean_title[:50]}</strong> - संगीत जगत की बड़ी खबर</li>",
-            f"<li>🎤 <strong>स्टार परफॉर्मेंस:</strong> {first_para[:60]}...</li>",
-            f"<li>🎶 <strong>खास गाना:</strong> स्पेशल परफॉर्मेंस</li>",
-            f"<li>📅 <strong>इवेंट:</strong> लंदन में शानदार शो</li>",
-            f"<li>🌍 <strong>फैंस की प्रतिक्रिया:</strong> दुनिया भर में उत्साह</li>",
-            f"<li>🎸 <strong>सांग:</strong> {more_content[:60]}...</li>",
-            f"<li>📈 <strong>ट्रेंड:</strong> सोशल मीडिया पर ट्रेंड</li>",
-            f"<li>🎯 <strong>इंपैक्ट:</strong> संगीत इंडस्ट्री पर प्रभाव</li>",
-        ]
-        expert_quote = """
-<p>Music critics and industry experts are calling this performance a historic moment. The collaboration between Cynthia Erivo and Ariana Grande has created waves in the music industry worldwide.</p>
-<p>संगीत समीक्षकों और उद्योग विशेषज्ञों का मानना है कि यह प्रदर्शन एक ऐतिहासिक क्षण है। Cynthia Erivo और Ariana Grande के बीच इस सहयोग ने दुनिया भर में संगीत उद्योग में हलचल मचा दी है।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह प्रदर्शन संगीत इतिहास में एक मील का पत्थर साबित होगा।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>इस प्रदर्शन ने संगीत प्रेमियों के दिलों को छू लिया। Cynthia Erivo और Ariana Grande की जोड़ी ने मंच पर जादू बिखेरा और लंदन के O2 एरेना में मौजूद हजारों दर्शकों को मंत्रमुग्ध कर दिया।</p>
-"""
-    
-    elif category == "Automobile":
-        highlights = [
-            f"<li>🚗 <strong>{clean_title[:50]}</strong> - ऑटोमोबाइल जगत की बड़ी खबर</li>",
-            f"<li>⚡ <strong>इंजन और स्पेक्स:</strong> {first_para[:60]}...</li>",
-            f"<li>🔋 <strong>इलेक्ट्रिक व्हीकल (EV) ट्रेंड:</strong> पर्यावरण के अनुकूल तकनीक</li>",
-            f"<li>🛠️ <strong>सुरक्षा और फीचर्स:</strong> आधुनिक सुरक्षा मानकों से लैस</li>",
-            f"<li>🏁 <strong>लॉन्च:</strong> कार प्रेमियों के लिए बड़ी खबर</li>",
-            f"<li>⚖️ <strong>कानूनी मामला:</strong> {more_content[:60]}...</li>",
-            f"<li>💰 <strong>कीमत:</strong> बाजार में प्रतिस्पर्धी दाम</li>",
-            f"<li>🌍 <strong>ग्लोबल इंपैक्ट:</strong> दुनिया भर में प्रभाव</li>",
-        ]
-        expert_quote = """
-<p>Auto industry experts and legal analysts are closely watching this development. The outcome of this lawsuit could reshape how international automakers operate in the US market.</p>
-<p>ऑटो उद्योग विशेषज्ञों और कानूनी विश्लेषकों की नजर इस मामले पर टिकी है। इस मुकदमे के नतीजे से अमेरिकी बाजार में अंतरराष्ट्रीय ऑटो निर्माताओं के कारोबार करने के तरीके में बदलाव आ सकता है।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह मामला ऑटोमोबाइल उद्योग और कानूनी प्रणाली दोनों के लिए महत्वपूर्ण है।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>यह कानूनी मामला Polestar और US डीलरों के बीच चल रहा है। इसका नतीजा न केवल Polestar बल्कि अन्य इलेक्ट्रिक व्हीकल निर्माताओं के लिए भी अहम होगा।</p>
+<p>यह राजनीतिक घटनाक्रम एक नया मोड़ ला सकता है।</p>
 """
     
     else:
@@ -659,8 +624,8 @@ def generate_dynamic_content(title, full_content, category):
             f"<li>🎯 <strong>फ्यूचर:</strong> आने वाला भविष्य</li>",
         ]
         expert_quote = f"""
-<p>Experts from around the world are weighing in on this significant development. This event is expected to reshape the future of the {category} sector.</p>
-<p>दुनिया भर के विशेषज्ञ इस महत्वपूर्ण विकास पर अपनी राय दे रहे हैं। इस घटना से {category} सेक्टर का भविष्य बदलने की उम्मीद है।</p>
+<p>Experts from around the world are weighing in on this significant development.</p>
+<p>दुनिया भर के विशेषज्ञ इस महत्वपूर्ण विकास पर अपनी राय दे रहे हैं।</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
     <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर के इतिहास में एक महत्वपूर्ण मोड़ है।"</p>
 </blockquote>
@@ -668,7 +633,7 @@ def generate_dynamic_content(title, full_content, category):
         analysis_detail = f"""
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं। यह {category} सेक्टर के लिए एक बड़ा बदलाव ला सकता है।</p>
+<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं।</p>
 """
     
     # ✅ DETAILED Introduction
@@ -677,14 +642,14 @@ def generate_dynamic_content(title, full_content, category):
 <p><strong>{clean_title}</strong></p>
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।  यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
+<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।</p>
 """
 
     # ✅ DETAILED Analysis
     analysis = f"""
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
 {analysis_detail}
-<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है। विशेषज्ञों का मानना है कि इस {category}  सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
+<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा।</p>
 """
 
     # ✅ DETAILED Expert
@@ -696,16 +661,15 @@ def generate_dynamic_content(title, full_content, category):
     # ✅ DETAILED Impact
     impact = f"""
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है। आने वाले दिनों में और अपडेट आने की संभावना है। विशेषज्ञों का मानना है कि इस घटना के दीर्घकालिक प्रभाव आने वाले महीनों में देखने को मिलेंगे।</p>
-<p>कंपनियां अपनी रणनीतियों को इस नई जानकारी के अनुसार ढाल रही हैं। पूरी दुनिया में इस खबर पर चर्चा हो रही है और आने वाले समय में इससे जुड़ी और जानकारी सामने आएगी।</p>
+<p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है।</p>
+<p>आने वाले दिनों में और अपडेट आने की संभावना है।</p>
 """
 
     # ✅ DETAILED Conclusion
     conclusion = f"""
 <h3>✅ निष्कर्ष - Conclusion</h3>
-<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है। इसका प्रभाव आने वाले समय में और स्पष्ट होगा।</p>
-<p>विशेषज्ञ इस बात पर सहमत हैं कि यह {category} के भविष्य को आकार देने वाला एक महत्वपूर्ण कदम है। आने वाले दिनों में इससे जुड़ी और जानकारी सामने आएगी।</p>
-<p>यह खबर {category} सेक्टर में एक नई शुरुआत का संकेत है। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक रोमांचक समय है।</p>
+<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है।</p>
+<p>विशेषज्ञ इस बात पर सहमत हैं कि यह {category} के भविष्य को आकार देने वाला एक महत्वपूर्ण कदम है।</p>
 """
     
     return f"""
@@ -845,7 +809,8 @@ def main():
                 if response.status_code == 200:
                     feed = feedparser.parse(response.content)
                     for i in range(min(15, len(feed.entries))):
-                        temp_entry = temp_entry_title = temp_entry.title
+                        temp_entry = feed.entries[i]
+                        temp_title = temp_entry.title
                         if hasattr(temp_entry, 'published_parsed'):
                             pub_date = datetime(*temp_entry.published_parsed[:6])
                             if pub_date.date() < datetime.now().date() - timedelta(days=2):
@@ -889,11 +854,9 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
-    # Generate DYNAMIC content
     print("🤖 Generating dynamic content...")
     ai_content = generate_long_content(title, full_content, category)
     
-    # ✅ Earning Button with ShrinkMe Link
     earning_button = f"""
     <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
         <a href="{short_link}" target="_blank" style="background:linear-gradient(135deg,#ff5722,#ff6f00);color:white;padding:20px 60px;text-decoration:none;font-size:22px;font-weight:bold;border-radius:50px;display:inline-block;text-transform:uppercase;box-shadow:0 4px 15px rgba(255,87,34,0.3);">
