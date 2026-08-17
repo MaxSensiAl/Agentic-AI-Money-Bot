@@ -13,12 +13,13 @@ import urllib3.util.connection as urllib3_connection
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SMART TCP REDIRECT PATCH (Google और अन्य Pings के लिए सुरक्षित) ---
+# --- SMART TCP REDIRECT PATCH (Google, Hugging Face और अन्य Pings के लिए सुरक्षित) ---
 def apply_smart_connection_patch():
     print("🌐 Initializing Smart TCP Connection Redirect Patch...")
     original_create_connection = urllib3_connection.create_connection
 
     HARDCODED_IPS = {
+        "api-inference.huggingface.co": "104.18.22.48",
         "rpc.weblogs.com": "216.92.112.55",
         "blogsearch.google.com": "142.250.190.46"
     }
@@ -34,21 +35,22 @@ def apply_smart_connection_patch():
     urllib3_connection.create_connection = patched_create_connection
     print("✅ Smart TCP Connection Redirect Patch applied globally")
 
-# पैच को लागू करें
+# पैच को लागू करें (इससे Hugging Face SSL एरर नहीं देगा)
 apply_smart_connection_patch()
 
 def fix_dns():
-    print("✅ Testing connection to Pollinations AI...")
+    print("✅ Testing connection to Hugging Face API...")
     try:
-        res = requests.get("https://text.pollinations.ai", timeout=10)
-        print(f"✅ Pollinations AI reachable (Status Code: {res.status_code})")
+        res = requests.get("https://api-inference.huggingface.co", timeout=10)
+        print(f"✅ Hugging Face API reachable (Status Code: {res.status_code})")
     except Exception as e:
         print(f"⚠️ Connection check failed: {e}")
 
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
-GEMINI_API = os.getenv('GEMINI_API')  # यदि गिटहब .yml में मैप है तो उपयोग होगा
+HF_TOKEN = os.getenv('HF_TOKEN')  # हगिंगफेस का मुख्य टोकन
+GEMINI_API = os.getenv('GEMINI_API')  # जेमिनी बैकअप टोकन
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
@@ -327,7 +329,7 @@ def word_in_text(word, text):
         return False
     return bool(re.search(rf'\b{re.escape(word)}\b', text, re.IGNORECASE))
 
-# Category Detection with Whole-Word Matching (Strict Keywords)
+# Category Detection with Whole-Word Matching
 def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
@@ -347,7 +349,7 @@ def detect_category(feed_url, title):
     if match_words(["star cast", "pop star", "rock star"]):
         return "Entertainment"
     
-    # Space (अंतरिक्ष) - 'star' शब्द को यहाँ से हटा दिया गया है ताकि "Pop Star" जैसी खबरें स्पेस में न जाएं।
+    # Space (अंतरिक्ष) - 'star' शब्द को यहाँ से हटा दिया गया है।
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
     if match_words(["galaxy", "planet", "moon", "mars", "universe", "cosmos", "astronaut", "asteroid", "telescope", "eclipse", "stargazing", "constellation", "nebula"]):
@@ -406,18 +408,11 @@ def detect_category(feed_url, title):
         
     return "News"
 
-# ✅ DUAL ENGINE: Google Gemini (Primary) & Pollinations AI (Backup Fallback)
+# ✅ TRIPLE-ENGINE AI CONNECTOR (Hugging Face -> Gemini -> Pollinations)
 def ask_ai_for_news(title, full_content, category):
-    """Google Gemini (प्राथमिक) से कनेक्ट करेगा, यदि उपलब्ध न हो तो स्वतः Pollinations AI (बैकअप) पर चला जाएगा"""
+    """सुरक्षित, स्थिर और तीव्र एआई जनरेटर (Hugging Face Qwen 2.5 7B)"""
     
-    # 🌟 ENGINE 1: Google Gemini API (सबसे बेस्ट और बिल्कुल अनब्लॉक)
-    if GEMINI_API:
-        print("🧠 Engine 1: Calling Google Gemini 1.5 Flash...")
-        try:
-            api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API}"
-            headers = {"Content-Type": "application/json"}
-            
-            prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
+    prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
 Write a highly engaging, SEO-friendly news article based on this news:
 Title: {title}
 Content: {full_content[:1500]}
@@ -464,73 +459,75 @@ Strict Instructions:
 <p>[EXTREMELY DETAILED conclusion in English - minimum 150 words]</p>
 <p>[EXTREMELY DETAILED conclusion in Hindi - minimum 150 words]</p>
 """
+
+    # 🌟 ENGINE 1: Hugging Face (Qwen 2.5 7B Instruct - सुपर फ़ास्ट और स्टेबल)
+    if HF_TOKEN:
+        print("🧠 Engine 1: Calling Hugging Face (Qwen 2.5 7B)...")
+        try:
+            api_url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct"
+            headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
+            payload = {
+                "inputs": f"<|im_start|>system\nYou are a professional news editor writing detailed HTML output in Hinglish.<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n",
+                "parameters": {"max_new_tokens": 1200, "temperature": 0.7}
+            }
+            res = requests.post(api_url, json=payload, headers=headers, timeout=40)
+            if res.status_code == 200:
+                result = res.json()
+                if isinstance(result, list) and len(result) > 0:
+                    generated_text = result[0].get("generated_text", "")
+                    if "<|im_start|>assistant" in generated_text:
+                        generated_text = generated_text.split("<|im_start|>assistant")[-1].strip()
+                    clean_html = generated_text.replace("<|im_end|>", "").strip()
+                    if "<h3>" in clean_html:
+                        print("✅ Engine 1 (Hugging Face) successfully generated content!")
+                        return clean_html
+            print(f"⚠️ Engine 1 Status: {res.status_code}, trying Engine 2...")
+        except Exception as e:
+            print(f"⚠️ Engine 1 Error: {e}, trying Engine 2...")
+
+    # 🌟 ENGINE 2: Google Gemini 1.5 Flash (अनब्लॉक बैकअप)
+    if GEMINI_API:
+        print("🧠 Engine 2: Calling Google Gemini 1.5 Flash...")
+        try:
+            api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API}"
+            headers = {"Content-Type": "application/json"}
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {"temperature": 0.7}
             }
-            res = requests.post(api_url, json=payload, headers=headers, timeout=50)
+            res = requests.post(api_url, json=payload, headers=headers, timeout=40)
             if res.status_code == 200:
                 data = res.json()
                 clean_html = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 clean_html = clean_html.replace("```html", "").replace("```", "").strip()
                 if "<h3>" in clean_html:
-                    print("✅ Engine 1 (Gemini) successfully generated content!")
+                    print("✅ Engine 2 (Gemini) successfully generated content!")
                     return clean_html
-            print(f"⚠️ Engine 1 (Gemini) returned status {res.status_code}, switching to Engine 2...")
+            print(f"⚠️ Engine 2 Status: {res.status_code}, trying Engine 3...")
         except Exception as e:
-            print(f"⚠️ Engine 1 (Gemini) Error: {e}, switching to Engine 2...")
+            print(f"⚠️ Engine 2 Error: {e}, trying Engine 3...")
 
-    # 🌟 ENGINE 2: Pollinations AI (मुफ़्त बैकअप - 100% अनब्लॉक और टोकन-फ्री)
-    print("🧠 Engine 2: Calling Pollinations AI (Backup)...")
+    # 🌟 ENGINE 3: Pollinations AI (मुफ़्त बैकअप - 100% अनब्लॉक और टोकन-फ्री)
+    print("🧠 Engine 3: Calling Pollinations AI (Backup)...")
     try:
         api_url = "https://text.pollinations.ai"  # No trailing slash (404 fixed)
-        model = "llama"  # Llama-3-70B (स्टेबल और फ्री)
-        
-        prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
-Write a highly engaging news article based on this news:
-Title: {title}
-Content: {full_content[:1500]}
-Category: {category}
-
-Strict Instructions:
-1. Write in Hinglish.
-2. Output strictly using this HTML structure:
-<h3>📝 परिचय - Introduction</h3>
-<p>[Detailed English intro]</p>
-<p>[Detailed Hindi intro]</p>
-<h3>🎯 मुख्य बातें - Key Highlights</h3>
-<ul>
-  <li>• [Fact 1]</li>
-  <li>• [Fact 2]</li>
-  <li>• [Fact 3]</li>
-  <li>• [Fact 4]</li>
-</ul>
-<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>[Detailed analysis]</p>
-<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-<p>[Expert opinion]</p>
-<blockquote>"[Quote]"</blockquote>
-<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>[Impact]</p>
-<h3>✅ निष्कर्ष - Conclusion</h3>
-<p>[Conclusion]</p>
-"""
+        model = "llama"  # Llama-3-70B
         payload = {
             "messages": [
-                {"role": "system", "content": "You are a professional news editor writing HTML output in Hinglish."},
+                {"role": "system", "content": "You are a professional news editor writing HTML output in Hinglish. Write detailed articles."},
                 {"role": "user", "content": prompt}
             ],
             "model": model
         }
-        res = requests.post(api_url, json=payload, timeout=60)
+        res = requests.post(api_url, json=payload, timeout=50)
         if res.status_code == 200:
             clean_html = res.text.strip()
             if "<h3>" in clean_html:
-                print("✅ Engine 2 (Pollinations) successfully generated content!")
+                print("✅ Engine 3 (Pollinations) successfully generated content!")
                 return clean_html
-        print(f"⚠️ Engine 2 (Pollinations) Status: {res.status_code}")
+        print(f"⚠️ Engine 3 Status: {res.status_code}")
     except Exception as e:
-        print(f"⚠️ Engine 2 Error: {e}")
+        print(f"⚠️ Engine 3 Error: {e}")
         
     return None
 
@@ -538,7 +535,7 @@ Strict Instructions:
 def generate_dynamic_content(title, full_content, category):
     """AI से Content Generate करे, नहीं तो DETAILED Fallback Template"""
     
-    # पहले AI try करो (Gemini या Pollinations)
+    # पहले AI try करो (Hugging Face -> Gemini -> Pollinations)
     ai_content = ask_ai_for_news(title, full_content, category)
     if ai_content:
         return ai_content
@@ -738,6 +735,7 @@ def main():
     print("\n--- Checking Secrets ---")
     secrets = {
         "BLOG_ID": BLOG_ID,
+        "HF_TOKEN": HF_TOKEN,
         "SHRINKME_API": SHRINKME_API,
         "BC_CLIENT_ID": BC_CLIENT_ID,
         "BC_CLIENT_SECRET": BC_CLIENT_SECRET,
@@ -750,8 +748,8 @@ def main():
         if not value:
             all_loaded = False
     
-    # GEMINI_API को अनिवार्य (Mandatory) चेक से हटा दिया गया है
-    print(f"GEMINI_API: {'✅ LOADED (Using Google Gemini as Primary AI Engine)' if GEMINI_API else '⚠️ NOT MAPPED (Using Pollinations AI as Backup AI Engine)'}")
+    # GEMINI_API की जाँच (वैकल्पिक)
+    print(f"GEMINI_API: {'✅ LOADED (Using Google Gemini as Backup Engine)' if GEMINI_API else '⚠️ NOT MAPPED (Using Pollinations AI as Fallback Engine)'}")
     
     if not all_loaded:
         print("\n❌ Mandatory Secrets missing!")
@@ -865,10 +863,10 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
-    # Generate DYNAMIC content
-    print("🤖 Generating dynamic content...")
+    print("🤖 Generating detailed content...")
     ai_content = generate_long_content(title, full_content, category)
     
+    # ✅ Earning Button with ShrinkMe Link
     earning_button = f"""
     <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
         <a href="{short_link}" target="_blank" style="background:linear-gradient(135deg,#ff5722,#ff6f00);color:white;padding:20px 60px;text-decoration:none;font-size:22px;font-weight:bold;border-radius:50px;display:inline-block;text-transform:uppercase;box-shadow:0 4px 15px rgba(255,87,34,0.3);">
