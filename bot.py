@@ -282,7 +282,7 @@ def get_full_content(entry):
 def get_entry_image(entry):
     try:
         media_content = entry.get('media_content')
-        if media_content and isinstance(media_content, list):
+        if media_content& isinstance(media_content, list):
             for media in media_content:
                 if 'url' in media:
                     return media['url']
@@ -366,27 +366,102 @@ def detect_category(feed_url, title):
         return "Business"
     return "News"
 
-# --- ✅ FIXED: DYNAMIC CONTENT GENERATOR ---
-def generate_dynamic_content(title, full_content, category):
-    """Generate UNIQUE, VIRAL-READY content with real news highlights"""
+# ✅ AI CONTENT GENERATOR (Hugging Face)
+def ask_ai_for_news(title, full_content, category):
+    """Hugging Face AI से Unique Content Generate करेगा"""
+    if not HF_TOKEN:
+        print("⚠️ HF_TOKEN missing, using template fallback...")
+        return None
     
+    print("🧠 Calling AI for unique post-specific content...")
+    try:
+        # Qwen 2.5-7B - Best for Hinglish
+        model = "Qwen/Qwen2.5-7B-Instruct"
+        api_url = f"https://api-inference.huggingface.co/models/{model}"
+        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+        
+        prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
+Write a highly engaging, SEO-friendly news article based on this news:
+Title: {title}
+Content: {full_content[:1500]}
+Category: {category}
+
+Strict Instructions:
+1. Write in natural Hinglish (blend of Hindi and English).
+2. Do not use generic placeholder sentences. Use actual names, facts, and details from the provided news.
+3. Generate a realistic and highly specific expert opinion quote about this exact event.
+4. Output the content using this exact HTML structure:
+
+<h3>📝 परिचय - Introduction</h3>
+<p>[Detailed introduction in English based on the news content...]</p>
+<p>[Detailed introduction in Hindi based on the news content...]</p>
+
+<h3>🎯 मुख्य बातें - Key Highlights</h3>
+<ul>
+  <li>[Specific highlight 1 containing real facts/names/scores from the news]</li>
+  <li>[Specific highlight 2 containing real facts/names from the news]</li>
+  <li>[Specific highlight 3 containing real facts/names from the news]</li>
+  <li>[Specific highlight 4 containing real facts/names from the news]</li>
+  <li>[Specific highlight 5 containing real facts/names from the news]</li>
+</ul>
+
+<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+<p>[Detailed analysis paragraph in English...]</p>
+<p>[Detailed analysis paragraph in Hindi...]</p>
+
+<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
+<p>[Expert/Industry review in English...]</p>
+<p>[Expert/Industry review in Hindi...]</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"[A realistic, highly specific expert quote in Hindi about this event]"</p>
+</blockquote>
+
+<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
+<p>[Impact in English...]</p>
+<p>[Impact in Hindi...]</p>
+
+<h3>✅ निष्कर्ष - Conclusion</h3>
+<p>[Conclusion in Hindi...]</p>
+<p>[Conclusion in English...]</p>
+"""
+        
+        payload = {
+            "inputs": f"<|im_start|>system\nYou are a professional news editor writing HTML output in Hinglish.<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n",
+            "parameters": {"max_new_tokens": 1200, "temperature": 0.7}
+        }
+        
+        res = requests.post(api_url, json=payload, headers=headers, timeout=30)
+        if res.status_code == 200:
+            result = res.json()
+            if isinstance(result, list) and len(result) > 0:
+                generated_text = result[0].get("generated_text", "")
+                if "<|im_start|>assistant" in generated_text:
+                    generated_text = generated_text.split("<|im_start|>assistant")[-1].strip()
+                clean_html = generated_text.replace("<|im_end|>", "").strip()
+                if "<h3>" in clean_html:
+                    print("✅ AI successfully generated unique content!")
+                    return clean_html
+        print(f"⚠️ AI API Status: {res.status_code}, using fallback...")
+    except Exception as e:
+        print(f"⚠️ AI Error: {e}")
+    return None
+
+# ✅ DYNAMIC CONTENT GENERATOR
+def generate_dynamic_content(title, full_content, category):
+    """AI से Content Generate करे, नहीं तो Fallback Template"""
+    
+    # पहले AI try करो
+    ai_content = ask_ai_for_news(title, full_content, category)
+    if ai_content:
+        return ai_content
+    
+    # AI fail हो तो Fallback Template
+    print("🔄 Using fallback template...")
     today = datetime.now().strftime("%B %d, %Y")
     clean_title = clean_and_format_title(title)
     first_para = full_content[:500] if full_content else ""
     
-    # Extract key information from content
-    key_info = []
-    if "century" in full_content.lower() or "runs" in full_content.lower() or "wickets" in full_content.lower():
-        # Sports - Extract numbers
-        numbers = re.findall(r'\d+', full_content)
-        if numbers:
-            key_info.append(f"🏏 {numbers[0]}+ runs scored in the match")
-        if "wicket" in full_content.lower():
-            key_info.append("🎯 Key wickets taken by bowlers")
-        if "partnership" in full_content.lower():
-            key_info.append("🤝 Match-winning partnership")
-    
-    # GENERATE UNIQUE HIGHLIGHTS BASED ON ACTUAL NEWS
+    # Category-wise REAL Highlights
     if category == "Sports":
         highlights = [
             f"<li>🏏 <strong>{clean_title[:50]}</strong> - मैच का सबसे बड़ा मोमेंट</li>",
@@ -411,14 +486,6 @@ def generate_dynamic_content(title, full_content, category):
             f"<li>💵 <strong>कीमत:</strong> किफायती दाम में उपलब्ध</li>",
             f"<li>🚀 <strong>लॉन्च:</strong> जल्द ही मार्केट में आएगा</li>",
         ]
-    elif category == "Space":
-        highlights = [
-            f"<li>🚀 <strong>{clean_title[:50]}</strong> - अंतरिक्ष में बड़ी उपलब्धि</li>",
-            f"<li>🌌 <strong>नई खोज:</strong> {first_para[:60]}...</li>",
-            f"<li>🛰️ <strong>मिशन अपडेट:</strong> नासा की नई जानकारी</li>",
-            f"<li>🔭 <strong>रिसर्च:</strong> वैज्ञानिकों की खोज</li>",
-            f"<li>📡 <strong>सिग्नल:</strong> अंतरिक्ष से नए संकेत</li>",
-        ]
     else:
         highlights = [
             f"<li>🔴 <strong>{clean_title[:50]}</strong> - आज की बड़ी खबर</li>",
@@ -428,27 +495,20 @@ def generate_dynamic_content(title, full_content, category):
             f"<li>🌍 <strong>ग्लोबल इंपैक्ट:</strong> दुनिया भर में प्रभाव</li>",
         ]
     
-    # UNIQUE INTRODUCTION
     intro_english = f"""
 <p><strong>{clean_title}</strong></p>
-
 <p>{first_para}</p>
-
 <p>This {category.lower()} news has created a buzz across the industry. Experts are closely monitoring this development as it could reshape the future of the {category} sector.</p>
 """
     
     intro_hindi = f"""
 <p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है। यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
-
 <p>{first_para}</p>
-
 <p>इस खबर का असर आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है।</p>
 """
     
-    # UNIQUE ANALYSIS
     analysis_english = f"""
 <p>{first_para}</p>
-
 <p>Industry experts believe this development will have far-reaching implications. The full impact of this news will unfold in the coming weeks.</p>
 """
     
@@ -456,7 +516,6 @@ def generate_dynamic_content(title, full_content, category):
 <p>इस खबर के कई पहलू हैं। विशेषज्ञों का मानना है कि यह {category} सेक्टर के लिए एक महत्वपूर्ण मोड़ है। आने वाले समय में इससे जुड़ी और जानकारी सामने आएगी।</p>
 """
     
-    # EXPERT OPINION (Category specific)
     if category == "Sports":
         expert = """
 <p>Cricket pundits and former players are praising this performance as one of the best in recent times.</p>
@@ -473,16 +532,8 @@ def generate_dynamic_content(title, full_content, category):
     <p style="font-style:italic;font-size:16px;">"यह प्रोजेक्ट एंटरटेनमेंट जगत में एक नई शुरुआत है।"</p>
 </blockquote>
 """
-    elif category == "Technology":
-        expert = """
-<p>Tech reviewers and industry analysts are impressed by the specifications and pricing of this new product.</p>
-<p>टेक रिव्यूअर्स और इंडस्ट्री विश्लेषक इस नए प्रोडक्ट के स्पेक्स और कीमत से काफी प्रभावित हैं।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह प्रोडक्ट टेक्नोलॉजी सेक्टर में एक नया मानक स्थापित करेगा।"</p>
-</blockquote>
-"""
     else:
-        expert = """
+        expert = f"""
 <p>Experts from around the world are weighing in on this significant development.</p>
 <p>दुनिया भर के विशेषज्ञ इस महत्वपूर्ण विकास पर अपनी राय दे रहे हैं।</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
@@ -500,7 +551,6 @@ def generate_dynamic_content(title, full_content, category):
 <p>This is a significant development that will shape the future of the {category} sector in the coming months.</p>
 """
     
-    # ✅ DYNAMIC CONTENT - DIFFERENT FOR EVERY POST
     return f"""
 <h2>🚨 BREAKING NEWS: {clean_title}</h2>
 
@@ -534,10 +584,7 @@ def generate_dynamic_content(title, full_content, category):
 <p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
 """
 
-# --- FALLBACK CONTENT ---
-def fallback_long_content(title, full_content, category):
-    return generate_dynamic_content(title, full_content, category)
-
+# --- DYNAMIC FUNCTIONS RE-ADDED ---
 def generate_long_content(title, full_content, category):
     """Generate dynamic content for every post"""
     return generate_dynamic_content(title, full_content, category)
@@ -556,7 +603,8 @@ def post_to_blogger(access_token, title, content, category):
         post_res = requests.post(post_url, headers=headers, json=post_body, timeout=20)
         if post_res.status_code in [200, 201]:
             return post_res.json().get("url")
-    except:
+    except Exception as e:
+        print(f"⚠️ Error posting to Blogger: {e}")
         return None
 
 # --- MAIN ---
@@ -694,7 +742,7 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
-    # ✅ Generate DYNAMIC content
+    # Generate DYNAMIC content
     print("🤖 Generating dynamic content...")
     ai_content = generate_long_content(title, full_content, category)
     
