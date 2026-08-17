@@ -118,7 +118,6 @@ def save_posted_news(title):
     except:
         pass
 
-# ✅ Blogger API से सीधे हालिया श्रेणियों को सिंक करने का फंक्शन
 def get_recent_blogger_categories(access_token):
     recent_categories = []
     if not access_token:
@@ -330,16 +329,24 @@ def detect_category(feed_url, title):
         return "Entertainment"
     if word_in_text("actress", title_lower) or word_in_text("disney", title_lower) or word_in_text("box office", title_lower):
         return "Entertainment"
+    # ✅ Star Cast, Pop Star, Rock Star - Entertainment not Space
+    if word_in_text("star cast", title_lower) or word_in_text("pop star", title_lower) or word_in_text("rock star", title_lower):
+        return "Entertainment"
     
-    # ✅ Space - Only exact words
+    # ✅ Space - Only exact words, NOT "star" alone (to avoid Polestar, Star Cast)
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
-    if word_in_text("galaxy", title_lower) or word_in_text("planet", title_lower) or word_in_text("star", title_lower):
+    if word_in_text("galaxy", title_lower) or word_in_text("planet", title_lower):
         return "Space"
     if word_in_text("moon", title_lower) or word_in_text("mars", title_lower) or word_in_text("universe", title_lower):
         return "Space"
     if word_in_text("cosmos", title_lower) or word_in_text("astronaut", title_lower):
         return "Space"
+    # ✅ Only "star" if it's about astronomy (not celebrity)
+    if word_in_text("star", title_lower) and not word_in_text("star cast", title_lower) and not word_in_text("pop star", title_lower):
+        # Check if it's about space/astronomy
+        if word_in_text("astronomy", title_lower) or word_in_text("constellation", title_lower) or word_in_text("night sky", title_lower):
+            return "Space"
     
     # ✅ Technology
     if any(x in feed_lower for x in ["tech", "verge", "cnet", "techcrunch"]):
@@ -366,18 +373,22 @@ def detect_category(feed_url, title):
         return "Music"
     if word_in_text("cynthia", title_lower):
         return "Music"
+    if word_in_text("pop star", title_lower) or word_in_text("rock star", title_lower):
+        return "Music"
     
-    # ✅ Sports - Exact words only
+    # ✅ Sports - FIXED: Only "test match", "test cricket", "test series"
     if "cric" in feed_lower:
         return "Sports"
     if word_in_text("cricket", title_lower) or word_in_text("century", title_lower) or word_in_text("wicket", title_lower):
         return "Sports"
-    if word_in_text("odi", title_lower) or word_in_text("test", title_lower) or word_in_text("match", title_lower):
+    if word_in_text("odi", title_lower) or word_in_text("test match", title_lower) or word_in_text("test cricket", title_lower):
         return "Sports"
-    if word_in_text("football", title_lower) or word_in_text("goal", title_lower) or word_in_text("fifa", title_lower):
+    if word_in_text("test series", title_lower) or word_in_text("football", title_lower) or word_in_text("goal", title_lower):
         return "Sports"
-    if word_in_text("olympics", title_lower) or word_in_text("player", title_lower):
+    if word_in_text("fifa", title_lower) or word_in_text("olympics", title_lower) or word_in_text("player", title_lower):
         return "Sports"
+    # ❌ REMOVED: standalone "test" word (causes Politics → Sports)
+    # if word_in_text("test", title_lower):  # ← REMOVED!
     
     # ✅ Business
     if any(x in feed_lower for x in ["bloomberg", "reuters", "markets"]):
@@ -396,6 +407,8 @@ def detect_category(feed_url, title):
         return "Politics"
     if word_in_text("senate", title_lower) or word_in_text("congress", title_lower):
         return "Politics"
+    if word_in_text("federal", title_lower) or word_in_text("state officials", title_lower):
+        return "Politics"
     
     # ✅ Health
     if "health" in feed_lower or "medical" in feed_lower:
@@ -407,7 +420,7 @@ def detect_category(feed_url, title):
     if word_in_text("fitness", title_lower):
         return "Health"
     
-    # ✅ Automobile - Exact words only (NOT "career", "every", "event")
+    # ✅ Automobile - Exact words only
     if "motor" in feed_lower or "auto" in feed_lower:
         return "Automobile"
     if word_in_text("car", title_lower) or word_in_text("suv", title_lower) or word_in_text("vehicle", title_lower):
@@ -416,18 +429,18 @@ def detect_category(feed_url, title):
         return "Automobile"
     if word_in_text("engine", title_lower) or word_in_text("motorcycle", title_lower) or word_in_text("bike", title_lower):
         return "Automobile"
-    # ✅ Exact match for Polestar (not "star")
     if word_in_text("polestar", title_lower):
         return "Automobile"
         
     return "News"
 
-# ✅ AI CONTENT GENERATOR (Pollinations AI - Mistral-7B)
+# ✅ AI CONTENT GENERATOR (Pollinations AI - LLaMA Model)
 def ask_ai_for_news(title, full_content, category):
     """Pollinations AI से 100% Unique और Unblocked Content Generate करेगा"""
     print("🧠 Calling Pollinations AI for unique post-specific content...")
     try:
-        model = "mistral" 
+        # ✅ FIXED: Changed from "mistral" to "llama" (Llama-3-70B - Stable & Online)
+        model = "llama"  # Llama-3-70B
         api_url = "https://text.pollinations.ai/"
         
         prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
@@ -516,7 +529,31 @@ def generate_dynamic_content(title, full_content, category):
     more_content = full_content[500:1000] if len(full_content) > 500 else ""
     
     # ✅ Category-wise DETAILED Highlights (8 points)
-    if category == "Sports":
+    if category == "Politics":
+        highlights = [
+            f"<li>🏛️ <strong>{clean_title[:50]}</strong> - राजनीति की बड़ी खबर</li>",
+            f"<li>👥 <strong>मुख्य मुद्दे:</strong> {first_para[:60]}...</li>",
+            f"<li>📈 <strong>विशेषज्ञों की राय:</strong> नीतिगत बदलावों पर चर्चा</li>",
+            f"<li>🔮 <strong>आने वाले दिन:</strong> चुनाव और निर्णयों पर नज़र</li>",
+            f"<li>🌍 <strong>वैश्विक प्रभाव:</strong> इसका वैश्विक राजनीति पर असर</li>",
+            f"<li>⚖️ <strong>कानूनी पहलू:</strong> संवैधानिक और कानूनी निहितार्थ</li>",
+            f"<li>📊 <strong>जनता की राय:</strong> सर्वेक्षण और जनमत</li>",
+            f"<li>🎯 <strong>राजनीतिक रणनीति:</strong> आगामी चुनावी रणनीति</li>",
+        ]
+        expert_quote = """
+<p>Political analysts and constitutional experts are closely monitoring this situation. The outcome could have far-reaching implications for the American political system.</p>
+<p>राजनीतिक विश्लेषकों और संवैधानिक विशेषज्ञों की नजर इस स्थिति पर टिकी है। इसके परिणाम अमेरिकी राजनीतिक प्रणाली के लिए दूरगामी प्रभाव डाल सकते हैं।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह राजनीतिक स्थिति अमेरिकी लोकतंत्र के लिए एक महत्वपूर्ण परीक्षा है।"</p>
+</blockquote>
+"""
+        analysis_detail = f"""
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>यह राजनीतिक घटनाक्रम अमेरिकी राजनीति में एक नया मोड़ ला सकता है। विशेषज्ञों का मानना है कि इसका प्रभाव आने वाले चुनावों पर पड़ेगा।</p>
+"""
+    
+    elif category == "Sports":
         highlights = [
             f"<li>🏏 <strong>{clean_title[:50]}</strong> - मैच का सबसे बड़ा मोमेंट</li>",
             f"<li>⭐ <strong>स्टार प्रदर्शन:</strong> {first_para[:60]}...</li>",
@@ -555,7 +592,7 @@ def generate_dynamic_content(title, full_content, category):
 <p>Music critics and industry experts are calling this performance a historic moment. The collaboration between Cynthia Erivo and Ariana Grande has created waves in the music industry worldwide.</p>
 <p>संगीत समीक्षकों और उद्योग विशेषज्ञों का मानना है कि यह प्रदर्शन एक ऐतिहासिक क्षण है। Cynthia Erivo और Ariana Grande के बीच इस सहयोग ने दुनिया भर में संगीत उद्योग में हलचल मचा दी है।</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह प्रदर्शन संगीत इतिहास में एक मील का पत्थर साबित होगा।"</p>
+    <p style="font-style:italic;font-size:16px;">"यह प्रदर्शन संगीत इतिहास में एक मील का पत्थर साबित होगा。"</p>
 </blockquote>
 """
         analysis_detail = f"""
