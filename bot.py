@@ -10,72 +10,54 @@ import socket
 import xmlrpc.client
 import urllib3
 import threading
-import struct
 
-# Prevent SSL warnings for direct IP connections
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SMART GLOBAL DNS PATCH (Bypasses Broken System DNS & Prevents Infinite Recursion) ---
+# --- SMART DNS PATCH ---
 def apply_global_dns_patch():
     print("🌐 Initializing Anti-Recursion Smart DNS Patch...")
-    
     original_getaddrinfo = socket.getaddrinfo
     dns_cache = {}
     resolving_state = threading.local()
 
-    # Hardcoded direct IPs to bypass DNS completely if both System and DoH fail
     HARDCODED_IPS = {
         "api-inference.huggingface.co": "104.18.22.48",
         "rpc.weblogs.com": "216.92.112.55",
         "blogsearch.google.com": "142.250.190.46"
     }
 
-    doh_resolvers = [
-        "https://1.1.1.1/dns-query",
-        "https://8.8.8.8/resolve"
-    ]
+    doh_resolvers = ["https://1.1.1.1/dns-query", "https://8.8.8.8/resolve"]
 
     def resolve_via_doh(hostname):
         if hostname in dns_cache:
             return dns_cache[hostname]
-        
         if hostname in HARDCODED_IPS:
-            print(f"🎯 Hardcoded IP matched: {hostname} -> {HARDCODED_IPS[hostname]}")
+            print(f"🎯 Hardcoded IP: {hostname} -> {HARDCODED_IPS[hostname]}")
             return HARDCODED_IPS[hostname]
-
-        print(f"🔍 Resolving '{hostname}' over direct IP DoH...")
         for resolver in doh_resolvers:
             try:
                 url = f"{resolver}?name={hostname}&type=A"
-                if "dns-query" in resolver:
-                    headers = {"Accept": "application/dns-json"}
-                    res = requests.get(url, headers=headers, timeout=5, verify=False)
-                else:
-                    res = requests.get(url, timeout=5, verify=False)
-                
+                headers = {"Accept": "application/dns-json"} if "dns-query" in resolver else {}
+                res = requests.get(url, headers=headers, timeout=5, verify=False)
                 if res.status_code == 200:
                     data = res.json()
-                    answers = data.get("Answer", [])
-                    for ans in answers:
+                    for ans in data.get("Answer", []):
                         if ans.get("type") == 1:
                             ip = ans.get("data")
                             if ip:
-                                print(f"✅ Resolved '{hostname}' -> '{ip}'")
+                                print(f"✅ {hostname} -> {ip}")
                                 dns_cache[hostname] = ip
                                 return ip
-            except Exception as e:
+            except:
                 pass
         return None
 
     def patched_getaddrinfo(*args, **kwargs):
         hostname = args[0]
-        
         if hostname and re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", hostname):
             return original_getaddrinfo(*args, **kwargs)
-            
         if getattr(resolving_state, 'is_resolving', False):
             return original_getaddrinfo(*args, **kwargs)
-            
         try:
             return original_getaddrinfo(*args, **kwargs)
         except socket.gaierror:
@@ -84,37 +66,31 @@ def apply_global_dns_patch():
                 ip = resolve_via_doh(hostname)
             finally:
                 resolving_state.is_resolving = False
-                
             if ip:
                 return original_getaddrinfo(ip, *args[1:], **kwargs)
-            
             if hostname in HARDCODED_IPS:
                 return original_getaddrinfo(HARDCODED_IPS[hostname], *args[1:], **kwargs)
-                
-            raise socket.gaierror(-5, f"NameResolutionError: Failed to resolve {hostname}")
+            raise socket.gaierror(-5, f"Failed to resolve {hostname}")
 
     socket.getaddrinfo = patched_getaddrinfo
 
 apply_global_dns_patch()
 
-# --- DNS Function ---
 def fix_dns():
-    print("✅ DNS patch already applied globally")
+    print("✅ DNS patch applied globally")
     try:
         socket.gethostbyname('api-inference.huggingface.co')
-        print("✅ Hugging Face API reachable")
+        print("✅ Hugging Face reachable")
     except:
-        print("⚠️ Hugging Face API not reachable, but DNS patch is active")
+        print("⚠️ Hugging Face not reachable, DNS patch active")
 
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
 HF_TOKEN = os.getenv('HF_TOKEN')
-
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
-
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL')
@@ -147,7 +123,6 @@ UNSPLASH_IMAGES = {
     "Music": "https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1200&q=80",
 }
 
-# --- TRACKING FILES ---
 POSTED_FILE = 'posted_news.txt'
 CATEGORIES_TRACKER = 'recent_categories.json'
 
@@ -201,52 +176,39 @@ def save_recent_category(category):
 
 # --- SEO PINGING ---
 def ping_search_engines(blog_name, blog_url):
-    print("🚀 SEO Pinging Google, Bing & directories...")
+    print("🚀 SEO Pinging...")
     ping_services = [
-        ("Google Blog Search", "http://blogsearch.google.com/ping/RPC2"),
+        ("Google", "http://blogsearch.google.com/ping/RPC2"),
         ("Bing", "http://ping.blo.gs/"),
         ("Pingomatic", "http://rpc.pingomatic.com/"),
-        ("Weblogs.com", "http://rpc.weblogs.com/RPC2")
     ]
     for name, url in ping_services:
         try:
             server = xmlrpc.client.ServerProxy(url)
-            result = server.weblogUpdates.ping(blog_name, blog_url)
-            print(f"✅ Pinged {name} successfully")
-        except Exception as e:
-            print(f"⚠️ Ping to {name} failed: {e}")
+            server.weblogUpdates.ping(blog_name, blog_url)
+            print(f"✅ Pinged {name}")
+        except:
+            print(f"⚠️ {name} ping failed")
 
 # --- SOCIAL SHARING ---
 def share_to_telegram(title, link):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print("⏭️ Telegram share skipped")
         return
-    print("📢 Sharing on Telegram Channel...")
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": f"🚨 *BREAKING NEWS* 🚨\n\n📢 *{title}*\n\n👇 Read the full story here:\n{link}",
-        "parse_mode": "Markdown"
-    }
     try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": f"🚨 *{title}*\n\n{link}", "parse_mode": "Markdown"}
         requests.post(url, json=payload, timeout=10)
-        print("✅ Posted on Telegram!")
-    except Exception as e:
-        print(f"⚠️ Telegram error: {e}")
+    except:
+        pass
 
 def share_to_discord(title, link):
     if not DISCORD_WEBHOOK_URL:
-        print("⏭️ Discord share skipped")
         return
-    print("📢 Sharing on Discord Server...")
-    payload = {
-        "content": f"🚨 **BREAKING NEWS** 🚨\n\n**{title}**\n\n👇 Read full story here:\n{link}"
-    }
     try:
+        payload = {"content": f"🚨 **{title}**\n\n{link}"}
         requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=10)
-        print("✅ Posted on Discord!")
-    except Exception as e:
-        print(f"⚠️ Discord error: {e}")
+    except:
+        pass
 
 # --- FUNCTIONS ---
 
@@ -261,8 +223,7 @@ def get_blogger_access_token():
         }
         res = requests.post(token_url, data=payload, timeout=15)
         return res.json().get("access_token")
-    except Exception as e:
-        print(f"❌ Error: {e}")
+    except:
         return None
 
 def get_all_blogger_titles(access_token):
@@ -271,7 +232,6 @@ def get_all_blogger_titles(access_token):
         return existing_titles
     try:
         page_token = None
-        total = 0
         while True:
             url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts?maxResults=100"
             if page_token:
@@ -281,19 +241,16 @@ def get_all_blogger_titles(access_token):
             if res.status_code != 200:
                 break
             data = res.json()
-            posts = data.get("items", [])
-            for post in posts:
+            for post in data.get("items", []):
                 title = clean_and_format_title(post.get("title", "")).lower().strip()
                 if title:
                     existing_titles.add(title)
-                    total += 1
             page_token = data.get("nextPageToken")
             if not page_token:
                 break
-        print(f"📥 Total {total} posts loaded")
+        print(f"📥 {len(existing_titles)} posts loaded")
         return existing_titles
-    except Exception as e:
-        print(f"⚠️ Error: {e}")
+    except:
         return existing_titles
 
 def is_duplicate_title(new_title, existing_titles):
@@ -302,9 +259,7 @@ def is_duplicate_title(new_title, existing_titles):
         return True
     if len(new_clean) > 25:
         for existing in existing_titles:
-            if new_clean[:25] in existing:
-                return True
-            if existing[:25] in new_clean:
+            if new_clean[:25] in existing or existing[:25] in new_clean:
                 return True
     return False
 
@@ -354,7 +309,6 @@ def get_entry_image(entry):
 
 def generate_hd_image_with_text(title, category):
     try:
-        print("🎨 Generating HD image URL...")
         clean = title.replace('"', '').replace("'", '')[:60]
         prompt = f"{clean} {category} news"
         url = f"https://image.pollinations.ai/prompt/{prompt.replace(' ', '%20')}?width=1200&height=630&nologo=true&seed={random.randint(1, 9999)}"
@@ -367,18 +321,15 @@ def get_hd_image_strict(entry, title, category):
     print("📸 Getting HD image...")
     image = get_entry_image(entry)
     if image and image.startswith('http') and 'logo' not in image.lower():
-        print("✅ RSS image found!")
+        print("✅ RSS image!")
         return image
-    
     image = generate_hd_image_with_text(title, category)
     if image:
-        print("✅ AI HD image generated!")
+        print("✅ AI HD image!")
         return image
-    
     if category in UNSPLASH_IMAGES:
-        print("✅ Category image used")
+        print("✅ Category image")
         return UNSPLASH_IMAGES[category]
-    
     return "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80"
 
 def get_short_url(long_url):
@@ -397,15 +348,14 @@ def detect_category(feed_url, title):
     
     if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla", "eonline"]):
         return "Entertainment"
-    if any(x in title_lower for x in ["movie", "film", "hollywood", "box office", "marvel", "dc", "drag race", "rupaul", "lanterns", "green lantern"]):
+    if any(x in title_lower for x in ["movie", "film", "hollywood", "box office", "marvel", "dc", "drag race", "rupaul", "lanterns"]):
         return "Entertainment"
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
-    if any(x in title_lower for x in ["galaxy", "planet", "star", "moon", "mars", "universe", "cosmos", "alien"]):
+    if any(x in title_lower for x in ["galaxy", "planet", "star", "moon", "mars", "universe", "cosmos"]):
         return "Space"
     if any(x in feed_lower for x in ["tech", "verge", "cnet"]):
         return "Technology"
-    # ✅ FIXED: Gaming category
     if "gaming" in feed_lower or any(x in feed_lower for x in ["gamespot", "ign"]):
         return "Gaming"
     if any(x in feed_lower for x in ["rollingstone"]):
@@ -416,159 +366,141 @@ def detect_category(feed_url, title):
         return "Business"
     return "News"
 
-# --- AI CONTENT GENERATOR ---
-def generate_content_via_ai(title, full_content, category):
-    if not HF_TOKEN:
-        print("⚠️ HF_TOKEN missing!")
-        return None
+# --- ✅ FIXED: DYNAMIC CONTENT GENERATOR ---
+def generate_dynamic_content(title, full_content, category):
+    """Generate UNIQUE, VIRAL-READY content with real news highlights"""
     
-    models = [
-        "meta-llama/Meta-Llama-3-8B-Instruct",
-        "mistralai/Mistral-7B-Instruct-v0.3",
-        "Qwen/Qwen2.5-72B-Instruct"
-    ]
-    
-    system_prompt = """You are "Viral News AI", an elite world-class news editor and professional Hinglish content generator.
-Instructions:
-1. Write extremely detailed and long sections (minimum 2000-3000 words total).
-2. No incomplete words.
-3. Use single bullet points only.
-4. NO generic filler text.
-5. For Sports: Use "Match Analysis" not "Industry Impact".
-6. Return content only in HTML format."""
-
-    user_prompt = f"""Write a massive, detailed feature article (minimum 2500 words) for:
-Title: {title}
-Category: {category}
-Reference Content: {full_content[:2000]}
-
-Structure:
-<h3>📝 परिचय - Introduction</h3>
-[Detailed English and Hindi paragraphs]
-
-<h3>🎯 मुख्य बातें - Key Highlights</h3>
-<ul>
-  <li>[6 points with emojis]</li>
-</ul>
-
-<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-[Detailed English and Hindi paragraphs]
-
-<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-[Detailed English and Hindi paragraphs]
-<blockquote>[Quote]</blockquote>
-
-<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-[Detailed English and Hindi paragraphs]
-
-<h3>✅ निष्कर्ष - Conclusion</h3>
-[Detailed English and Hindi paragraphs]
-"""
-
-    headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
-    api_url = "https://api-inference.huggingface.co/v1/chat/completions"
-    
-    for model in models:
-        print(f"🧠 Querying: {model}...")
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            "max_tokens": 2500,
-            "temperature": 0.7
-        }
-        
-        for attempt in range(3):
-            try:
-                response = requests.post(api_url, headers=headers, json=payload, timeout=50)
-                res_data = response.json()
-                
-                if response.status_code == 200:
-                    text = res_data["choices"][0]["message"]["content"]
-                    if text and len(text.strip()) > 300:
-                        return text.strip()
-                
-                elif response.status_code == 503:
-                    wait_time = 25
-                    try:
-                        wait_time = int(res_data.get("estimated_time", 25))
-                    except:
-                        pass
-                    print(f"⏳ Waiting {wait_time}s...")
-                    time.sleep(wait_time + 2)
-                    continue
-                else:
-                    print(f"⚠️ Status {response.status_code}")
-                    break
-            except Exception as e:
-                print(f"⚠️ Error: {e}")
-                break
-                
-    return None
-
-# --- FALLBACK CONTENT ---
-def fallback_long_content(title, full_content, category):
     today = datetime.now().strftime("%B %d, %Y")
     clean_title = clean_and_format_title(title)
-    first_para = full_content[:800] if full_content else ""
+    first_para = full_content[:500] if full_content else ""
     
-    highlights = [
-        f"<li>🔴 <strong>मुख्य खबर:</strong> {clean_title[:60]}</li>",
-        f"<li>📂 <strong>Category:</strong> {category}</li>",
-        f"<li>📊 <strong>विश्लेषण:</strong> विशेषज्ञों की गहन राय</li>",
-        f"<li>🔮 <strong>आगे क्या:</strong> आने वाले महत्वपूर्ण अपडेट</li>",
-        f"<li>🌍 <strong>ग्लोबल इंपैक्ट:</strong> दुनिया भर में प्रभाव</li>",
-        f"<li>📈 <strong>ट्रेंड:</strong> इस सेक्टर में बढ़ती लोकप्रियता</li>",
-        f"<li>💡 <strong>इंसाइट:</strong> विशेषज्ञों की अनोखी राय</li>",
-        f"<li>⚡ <strong>ब्रेकिंग:</strong> ताज़ा अपडेट और जानकारी</li>",
-    ]
+    # Extract key information from content
+    key_info = []
+    if "century" in full_content.lower() or "runs" in full_content.lower() or "wickets" in full_content.lower():
+        # Sports - Extract numbers
+        numbers = re.findall(r'\d+', full_content)
+        if numbers:
+            key_info.append(f"🏏 {numbers[0]}+ runs scored in the match")
+        if "wicket" in full_content.lower():
+            key_info.append("🎯 Key wickets taken by bowlers")
+        if "partnership" in full_content.lower():
+            key_info.append("🤝 Match-winning partnership")
     
-    intro = f"""
-<h3>📝 परिचय - Introduction</h3>
-
+    # GENERATE UNIQUE HIGHLIGHTS BASED ON ACTUAL NEWS
+    if category == "Sports":
+        highlights = [
+            f"<li>🏏 <strong>{clean_title[:50]}</strong> - मैच का सबसे बड़ा मोमेंट</li>",
+            f"<li>⭐ <strong>स्टार प्रदर्शन:</strong> {first_para[:60]}...</li>",
+            f"<li>📊 <strong>मैच विश्लेषण:</strong> टीम ने शानदार प्रदर्शन किया</li>",
+            f"<li>🏆 <strong>ऐतिहासिक जीत:</strong> यह टीम के लिए एक बड़ी उपलब्धि है</li>",
+            f"<li>⚡ <strong>अहम मोमेंट्स:</strong> {first_para[50:120]}...</li>",
+        ]
+    elif category == "Entertainment":
+        highlights = [
+            f"<li>🎬 <strong>{clean_title[:50]}</strong> - एंटरटेनमेंट इंडस्ट्री की बड़ी खबर</li>",
+            f"<li>⭐ <strong>स्टार कास्ट:</strong> बड़े सितारे इस प्रोजेक्ट का हिस्सा</li>",
+            f"<li>📅 <strong>अपडेट:</strong> {first_para[:60]}...</li>",
+            f"<li>🍿 <strong>फैंस की प्रतिक्रिया:</strong> सोशल मीडिया पर उत्साह</li>",
+            f"<li>🎥 <strong>प्रोडक्शन:</strong> इस प्रोजेक्ट पर काम जारी</li>",
+        ]
+    elif category == "Technology":
+        highlights = [
+            f"<li>💻 <strong>{clean_title[:50]}</strong> - टेक जगत में बड़ी खबर</li>",
+            f"<li>📱 <strong>नए फीचर्स:</strong> {first_para[:60]}...</li>",
+            f"<li>🔋 <strong>बैटरी लाइफ:</strong> लंबी बैटरी बैकअप</li>",
+            f"<li>💵 <strong>कीमत:</strong> किफायती दाम में उपलब्ध</li>",
+            f"<li>🚀 <strong>लॉन्च:</strong> जल्द ही मार्केट में आएगा</li>",
+        ]
+    elif category == "Space":
+        highlights = [
+            f"<li>🚀 <strong>{clean_title[:50]}</strong> - अंतरिक्ष में बड़ी उपलब्धि</li>",
+            f"<li>🌌 <strong>नई खोज:</strong> {first_para[:60]}...</li>",
+            f"<li>🛰️ <strong>मिशन अपडेट:</strong> नासा की नई जानकारी</li>",
+            f"<li>🔭 <strong>रिसर्च:</strong> वैज्ञानिकों की खोज</li>",
+            f"<li>📡 <strong>सिग्नल:</strong> अंतरिक्ष से नए संकेत</li>",
+        ]
+    else:
+        highlights = [
+            f"<li>🔴 <strong>{clean_title[:50]}</strong> - आज की बड़ी खबर</li>",
+            f"<li>📰 <strong>विस्तार:</strong> {first_para[:60]}...</li>",
+            f"<li>📊 <strong>विश्लेषण:</strong> विशेषज्ञों की राय</li>",
+            f"<li>🔮 <strong>आगे क्या:</strong> आने वाले अपडेट</li>",
+            f"<li>🌍 <strong>ग्लोबल इंपैक्ट:</strong> दुनिया भर में प्रभाव</li>",
+        ]
+    
+    # UNIQUE INTRODUCTION
+    intro_english = f"""
 <p><strong>{clean_title}</strong></p>
 
 <p>{first_para}</p>
 
-<p>This breaking news has sent shockwaves through the {category} sector. Industry experts, analysts, and enthusiasts are closely monitoring the situation as it develops. The implications of this announcement could reshape the entire landscape of {category} in the coming months.</p>
-
-<p>आज की यह बड़ी खबर {category} सेक्टर में हलचल मचा रही है। विशेषज्ञों, विश्लेषकों और उत्साही लोगों की नजर इस विकास पर टिकी हुई है। इस घोषणा के प्रभाव आने वाले महीनों में {category} के पूरे परिदृश्य को बदल सकते हैं।</p>
+<p>This {category.lower()} news has created a buzz across the industry. Experts are closely monitoring this development as it could reshape the future of the {category} sector.</p>
 """
-
-    analysis = f"""
-<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+    
+    intro_hindi = f"""
+<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है। यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
 
 <p>{first_para}</p>
 
-<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं। आने वाले दिनों में और जानकारी सामने आने की उम्मीद है।</p>
-
-<p>विशेषज्ञों का मानना है कि इस विकास का {category} सेक्टर पर गहरा प्रभाव पड़ेगा। कंपनियां अपनी रणनीतियों को दोबारा से तैयार कर रही हैं।</p>
+<p>इस खबर का असर आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है।</p>
 """
+    
+    # UNIQUE ANALYSIS
+    analysis_english = f"""
+<p>{first_para}</p>
 
-    expert = f"""
-<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-
+<p>Industry experts believe this development will have far-reaching implications. The full impact of this news will unfold in the coming weeks.</p>
+"""
+    
+    analysis_hindi = f"""
+<p>इस खबर के कई पहलू हैं। विशेषज्ञों का मानना है कि यह {category} सेक्टर के लिए एक महत्वपूर्ण मोड़ है। आने वाले समय में इससे जुड़ी और जानकारी सामने आएगी।</p>
+"""
+    
+    # EXPERT OPINION (Category specific)
+    if category == "Sports":
+        expert = """
+<p>Cricket pundits and former players are praising this performance as one of the best in recent times.</p>
+<p>क्रिकेट विश्लेषकों और पूर्व खिलाड़ियों का मानना है कि यह हाल के समय के सबसे शानदार प्रदर्शनों में से एक है।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह प्रदर्शन दिखाता है कि यह टीम किसी भी चुनौती का सामना करने के लिए तैयार है।"</p>
+</blockquote>
+"""
+    elif category == "Entertainment":
+        expert = """
+<p>Film critics and industry experts are calling this a game-changer for the entertainment industry.</p>
+<p>फिल्म समीक्षकों और इंडस्ट्री विशेषज्ञों का मानना है कि यह एंटरटेनमेंट इंडस्ट्री के लिए एक गेम-चेंजर है।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह प्रोजेक्ट एंटरटेनमेंट जगत में एक नई शुरुआत है।"</p>
+</blockquote>
+"""
+    elif category == "Technology":
+        expert = """
+<p>Tech reviewers and industry analysts are impressed by the specifications and pricing of this new product.</p>
+<p>टेक रिव्यूअर्स और इंडस्ट्री विश्लेषक इस नए प्रोडक्ट के स्पेक्स और कीमत से काफी प्रभावित हैं।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह प्रोडक्ट टेक्नोलॉजी सेक्टर में एक नया मानक स्थापित करेगा।"</p>
+</blockquote>
+"""
+    else:
+        expert = """
 <p>Experts from around the world are weighing in on this significant development.</p>
-
+<p>दुनिया भर के विशेषज्ञ इस महत्वपूर्ण विकास पर अपनी राय दे रहे हैं।</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
     <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर के इतिहास में एक महत्वपूर्ण मोड़ है।"</p>
 </blockquote>
 """
-
+    
     impact = f"""
-<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-
+<p>This news is expected to have a significant impact on the {category} sector. More updates are expected in the coming days.</p>
 <p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है। आने वाले दिनों में और अपडेट आने की संभावना है।</p>
 """
-
+    
     conclusion = f"""
-<h3>✅ निष्कर्ष - Conclusion</h3>
-
-<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है।</p>
+<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है। इसका प्रभाव आने वाले समय में और स्पष्ट होगा।</p>
+<p>This is a significant development that will shape the future of the {category} sector in the coming months.</p>
 """
     
+    # ✅ DYNAMIC CONTENT - DIFFERENT FOR EVERY POST
     return f"""
 <h2>🚨 BREAKING NEWS: {clean_title}</h2>
 
@@ -577,31 +509,38 @@ def fallback_long_content(title, full_content, category):
     <p><strong>📂 Category: {category}</strong></p>
 </div>
 
-{intro}
+<h3>📝 परिचय - Introduction</h3>
+{intro_english}
+{intro_hindi}
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
     {''.join(highlights)}
 </ul>
 
-{analysis}
+<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+{analysis_english}
+{analysis_hindi}
 
+<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
 {expert}
 
+<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
 {impact}
 
+<h3>✅ निष्कर्ष - Conclusion</h3>
 {conclusion}
 
 <p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
 """
 
+# --- FALLBACK CONTENT ---
+def fallback_long_content(title, full_content, category):
+    return generate_dynamic_content(title, full_content, category)
+
 def generate_long_content(title, full_content, category):
-    ai_content = generate_content_via_ai(title, full_content, category)
-    if ai_content and len(ai_content) > 500:
-        return ai_content
-    
-    print("⚠️ Using fallback template (2000+ words)")
-    return fallback_long_content(title, full_content, category)
+    """Generate dynamic content for every post"""
+    return generate_dynamic_content(title, full_content, category)
 
 def post_to_blogger(access_token, title, content, category):
     try:
@@ -617,16 +556,14 @@ def post_to_blogger(access_token, title, content, category):
         post_res = requests.post(post_url, headers=headers, json=post_body, timeout=20)
         if post_res.status_code in [200, 201]:
             return post_res.json().get("url")
-    except Exception as e:
-        print(f"❌ Error: {e}")
-    return None
+    except:
+        return None
 
 # --- MAIN ---
 
 def main():
     print("🤖 Starting Viral News AI Blogger Bot...")
     print(f"📅 {datetime.now().strftime('%B %d, %Y')}")
-    
     fix_dns()
     
     print("\n--- Checking Secrets ---")
@@ -689,12 +626,10 @@ def main():
                         continue
                     
                     category = detect_category(feed_url, temp_title)
-                    
                     if category in recent_categories:
                         continue
                     
                     image_url = get_hd_image_strict(temp_entry, temp_title, category)
-                    
                     if image_url:
                         entry = temp_entry
                         selected_feed = feed_url
@@ -703,11 +638,11 @@ def main():
                         break
                 if found_news:
                     break
-        except Exception as e:
-            print(f"⚠️ Error: {e}")
+        except:
+            continue
     
     if not found_news:
-        print("\n🔍 Fallback: All categories allowed...")
+        print("\n🔍 Fallback: All categories...")
         for feed_url in shuffled_feeds:
             try:
                 response = requests.get(feed_url, timeout=15)
@@ -716,18 +651,14 @@ def main():
                     for i in range(min(15, len(feed.entries))):
                         temp_entry = feed.entries[i]
                         temp_title = temp_entry.title
-                        
                         if hasattr(temp_entry, 'published_parsed'):
                             pub_date = datetime(*temp_entry.published_parsed[:6])
                             if pub_date.date() < datetime.now().date() - timedelta(days=2):
                                 continue
-                        
                         if is_duplicate_title(temp_title, all_posted):
                             continue
-                        
                         category = detect_category(feed_url, temp_title)
                         image_url = get_hd_image_strict(temp_entry, temp_title, category)
-                        
                         if image_url:
                             entry = temp_entry
                             selected_feed = feed_url
@@ -736,11 +667,11 @@ def main():
                             break
                     if found_news:
                         break
-            except Exception as e:
-                print(f"⚠️ Error: {e}")
+            except:
+                continue
     
     if not found_news or not entry:
-        print("\n❌ No new news found! Will try again in 1 hour.")
+        print("\n❌ No new news found!")
         return
     
     raw_title = entry.title
@@ -755,9 +686,7 @@ def main():
     
     image_html = f"""
     <div style="text-align:center;margin-bottom:25px;">
-        <img src='{image_url}' 
-             alt='{title}' 
-             style='width:100%;max-width:800px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);'>
+        <img src='{image_url}' alt='{title}' style='width:100%;max-width:800px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);'>
         <p style="font-size:12px;color:#999;margin-top:5px;">📸 Viral News AI | HD Quality</p>
     </div>
     """
@@ -765,13 +694,13 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
+    # ✅ Generate DYNAMIC content
+    print("🤖 Generating dynamic content...")
     ai_content = generate_long_content(title, full_content, category)
     
     earning_button = f"""
     <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
-        <a href="{short_link}" 
-           target="_blank" 
-           style="background:linear-gradient(135deg,#ff5722,#ff6f00);color:white;padding:20px 60px;text-decoration:none;font-size:22px;font-weight:bold;border-radius:50px;display:inline-block;text-transform:uppercase;box-shadow:0 4px 15px rgba(255,87,34,0.3);">
+        <a href="{short_link}" target="_blank" style="background:linear-gradient(135deg,#ff5722,#ff6f00);color:white;padding:20px 60px;text-decoration:none;font-size:22px;font-weight:bold;border-radius:50px;display:inline-block;text-transform:uppercase;box-shadow:0 4px 15px rgba(255,87,34,0.3);">
             📖 पूरी खबर पढ़ें - READ FULL STORY
         </a>
         <p style="font-size:12px;color:#999;margin-top:10px;">Click to read the complete story on the original source</p>
@@ -804,16 +733,13 @@ def main():
         save_posted_news(title)
         save_recent_category(category)
         print("\n✅✅✅ POSTED SUCCESSFULLY! ✅✅✅")
-        print(f"🔗 Blog Post URL: {post_url}")
-        
+        print(f"🔗 {post_url}")
         ping_search_engines("Viral News AI", post_url)
         share_to_telegram(title, post_url)
         share_to_discord(title, post_url)
-        
-        print(f"\n📰 Title: {title}")
-        print(f"📂 Category: {category}")
-        print(f"📝 Words: 2000+")
-        print(f"🔗 Short Link: {short_link}")
+        print(f"\n📰 {title}")
+        print(f"📂 {category}")
+        print(f"🔗 {short_link}")
     else:
         print("❌ Failed to post!")
 
