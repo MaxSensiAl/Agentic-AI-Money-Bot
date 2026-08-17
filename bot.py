@@ -9,14 +9,45 @@ from datetime import datetime, timedelta
 import socket
 import xmlrpc.client
 import urllib3
-import ssl
+import urllib3.util.connection as urllib3_connection
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# --- SMART TCP REDIRECT PATCH (Google और अन्य Pings के लिए सुरक्षित) ---
+def apply_smart_connection_patch():
+    print("🌐 Initializing Smart TCP Connection Redirect Patch...")
+    original_create_connection = urllib3_connection.create_connection
+
+    HARDCODED_IPS = {
+        "rpc.weblogs.com": "216.92.112.55",
+        "blogsearch.google.com": "142.250.190.46"
+    }
+
+    def patched_create_connection(address, *args, **kwargs):
+        host, port = address
+        if host in HARDCODED_IPS:
+            ip = HARDCODED_IPS[host]
+            print(f"🎯 Redirecting {host} connection to hardcoded IP: {ip}")
+            return original_create_connection((ip, port), *args, **kwargs)
+        return original_create_connection(address, *args, **kwargs)
+
+    urllib3_connection.create_connection = patched_create_connection
+    print("✅ Smart TCP Connection Redirect Patch applied globally")
+
+# पैच को लागू करें
+apply_smart_connection_patch()
+
+def fix_dns():
+    print("✅ Testing connection to Pollinations AI...")
+    try:
+        res = requests.get("https://text.pollinations.ai/", timeout=10)
+        print(f"✅ Pollinations AI reachable (Status Code: {res.status_code})")
+    except Exception as e:
+        print(f"⚠️ Connection check failed: {e}")
 
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
-HF_TOKEN = os.getenv('HF_TOKEN')
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
@@ -24,7 +55,7 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL')
 
-# --- RSS FEEDS ---
+# --- RSS FEEDS (11 Categories के लिए विस्तारित) ---
 RSS_FEEDS = [
     "https://techcrunch.com/feed/",
     "https://www.theverge.com/rss/index.xml",
@@ -39,9 +70,16 @@ RSS_FEEDS = [
     "https://www.bloomberg.com/feeds/markets.rss",
     "https://www.espncricinfo.com/rss/content/story/feeds/0.xml",
     "https://www.rollingstone.com/music/music-news/feed/",
+    # Politics (राजनीति)
+    "https://www.huffpost.com/section/politics/feed",
+    "https://feeds.feedburner.com/ndtvnews-top-stories",
+    # Health (स्वास्थ्य)
+    "https://www.medicalnewstoday.com/feed/news",
+    # Automobile (ऑटोमोबाइल)
+    "https://www.motor1.com/rss/news/all/"
 ]
 
-# --- IMAGE SOURCES ---
+# --- IMAGE SOURCES (11 Categories के लिए) ---
 UNSPLASH_IMAGES = {
     "Technology": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
     "Gaming": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
@@ -50,32 +88,12 @@ UNSPLASH_IMAGES = {
     "Sports": "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80",
     "Business": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80",
     "Music": "https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1200&q=80",
+    "Politics": "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=1200&q=80",
+    "Health": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1200&q=80",
+    "Automobile": "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=80",
 }
 
 POSTED_FILE = 'posted_news.txt'
-CATEGORIES_TRACKER = 'recent_categories.json'
-
-# --- CATEGORY ROTATION ---
-ALL_CATEGORIES = ["Sports", "Entertainment", "Technology", "Gaming", "Space", "Music", "Business"]
-
-def get_available_categories():
-    """Return categories that haven't been posted recently"""
-    recent = load_recent_categories()
-    available = [c for c in ALL_CATEGORIES if c not in recent]
-    
-    # अगर सभी categories recent में हैं तो reset करो
-    if not available:
-        print("🔄 All categories recent, resetting rotation...")
-        return ALL_CATEGORIES.copy()
-    
-    return available
-
-def get_skip_category():
-    """Get category to skip (last posted category)"""
-    recent = load_recent_categories()
-    if recent:
-        return recent[0]  # Last posted category
-    return None
 
 def clean_and_format_title(title):
     if not title:
@@ -104,26 +122,28 @@ def save_posted_news(title):
     except:
         pass
 
-def load_recent_categories():
+# ✅ Blogger API से सीधे हालिया श्रेणियों को सिंक करने का फंक्शन
+def get_recent_blogger_categories(access_token):
+    recent_categories = []
+    if not access_token:
+        return recent_categories
     try:
-        if os.path.exists(CATEGORIES_TRACKER):
-            with open(CATEGORIES_TRACKER, 'r') as f:
-                return json.load(f)
-    except:
-        pass
+        url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts?maxResults=6"
+        headers = {"Authorization": f"Bearer {access_token}"}
+        res = requests.get(url, headers=headers, timeout=15)
+        if res.status_code == 200:
+            data = res.json()
+            allowed_categories = ["Technology", "Gaming", "Entertainment", "Space", "Sports", "Business", "Music", "Politics", "Health", "Automobile", "News"]
+            for post in data.get("items", []):
+                labels = post.get("labels", [])
+                for label in labels:
+                    if label in allowed_categories and label not in recent_categories:
+                        recent_categories.append(label)
+            print(f"📥 Blogger से सिंक की गई हालिया श्रेणियां: {recent_categories}")
+            return recent_categories[:3]  # पिछले 3 कैटेगरीज को ब्लॉक (skip) करने के लिए रखें
+    except Exception as e:
+        print(f"⚠️ Blogger कैटेगरीज सिंक करने में एरर: {e}")
     return []
-
-def save_recent_category(category):
-    try:
-        recent = load_recent_categories()
-        if category in recent:
-            recent.remove(category)
-        recent.insert(0, category)
-        recent = recent[:7]  # Keep all 7 categories
-        with open(CATEGORIES_TRACKER, 'w') as f:
-            json.dump(recent, f)
-    except:
-        pass
 
 # --- SEO PINGING ---
 def ping_search_engines(blog_name, blog_url):
@@ -297,157 +317,266 @@ def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
     
-    # Entertainment
     if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla", "eonline"]):
         return "Entertainment"
-    if any(x in title_lower for x in ["movie", "film", "hollywood", "marvel", "dc", "disney", "drag race", "rupaul"]):
+    if any(x in title_lower for x in ["movie", "film", "hollywood", "box office", "marvel", "dc", "disney", "lands", "rides", "spider-man", "spiderman", "actor", "actress"]):
         return "Entertainment"
-    
-    # Space
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
-    if any(x in title_lower for x in ["galaxy", "planet", "star", "moon", "mars", "universe", "cosmos"]):
+    if any(x in title_lower for x in ["galaxy", "planet", "star", "moon", "mars", "universe", "cosmos", "astronaut"]):
         return "Space"
-    
-    # Technology
-    if any(x in feed_lower for x in ["tech", "verge", "cnet"]):
+    if any(x in feed_lower for x in ["tech", "verge", "cnet", "techcrunch"]):
         return "Technology"
-    
-    # Gaming
+    if any(x in title_lower for x in ["smartphone", "apple", "samsung", "software", "google ai", "artificial intelligence", "chatgpt"]):
+        return "Technology"
     if "gaming" in feed_lower or any(x in feed_lower for x in ["gamespot", "ign"]):
         return "Gaming"
-    
-    # Music
+    if any(x in title_lower for x in ["nintendo", "xbox", "playstation", "ps5", "gta", "gamer", "gaming"]):
+        return "Gaming"
     if any(x in feed_lower for x in ["rollingstone"]):
         return "Music"
-    
-    # Sports
-    if "cric" in feed_lower or any(x in title_lower for x in ["cricket", "century", "wicket", "odi", "test", "match", "football", "labuschagne", "rutherford"]):
+    if any(x in title_lower for x in ["album", "song", "singer", "concert", "tour"]):
+        return "Music"
+    if "cric" in feed_lower or any(x in title_lower for x in ["cricket", "century", "wicket", "odi", "test", "match", "football", "goal", "fifa", "olympics"]):
         return "Sports"
-    
-    # Business
-    if any(x in feed_lower for x in ["bloomberg", "reuters"]):
+    if any(x in feed_lower for x in ["bloomberg", "reuters", "markets"]):
         return "Business"
-    
+    if any(x in title_lower for x in ["stocks", "inflation", "market", "economy", "trade"]):
+        return "Business"
+    # Politics
+    if "politics" in feed_lower or any(x in title_lower for x in ["election", "biden", "trump", "modi", "parliament", "politics", "minister", "senate", "congress"]):
+        return "Politics"
+    # Health
+    if "health" in feed_lower or "medical" in feed_lower or any(x in title_lower for x in ["health", "mental", "doctor", "cancer", "vaccine", "disease", "fitness"]):
+        return "Health"
+    # Automobile
+    if "motor" in feed_lower or "auto" in feed_lower or any(x in title_lower for x in ["car", "suv", "vehicle", "electric vehicle", "ev", "tesla", "engine", "motorcycle", "bike"]):
+        return "Automobile"
+        
     return "News"
 
-# ✅ AI CONTENT GENERATOR (SSL BYPASS)
+# ✅ AI CONTENT GENERATOR (Pollinations AI - Mistral-7B)
 def ask_ai_for_news(title, full_content, category):
-    if not HF_TOKEN:
-        return None
-    
-    print("🧠 Calling AI...")
+    """Pollinations AI से 100% Unique और Unblocked Content Generate करेगा"""
+    print("🧠 Calling Pollinations AI for unique post-specific content...")
     try:
-        model = "mistralai/Mistral-7B-Instruct-v0.1"
-        hf_ip = "104.18.22.48"
-        api_url = f"https://{hf_ip}/models/{model}"
+        model = "mistral" 
+        api_url = "https://text.pollinations.ai/"
         
-        headers = {
-            "Authorization": f"Bearer {HF_TOKEN}",
-            "Content-Type": "application/json",
-            "Host": "api-inference.huggingface.co"
-        }
-        
-        prompt = f"""Write a Hinglish article about:
+        prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
+Write a highly engaging, SEO-friendly news article based on this news:
 Title: {title}
-Category: {category}
 Content: {full_content[:1500]}
+Category: {category}
 
-Use HTML structure:
+Strict Instructions:
+1. Write in natural Hinglish (blend of Hindi and English).
+2. Do not use generic placeholder sentences. Use actual names, facts, and details from the provided news.
+3. Generate a realistic and highly specific expert opinion quote about this exact event.
+4. Output the content using this exact HTML structure:
+
 <h3>📝 परिचय - Introduction</h3>
-<p>[English intro]</p>
-<p>[Hindi intro]</p>
+<p>[Detailed introduction in English based on the news content...]</p>
+<p>[Detailed introduction in Hindi based on the news content...]</p>
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
-  <li>• [Fact 1]</li>
-  <li>• [Fact 2]</li>
-  <li>• [Fact 3]</li>
-  <li>• [Fact 4]</li>
-  <li>• [Fact 5]</li>
+  <li>[Specific highlight 1 containing real facts/names/scores from the news]</li>
+  <li>[Specific highlight 2 containing real facts/names from the news]</li>
+  <li>[Specific highlight 3 containing real facts/names from the news]</li>
+  <li>[Specific highlight 4 containing real facts/names from the news]</li>
+  <li>[Specific highlight 5 containing real facts/names from the news]</li>
 </ul>
 
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>[Analysis]</p>
+<p>[Detailed analysis paragraph in English...]</p>
+<p>[Detailed analysis paragraph in Hindi...]</p>
 
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-<blockquote>"[Quote]"</blockquote>
+<p>[Expert/Industry review in English...]</p>
+<p>[Expert/Industry review in Hindi...]</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"[A realistic, highly specific expert quote in Hindi about this event]"</p>
+</blockquote>
 
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>[Impact]</p>
+<p>[Impact in English...]</p>
+<p>[Impact in Hindi...]</p>
 
 <h3>✅ निष्कर्ष - Conclusion</h3>
-<p>[Conclusion]</p>"""
+<p>[Conclusion in Hindi...]</p>
+<p>[Conclusion in English...]</p>
+"""
         
         payload = {
-            "inputs": prompt,
-            "parameters": {"max_new_tokens": 1500, "temperature": 0.7}
+            "messages": [
+                {"role": "system", "content": "You are a professional news editor writing HTML output in Hinglish."},
+                {"role": "user", "content": prompt}
+            ],
+            "model": model,
+            "jsonMode": False
         }
         
-        res = requests.post(api_url, json=payload, headers=headers, timeout=60, verify=False)
+        res = requests.post(api_url, json=payload, timeout=50)
         
         if res.status_code == 200:
-            result = res.json()
-            if isinstance(result, list) and len(result) > 0:
-                text = result[0].get("generated_text", "")
-                if "<h3>" in text:
-                    print("✅ AI Success!")
-                    return text
-    except:
-        pass
+            clean_html = res.text.strip()
+            if "<h3>" in clean_html:
+                print("✅ AI successfully generated unique content via Pollinations!")
+                return clean_html
+        print(f"⚠️ AI API Status: {res.status_code}, using fallback...")
+    except Exception as e:
+        print(f"⚠️ AI Error: {e}")
     return None
 
 # ✅ DYNAMIC CONTENT GENERATOR
 def generate_dynamic_content(title, full_content, category):
+    """AI से Content Generate करे, नहीं तो Fallback Template"""
+    
+    # पहले AI try करो
     ai_content = ask_ai_for_news(title, full_content, category)
     if ai_content:
         return ai_content
     
+    # AI fail हो तो Fallback Template
     print("🔄 Using fallback template...")
     today = datetime.now().strftime("%B %d, %Y")
     clean_title = clean_and_format_title(title)
     first_para = full_content[:500] if full_content else ""
     
-    # Category-specific highlights
-    if category == "Entertainment":
+    # Category-wise Fallback Templates
+    if category == "Sports":
         highlights = [
-            f"<li>🎬 <strong>{clean_title[:50]}</strong> - एंटरटेनमेंट की बड़ी खबर</li>",
-            f"<li>⭐ <strong>स्टार कास्ट:</strong> {first_para[:60]}...</li>",
-            f"<li>📅 <strong>रिलीज़:</strong> जल्द ही</li>",
-            f"<li>🍿 <strong>फैंस की प्रतिक्रिया:</strong> उत्साह</li>",
+            f"<li>🏏 <strong>{clean_title[:50]}</strong> - मैच का सबसे बड़ा मोमेंट</li>",
+            f"<li>⭐ <strong>स्टार प्रदर्शन:</strong> {first_para[:60]}...</li>",
+            f"<li>📊 <strong>मैच विश्लेषण:</strong> टीम ने शानदार प्रदर्शन किया</li>",
+            f"<li>🏆 <strong>ऐतिहासिक जीत:</strong> यह टीम के लिए एक बड़ी उपलब्धि है</li>",
+            f"<li>⚡ <strong>अहम मोमेंट्स:</strong> {first_para[50:120]}...</li>",
         ]
+        expert_quote = """
+<p>Cricket pundits and former players are praising this performance as one of the best in recent times.</p>
+<p>क्रिकेट विश्लेषकों और पूर्व खिलाड़ियों का मानना है कि यह हाल के समय के सबसे शानदार प्रदर्शनों में से एक है।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह प्रदर्शन दिखाता है कि यह टीम किसी भी चुनौती का सामना करने के लिए तैयार है।"</p>
+</blockquote>
+"""
+    elif category == "Entertainment":
+        highlights = [
+            f"<li>🎬 <strong>{clean_title[:50]}</strong> - एंटरटेनमेंट इंडस्ट्री की बड़ी खबर</li>",
+            f"<li>⭐ <strong>स्टार कास्ट:</strong> {first_para[:60]}...</li>",
+            f"<li>📅 <strong>अपडेट:</strong> नई जानकारी सामने आई</li>",
+            f"<li>🍿 <strong>फैंस की प्रतिक्रिया:</strong> सोशल मीडिया पर उत्साह</li>",
+            f"<li>🎥 <strong>प्रोडक्शन:</strong> इस प्रोजेक्ट पर काम जारी</li>",
+        ]
+        expert_quote = """
+<p>Film critics and industry experts are calling this a game-changer for the entertainment industry.</p>
+<p>Film समीक्षकों and इंडस्ट्री विशेषज्ञों का मानना है कि यह एंटरटेनमेंट इंडस्ट्री के लिए एक गेम-चेंजर है।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह प्रोजेक्ट एंटरटेनमेंट जगत में एक नई शुरुआत है।"</p>
+</blockquote>
+"""
     elif category == "Technology":
         highlights = [
-            f"<li>💻 <strong>{clean_title[:50]}</strong> - टेक जगत की बड़ी खबर</li>",
-            f"<li>📱 <strong>फीचर्स:</strong> {first_para[:60]}...</li>",
+            f"<li>💻 <strong>{clean_title[:50]}</strong> - टेक जगत में बड़ी खबर</li>",
+            f"<li>📱 <strong>डिटेल्स:</strong> {first_para[:60]}...</li>",
             f"<li>🔍 <strong>एनालिसिस:</strong> विशेषज्ञों की राय</li>",
-            f"<li>💡 <strong>इंपैक्ट:</strong> क्या प्रभाव होगा</li>",
+            f"<li>💡 <strong>इंपैक्ट:</strong> इसका क्या प्रभाव होगा</li>",
+            f"<li>🚀 <strong>फ्यूचर:</strong> आगे क्या होगा</li>",
         ]
-    elif category == "Sports":
+        expert_quote = """
+<p>Tech reviewers and industry analysts are impressed by this new technological development.</p>
+<p>टेक समीक्षकों और उद्योग विश्लेषकों का मानना है कि यह तकनीकी विकास इस क्षेत्र में नए आयाम स्थापित करेगा।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"तकनीक अब हमारे दैनिक जीवन को और अधिक स्मार्ट और सुगम बनाने की दिशा में बढ़ रही है।"</p>
+</blockquote>
+"""
+    elif category == "Politics":
         highlights = [
-            f"<li>🏏 <strong>{clean_title[:50]}</strong> - खेल जगत की बड़ी खबर</li>",
-            f"<li>⭐ <strong>स्टार प्रदर्शन:</strong> {first_para[:60]}...</li>",
-            f"<li>📊 <strong>मैच विश्लेषण:</strong> शानदार प्रदर्शन</li>",
-            f"<li>🏆 <strong>जीत:</strong> ऐतिहासिक उपलब्धि</li>",
+            f"<li>🏛️ <strong>{clean_title[:50]}</strong> - राजनीति की बड़ी खबर</li>",
+            f"<li>👥 <strong>मुख्य मुद्दे:</strong> {first_para[:60]}...</li>",
+            f"<li>📈 <strong>विशेषज्ञों की राय:</strong> नीतिगत बदलावों पर चर्चा</li>",
+            f"<li>🔮 <strong>आने वाले दिन:</strong> चुनाव और निर्णयों पर नज़र</li>",
+            f"<li>🌍 <strong>वैश्विक प्रभाव:</strong> इसका वैश्विक राजनीति पर असर</li>",
         ]
-    elif category == "Gaming":
+        expert_quote = """
+<p>Political analysts are debating the impact of this major decision on current governance and upcoming elections.</p>
+<p>राजनीतिक विश्लेषकों का मानना है कि इस बड़े फैसले का शासन और आगामी चुनावों पर गहरा असर पड़ेगा।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह राजनीतिक निर्णय आने वाले समय में नीतियों और जनता के दृष्टिकोण को बदलेगा।"</p>
+</blockquote>
+"""
+    elif category == "Health":
         highlights = [
-            f"<li>🎮 <strong>{clean_title[:50]}</strong> - गेमिंग जगत की बड़ी खबर</li>",
-            f"<li>🖥️ <strong>गेमप्ले:</strong> {first_para[:60]}...</li>",
-            f"<li>📅 <strong>रिलीज़:</strong> जल्द ही</li>",
+            f"<li>❤️ <strong>{clean_title[:50]}</strong> - स्वास्थ्य और अनुसंधान से जुड़ी खबर</li>",
+            f"<li>🔬 <strong>शोध के परिणाम:</strong> {first_para[:60]}...</li>",
+            f"<li>🍏 <strong>जीवनशैली:</strong> स्वस्थ रहने के नए सुझाव</li>",
+            f"<li>💊 <strong>उपचार और दवाएं:</strong> नए मेडिकल अपडेट्स</li>",
+            f"<li>🩺 <strong>डॉक्टरों की सलाह:</strong> स्वास्थ्य के प्रति जागरूकता</li>",
         ]
-    elif category == "Space":
+        expert_quote = """
+<p>Medical professionals recommend consulting with doctors before making major lifestyle changes based on new research.</p>
+<p>चिकित्सा पेशेवरों की सलाह है कि नए शोध के आधार पर अपनी दिनचर्या में बदलाव करने से पहले डॉक्टरों से परामर्श अवश्य करें।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"नया शोध स्वास्थ्य क्षेत्र में क्रांति ला सकता है, लेकिन व्यक्तिगत स्तर पर हमेशा सावधानी रखनी चाहिए।"</p>
+</blockquote>
+"""
+    elif category == "Automobile":
         highlights = [
-            f"<li>🚀 <strong>{clean_title[:50]}</strong> - अंतरिक्ष की बड़ी खबर</li>",
-            f"<li>🌌 <strong>खोज:</strong> {first_para[:60]}...</li>",
-            f"<li>🛰️ <strong>मिशन:</strong> नया अपडेट</li>",
+            f"<li>🚗 <strong>{clean_title[:50]}</strong> - ऑटोमोबाइल जगत में नया अपडेट</li>",
+            f"<li>⚡ <strong>इंजन और स्पेक्स:</strong> {first_para[:60]}...</li>",
+            f"<li>🔋 <strong>इलेक्ट्रिक व्हीकल (EV) ट्रेंड:</strong> पर्यावरण के अनुकूल तकनीक</li>",
+            f"<li>🛠️ <strong>सुरक्षा और फीचर्स:</strong> आधुनिक सुरक्षा मानकों से लैस</li>",
+            f"<li>🏁 <strong>लॉन्च:</strong> कार प्रेमियों के लिए बड़ी खबर</li>",
         ]
+        expert_quote = """
+<p>Auto experts believe this new launch will set new benchmarks in design, safety, and fuel efficiency.</p>
+<p>ऑटो विशेषज्ञों का मानना है कि यह नया लॉन्च डिजाइन, सुरक्षा और ईंधन दक्षता में नए मानक स्थापित करेगा।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"ऑटोमोबाइल उद्योग अब तेजी से स्मार्ट और पर्यावरण के अनुकूल तकनीक की ओर बढ़ रहा है।"</p>
+</blockquote>
+"""
     else:
         highlights = [
             f"<li>🔴 <strong>{clean_title[:50]}</strong> - आज की बड़ी खबर</li>",
             f"<li>📰 <strong>विस्तार:</strong> {first_para[:60]}...</li>",
             f"<li>📊 <strong>विश्लेषण:</strong> विशेषज्ञों की राय</li>",
+            f"<li>🔮 <strong>आगे क्या:</strong> आने वाले अपडेट</li>",
+            f"<li>🌍 <strong>ग्लोबल इंपैक्ट:</strong> दुनिया भर में प्रभाव</li>",
         ]
+        expert_quote = f"""
+<p>Experts from around the world are weighing in on this significant development.</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर के इतिहास में एक महत्वपूर्ण मोड़ है।"</p>
+</blockquote>
+"""
+    
+    intro = f"""
+<h3>📝 परिचय - Introduction</h3>
+<p><strong>{clean_title}</strong></p>
+<p>{first_para}</p>
+<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।</p>
+"""
+    
+    analysis = f"""
+<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+<p>{first_para}</p>
+<p>इस खबर के कई पहलू हैं। विशेषज्ञों का मानना है कि यह {category} सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
+"""
+    
+    expert = f"""
+<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
+{expert_quote}
+"""
+    
+    impact = f"""
+<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
+<p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है।</p>
+"""
+    
+    conclusion = f"""
+<h3>✅ निष्कर्ष - Conclusion</h3>
+<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है।</p>
+"""
     
     return f"""
 <h2>🚨 BREAKING NEWS: {clean_title}</h2>
@@ -457,17 +586,20 @@ def generate_dynamic_content(title, full_content, category):
     <p><strong>📂 Category: {category}</strong></p>
 </div>
 
-<h3>📝 परिचय - Introduction</h3>
-<p><strong>{clean_title}</strong></p>
-<p>{first_para}</p>
+{intro}
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
     {''.join(highlights)}
 </ul>
 
-<h3>✅ निष्कर्ष - Conclusion</h3>
-<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है।</p>
+{analysis}
+
+{expert}
+
+{impact}
+
+{conclusion}
 
 <p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
 """
@@ -489,7 +621,8 @@ def post_to_blogger(access_token, title, content, category):
         post_res = requests.post(post_url, headers=headers, json=post_body, timeout=20)
         if post_res.status_code in [200, 201]:
             return post_res.json().get("url")
-    except:
+    except Exception as e:
+        print(f"⚠️ Error posting to Blogger: {e}")
         return None
 
 # --- MAIN ---
@@ -497,11 +630,11 @@ def post_to_blogger(access_token, title, content, category):
 def main():
     print("🤖 Starting Viral News AI Blogger Bot...")
     print(f"📅 {datetime.now().strftime('%B %d, %Y')}")
+    fix_dns()
     
     print("\n--- Checking Secrets ---")
     secrets = {
         "BLOG_ID": BLOG_ID,
-        "HF_TOKEN": HF_TOKEN,
         "SHRINKME_API": SHRINKME_API,
         "BC_CLIENT_ID": BC_CLIENT_ID,
         "BC_CLIENT_SECRET": BC_CLIENT_SECRET,
@@ -528,17 +661,9 @@ def main():
     all_posted = existing_titles.union(local_posted)
     print(f"\n📊 Total tracked posts: {len(all_posted)}")
     
-    # ✅ CATEGORY ROTATION
-    recent_categories = load_recent_categories()
-    print(f"🔄 Recent categories: {recent_categories}")
-    
-    available_categories = get_available_categories()
-    print(f"📋 Available categories: {available_categories}")
-    
-    # ✅ Skip last posted category
-    skip_category = get_skip_category()
-    if skip_category:
-        print(f"⏭️ Skipping: {skip_category} (already posted)")
+    # ✅ Blogger API से सीधे हालिया श्रेणियों को सिंक करें (GitHub Actions की समस्या दूर)
+    recent_categories = get_recent_blogger_categories(access_token)
+    print(f"🔄 Recent categories (Blogger Synced): {recent_categories}")
     
     found_news = False
     entry = None
@@ -567,14 +692,7 @@ def main():
                         continue
                     
                     category = detect_category(feed_url, temp_title)
-                    
-                    # ✅ SKIP last posted category
-                    if category == skip_category:
-                        continue
-                    
-                    # ✅ ONLY ALLOW available categories
-                    if category not in available_categories:
-                        print(f"⏭️ Skipping {category} (not in available)")
+                    if category in recent_categories:
                         continue
                     
                     image_url = get_hd_image_strict(temp_entry, temp_title, category)
@@ -589,9 +707,8 @@ def main():
         except:
             continue
     
-    # ✅ FALLBACK: अगर कोई news न मिली तो सभी categories allow करो
     if not found_news:
-        print("\n🔍 Fallback: All categories allowed...")
+        print("\n🔍 Fallback: All categories...")
         for feed_url in shuffled_feeds:
             try:
                 response = requests.get(feed_url, timeout=15)
@@ -612,7 +729,7 @@ def main():
                             entry = temp_entry
                             selected_feed = feed_url
                             found_news = True
-                            print(f"✅ Found in '{category}' (Fallback)!")
+                            print(f"Found in '{category}' (Fallback)!")
                             break
                     if found_news:
                         break
@@ -643,6 +760,7 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
+    # Generate DYNAMIC content
     print("🤖 Generating dynamic content...")
     ai_content = generate_long_content(title, full_content, category)
     
@@ -679,7 +797,6 @@ def main():
     
     if post_url:
         save_posted_news(title)
-        save_recent_category(category)
         print("\n✅✅✅ POSTED SUCCESSFULLY! ✅✅✅")
         print(f"🔗 {post_url}")
         ping_search_engines("Viral News AI", post_url)
