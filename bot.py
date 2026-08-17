@@ -764,6 +764,7 @@ def main():
     print("🤖 Generating dynamic content...")
     ai_content = generate_long_content(title, full_content, category)
     
+    # ✅ FIXED: ShrinkMe Link के साथ Earning Button
     earning_button = f"""
     <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
         <a href="{short_link}" target="_blank" style="background:linear-gradient(135deg,#ff5722,#ff6f00);color:white;padding:20px 60px;text-decoration:none;font-size:22px;font-weight:bold;border-radius:50px;display:inline-block;text-transform:uppercase;box-shadow:0 4px 15px rgba(255,87,34,0.3);">
