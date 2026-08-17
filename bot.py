@@ -49,7 +49,7 @@ def fix_dns():
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
 HF_TOKEN = os.getenv('HF_TOKEN')
-GEMINI_API = os.getenv('GEMINI_API')  # गिटहब .yml में मैप होने पर सक्रिय होगा
+GEMINI_API = os.getenv('GEMINI_API')
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
@@ -155,7 +155,7 @@ def ping_search_engines(blog_name, blog_url):
         try:
             server = xmlrpc.client.ServerProxy(url)
             server.weblogUpdates.ping(blog_name, blog_url)
-            print(f"✅ Pinged {name}")
+            print(f"🚀 Pinged {name}")
         except:
             print(f"⚠️ {name} ping failed")
 
@@ -321,14 +321,14 @@ def get_short_url(long_url):
     except:
         return long_url
 
-# ✅ Word Boundary Function
+# Word Boundary Function
 def word_in_text(word, text):
     """Check if whole word exists in text (not as substring)"""
     if not text:
         return False
     return bool(re.search(rf'\b{re.escape(word)}\b', text, re.IGNORECASE))
 
-# ✅ Category Detection with Whole-Word Matching (Strict Keywords)
+# Category Detection with Whole-Word Matching (Strict Keywords)
 def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
@@ -407,7 +407,7 @@ def detect_category(feed_url, title):
         
     return "News"
 
-# ✅ AI CONTENT GENERATOR (Hugging Face -> Gemini -> Pollinations)
+# ✅ TRIPLE-ENGINE AI CONNECTOR (Hugging Face -> Gemini -> Pollinations)
 def ask_ai_for_news(title, full_content, category):
     """सुरक्षित, स्थिर और तीव्र एआई जनरेटर (Hugging Face Qwen 2.5 7B)"""
     
@@ -509,9 +509,11 @@ Strict Instructions:
     # 🌟 ENGINE 3: Pollinations AI (मुफ़्त बैकअप - OpenAI-संगत एंडपॉइंट पर आधारित, 404/402 FIXED)
     print("🧠 Engine 3: Calling Pollinations AI (Backup)...")
     try:
-        # ✅ FIX: एंडपॉइंट को /v1/chat/completions किया गया ताकि कभी भी 404 एरर न आए
+        # ✅ एंडपॉइंट को /v1/chat/completions किया गया ताकि कभी भी 404 एरर न आए
         api_url = "https://text.pollinations.ai/v1/chat/completions"
-        model = "openai"  # GPT-4o-Mini
+        
+        # ✅ FIX: mistral या llama मॉडल का उपयोग जो 100% मुफ्त और अनलिमिटेड है (कभी भी 402 एरर नहीं देगा)
+        model = "llama"  # Llama-3-70B
         payload = {
             "messages": [
                 {"role": "system", "content": "You are a professional news editor writing HTML output in Hinglish. Write detailed articles."},
@@ -869,7 +871,6 @@ def main():
     print("🤖 Generating dynamic content...")
     ai_content = generate_long_content(title, full_content, category)
     
-    # ✅ Earning Button with ShrinkMe Link
     earning_button = f"""
     <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
         <a href="{short_link}" target="_blank" style="background:linear-gradient(135deg,#ff5722,#ff6f00);color:white;padding:20px 60px;text-decoration:none;font-size:22px;font-weight:bold;border-radius:50px;display:inline-block;text-transform:uppercase;box-shadow:0 4px 15px rgba(255,87,34,0.3);">
