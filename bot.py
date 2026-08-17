@@ -10,6 +10,8 @@ import socket
 import xmlrpc.client
 import urllib3
 import urllib3.util.connection as urllib3_connection
+import subprocess
+import shlex
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -184,7 +186,6 @@ def share_to_discord(title, link):
 
 # --- FUNCTIONS ---
 
-# गिटहब सर्वर के यूटीसी समय को भारतीय समय (IST) के अनुसार सिंक करने का फंक्शन
 def get_current_date():
     """Get current date in Indian Standard Time (IST) format"""
     ist_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
@@ -324,26 +325,23 @@ def get_short_url(long_url):
     except:
         return long_url
 
-# Word Boundary Function
 def word_in_text(word, text):
     """Check if whole word exists in text (not as substring)"""
     if not text:
         return False
     return bool(re.search(rf'\b{re.escape(word)}\b', text, re.IGNORECASE))
 
-# Category Detection with Whole-Word Matching (Strict Keywords)
 def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
     
-    # कोडिंग टकराव (Collisions) रोकने के लिए हेल्पर फंक्शन
     def match_words(word_list):
         for word in word_list:
             if re.search(r'\b' + re.escape(word.lower()) + r'\b', title_lower):
                 return True
         return False
 
-    # Entertainment (मनोरंजन)
+    # Entertainment
     if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla", "eonline"]):
         return "Entertainment"
     if match_words(["movie", "film", "hollywood", "box office", "marvel", "dc", "disney", "lands", "rides", "spider-man", "spiderman", "actor", "actress", "celebrity", "drama"]):
@@ -351,58 +349,57 @@ def detect_category(feed_url, title):
     if match_words(["star cast", "pop star", "rock star"]):
         return "Entertainment"
     
-    # Space (अंतरिक्ष) - 'star' शब्द को यहाँ से हटा दिया गया है।
+    # Space
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
     if match_words(["galaxy", "planet", "moon", "mars", "universe", "cosmos", "astronaut", "asteroid", "telescope", "eclipse", "stargazing", "constellation", "nebula"]):
         return "Space"
         
-    # Technology (तकनीक)
+    # Technology
     if any(x in feed_lower for x in ["tech", "verge", "cnet", "techcrunch"]):
         return "Technology"
     if match_words(["smartphone", "apple", "samsung", "software", "artificial intelligence", "chatgpt", "iphone", "gadget", "cybersecurity", "hacker", "app", "spyware"]):
         return "Technology"
-    # "AI" को स्वतंत्र शब्द के रूप में मैच करें
     if re.search(r'\b' + "ai" + r'\b', title_lower):
         return "Technology"
         
-    # Gaming (गेमिंग)
+    # Gaming
     if "gaming" in feed_lower or any(x in feed_lower for x in ["gamespot", "ign"]):
         return "Gaming"
     if match_words(["nintendo", "xbox", "playstation", "ps5", "gta", "gamer", "gaming", "gameplay", "console"]):
         return "Gaming"
         
-    # Music (संगीत)
+    # Music
     if any(x in feed_lower for x in ["rollingstone"]):
         return "Music"
     if match_words(["album", "song", "singer", "concert", "tour", "music", "guitar", "pop", "rap", "band", "singing", "cynthia", "ariana", "mcconaughey"]):
         return "Music"
         
-    # Sports (खेल) - 'test' की जगह 'test cricket', 'test match' किया गया है।
+    # Sports
     if "cric" in feed_lower:
         return "Sports"
     if match_words(["cricket", "century", "wicket", "odi", "test cricket", "test match", "test series", "football", "goal", "fifa", "olympics", "athletics", "basketball", "tennis", "stadium", "sciver", "brunt", "england"]):
         return "Sports"
         
-    # Business (व्यापार)
+    # Business
     if any(x in feed_lower for x in ["bloomberg", "reuters", "markets"]):
         return "Business"
     if match_words(["stocks", "inflation", "market", "economy", "trade", "finance", "investing", "crypto", "bitcoin"]):
         return "Business"
         
-    # Politics (राजनीति)
+    # Politics
     if "politics" in feed_lower:
         return "Politics"
     if match_words(["election", "biden", "trump", "modi", "parliament", "politics", "minister", "senate", "congress", "government", "vote", "bjp", "amit malviya", "deepak mhaske"]):
         return "Politics"
         
-    # Health (स्वास्थ्य)
+    # Health
     if "health" in feed_lower or "medical" in feed_lower:
         return "Health"
     if match_words(["health", "mental", "doctor", "cancer", "vaccine", "disease", "fitness", "nutrition", "diet"]):
         return "Health"
         
-    # Automobile (ऑटोमोबाइल)
+    # Automobile
     if "motor" in feed_lower or "auto" in feed_lower:
         return "Automobile"
     if match_words(["car", "suv", "vehicle", "electric vehicle", "ev", "tesla", "engine", "motorcycle", "bike", "polestar", "volvo", "ferrari", "porsche", "ford", "bmw", "audi"]):
@@ -462,17 +459,42 @@ Strict Instructions:
 <p>[EXTREMELY DETAILED conclusion in Hindi - minimum 150 words]</p>
 """
 
-    # 🌟 ENGINE 1: Hugging Face (Qwen 2.5 7B Instruct - सुपर फ़ास्ट और स्टेबल)
+    # 🌟 ENGINE 1: Hugging Face (Qwen 2.5 7B) - cURL IP Bypass
     if HF_TOKEN:
         print("🧠 Engine 1: Calling Hugging Face (Qwen 2.5 7B)...")
         try:
+            # ✅ cURL IP Bypass - Direct AWS IP
+            curl_cmd = f"""curl -s -X POST https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct \
+                --resolve api-inference.huggingface.co:443:104.18.22.48 \
+                -H "Authorization: Bearer {HF_TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d '{{"inputs": "<|im_start|>system\\nYou are a professional news editor writing detailed HTML output in Hinglish.<|im_end|>\\n<|im_start|>user\\n{prompt}<|im_end|>\\n<|im_start|>assistant\\n", "parameters": {{"max_new_tokens": 1200, "temperature": 0.7}}}}'"""
+            
+            result = subprocess.run(shlex.split(curl_cmd), capture_output=True, text=True, timeout=45)
+            
+            if result.returncode == 0 and result.stdout:
+                try:
+                    data = json.loads(result.stdout)
+                    if isinstance(data, list) and len(data) > 0:
+                        generated_text = data[0].get("generated_text", "")
+                        if "<|im_start|>assistant" in generated_text:
+                            generated_text = generated_text.split("<|im_start|>assistant")[-1].strip()
+                        clean_html = generated_text.replace("<|im_end|>", "").strip()
+                        if "<h3>" in clean_html:
+                            print("✅ Engine 1 (Hugging Face cURL) successfully generated content!")
+                            return clean_html
+                except json.JSONDecodeError:
+                    pass
+            print("⚠️ Engine 1 cURL failed, trying direct request...")
+            
+            # ✅ Direct Request Fallback
             api_url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct"
             headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
             payload = {
                 "inputs": f"<|im_start|>system\nYou are a professional news editor writing detailed HTML output in Hinglish.<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n",
                 "parameters": {"max_new_tokens": 1200, "temperature": 0.7}
             }
-            res = requests.post(api_url, json=payload, headers=headers, timeout=40)
+            res = requests.post(api_url, json=payload, headers=headers, timeout=45)
             if res.status_code == 200:
                 result = res.json()
                 if isinstance(result, list) and len(result) > 0:
@@ -481,13 +503,31 @@ Strict Instructions:
                         generated_text = generated_text.split("<|im_start|>assistant")[-1].strip()
                     clean_html = generated_text.replace("<|im_end|>", "").strip()
                     if "<h3>" in clean_html:
-                        print("✅ Engine 1 (Hugging Face) successfully generated content!")
+                        print("✅ Engine 1 (Hugging Face direct) successfully generated content!")
                         return clean_html
-            print(f"⚠️ Engine 1 Status: {res.status_code}, trying Engine 2...")
+            elif res.status_code == 503:
+                try:
+                    wait_time = res.json().get("estimated_time", 25)
+                    print(f"⏳ Model loading, waiting {wait_time}s...")
+                    time.sleep(wait_time + 5)
+                    res = requests.post(api_url, json=payload, headers=headers, timeout=45)
+                    if res.status_code == 200:
+                        result = res.json()
+                        if isinstance(result, list) and len(result) > 0:
+                            generated_text = result[0].get("generated_text", "")
+                            if "<|im_start|>assistant" in generated_text:
+                                generated_text = generated_text.split("<|im_start|>assistant")[-1].strip()
+                            clean_html = generated_text.replace("<|im_end|>", "").strip()
+                            if "<h3>" in clean_html:
+                                print("✅ Engine 1 (Hugging Face after wait) successfully generated content!")
+                                return clean_html
+                except:
+                    pass
+            print(f"⚠️ Engine 1 Status: {res.status_code if 'res' in locals() else 'Failed'}, trying Engine 2...")
         except Exception as e:
             print(f"⚠️ Engine 1 Error: {e}, trying Engine 2...")
 
-    # 🌟 ENGINE 2: Google Gemini 1.5 Flash (अनब्लॉक बैकअप)
+    # 🌟 ENGINE 2: Google Gemini 1.5 Flash
     if GEMINI_API:
         print("🧠 Engine 2: Calling Google Gemini 1.5 Flash...")
         try:
@@ -509,11 +549,11 @@ Strict Instructions:
         except Exception as e:
             print(f"⚠️ Engine 2 Error: {e}, trying Engine 3...")
 
-    # 🌟 ENGINE 3: Pollinations AI (मुफ़्त बैकअप - 100% अनब्लॉक और टोकन-फ्री)
+    # 🌟 ENGINE 3: Pollinations AI
     print("🧠 Engine 3: Calling Pollinations AI (Backup)...")
     try:
-        api_url = "https://text.pollinations.ai"  # No trailing slash (404 fixed)
-        model = "llama"  # Llama-3-70B
+        api_url = "https://text.pollinations.ai"
+        model = "llama"
         payload = {
             "messages": [
                 {"role": "system", "content": "You are a professional news editor writing HTML output in Hinglish. Write detailed articles."},
@@ -537,19 +577,16 @@ Strict Instructions:
 def generate_dynamic_content(title, full_content, category):
     """AI से Content Generate करे, नहीं तो DETAILED Fallback Template"""
     
-    # पहले AI try करो (Hugging Face -> Gemini -> Pollinations)
     ai_content = ask_ai_for_news(title, full_content, category)
     if ai_content:
         return ai_content
     
-    # AI fail हो तो DETAILED Fallback Template
     print("🔄 Using detailed fallback template...")
     today = get_current_date()
     clean_title = clean_and_format_title(title)
     first_para = full_content[:500] if full_content else ""
     more_content = full_content[500:1000] if len(full_content) > 500 else ""
     
-    # Category-wise DETAILED Highlights (8 points)
     if category == "Technology":
         highlights = [
             f"<li>💻 <strong>{clean_title[:50]}</strong> - टेक जगत में बड़ी खबर</li>",
@@ -645,7 +682,6 @@ def generate_dynamic_content(title, full_content, category):
 <p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं। यह {category} सेक्टर के लिए एक बड़ा बदलाव ला सकता है।</p>
 """
     
-    # DETAILED Introduction
     intro = f"""
 <h3>📝 परिचय - Introduction</h3>
 <p><strong>{clean_title}</strong></p>
@@ -654,26 +690,22 @@ def generate_dynamic_content(title, full_content, category):
 <p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।  यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
 """
 
-    # DETAILED Analysis
     analysis = f"""
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
 {analysis_detail}
 <p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है। विशेषज्ञों का मानना है कि इस {category}  सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
 """
 
-    # DETAILED Expert
     expert = f"""
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
 {expert_quote}
 """
 
-    # DETAILED Impact
     impact = f"""
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
 <p>इस खबर का {category}  सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है। आने वाले दिनों में और अपडेट आने की संभावना है।</p>
 """
 
-    # DETAILED Conclusion
     conclusion = f"""
 <h3>✅ निष्कर्ष - Conclusion</h3>
 <p>{clean_title} - यह {category}  सेक्टर के लिए एक महत्वपूर्ण विकास है।</p>
@@ -750,7 +782,6 @@ def main():
         if not value:
             all_loaded = False
     
-    # GEMINI_API की जाँच (वैकल्पिक)
     print(f"GEMINI_API: {'✅ LOADED (Using Google Gemini as Backup Engine)' if GEMINI_API else '⚠️ NOT MAPPED (Using Pollinations AI as Fallback Engine)'}")
     
     if not all_loaded:
@@ -868,7 +899,6 @@ def main():
     print("🤖 Generating detailed content...")
     ai_content = generate_long_content(title, full_content, category)
     
-    # ✅ Earning Button with ShrinkMe Link
     earning_button = f"""
     <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
         <a href="{short_link}" target="_blank" style="background:linear-gradient(135deg,#ff5722,#ff6f00);color:white;padding:20px 60px;text-decoration:none;font-size:22px;font-weight:bold;border-radius:50px;display:inline-block;text-transform:uppercase;box-shadow:0 4px 15px rgba(255,87,34,0.3);">
