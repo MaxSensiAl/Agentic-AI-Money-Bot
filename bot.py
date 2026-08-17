@@ -9,14 +9,45 @@ from datetime import datetime, timedelta
 import socket
 import xmlrpc.client
 import urllib3
-import ssl
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# --- SMART TCP REDIRECT PATCH (Google और अन्य Pings के लिए सुरक्षित) ---
+def apply_smart_connection_patch():
+    print("🌐 Initializing Smart TCP Connection Redirect Patch...")
+    import urllib3.util.connection as urllib3_connection
+    original_create_connection = urllib3_connection.create_connection
+
+    HARDCODED_IPS = {
+        "rpc.weblogs.com": "216.92.112.55",
+        "blogsearch.google.com": "142.250.190.46"
+    }
+
+    def patched_create_connection(address, *args, **kwargs):
+        host, port = address
+        if host in HARDCODED_IPS:
+            ip = HARDCODED_IPS[host]
+            print(f"🎯 Redirecting {host} connection to hardcoded IP: {ip}")
+            return original_create_connection((ip, port), *args, **kwargs)
+        return original_create_connection(address, *args, **kwargs)
+
+    urllib3_connection.create_connection = patched_create_connection
+    print("✅ Smart TCP Connection Redirect Patch applied globally")
+
+# पैच को लागू करें
+apply_smart_connection_patch()
+
+def fix_dns():
+    print("✅ Testing connection to Pollinations AI...")
+    try:
+        res = requests.get("https://text.pollinations.ai/", timeout=10)
+        print(f"✅ Pollinations AI reachable (Status Code: {res.status_code})")
+    except Exception as e:
+        print(f"⚠️ Connection check failed: {e}")
 
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
-HF_TOKEN = os.getenv('HF_TOKEN')
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
@@ -277,11 +308,11 @@ def detect_category(feed_url, title):
     
     if any(x in feed_lower for x in ["variety", "hollywood", "pinkvilla", "eonline"]):
         return "Entertainment"
-    if any(x in title_lower for x in ["movie", "film", "hollywood", "marvel", "dc", "disney", "lands", "rides"]):
+    if any(x in title_lower for x in ["movie", "film", "hollywood", "box office", "marvel", "dc", "disney", "lands", "rides", "spider-man", "spiderman"]):
         return "Entertainment"
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
-    if any(x in title_lower for x in ["galaxy", "planet", "star", "moon", "mars", "universe"]):
+    if any(x in title_lower for x in ["galaxy", "planet", "star", "moon", "mars", "universe", "cosmos"]):
         return "Space"
     if any(x in feed_lower for x in ["tech", "verge", "cnet"]):
         return "Technology"
@@ -295,103 +326,106 @@ def detect_category(feed_url, title):
         return "Business"
     return "News"
 
-# ✅ FINAL FIX: AI WITH SSL BYPASS
+# ✅ AI CONTENT GENERATOR (Pollinations AI - OpenAI GPT-4o-Mini)
 def ask_ai_for_news(title, full_content, category):
-    """SSL + DNS दोनों को बायपास करके AI से Content Generate करेगा"""
-    if not HF_TOKEN:
-        print("⚠️ HF_TOKEN missing")
-        return None
-    
-    print("🧠 Calling AI with SSL bypass...")
+    """Pollinations AI (GPT-4o-Mini) से 100% Unique और Unblocked Content Generate करेगा"""
+    print("🧠 Calling Pollinations AI for unique post-specific content...")
     try:
-        model = "mistralai/Mistral-7B-Instruct-v0.1"
+        # GPT-4o-Mini मॉडल का उपयोग जो अत्यंत बुद्धिमान और अनब्लॉक है
+        model = "openai" 
+        api_url = "https://text.pollinations.ai/"
         
-        # ✅ Hardcoded IP + Host Header
-        hf_ip = "104.18.22.48"
-        api_url = f"https://{hf_ip}/models/{model}"
-        
-        headers = {
-            "Authorization": f"Bearer {HF_TOKEN}",
-            "Content-Type": "application/json",
-            "Host": "api-inference.huggingface.co"
-        }
-        
-        prompt = f"""You are a professional News Journalist writing in Hinglish.
-Write a highly engaging article based on this news:
+        prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
+Write a highly engaging, SEO-friendly news article based on this news:
 Title: {title}
 Content: {full_content[:1500]}
 Category: {category}
 
-Output HTML structure:
+Strict Instructions:
+1. Write in natural Hinglish (blend of Hindi and English).
+2. Do not use generic placeholder sentences. Use actual names, facts, and details from the provided news.
+3. Generate a realistic and highly specific expert opinion quote about this exact event.
+4. Output the content using this exact HTML structure:
+
 <h3>📝 परिचय - Introduction</h3>
-<p>[English intro]</p>
-<p>[Hindi intro]</p>
+<p>[Detailed introduction in English based on the news content...]</p>
+<p>[Detailed introduction in Hindi based on the news content...]</p>
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
-  <li>• [Real fact 1]</li>
-  <li>• [Real fact 2]</li>
-  <li>• [Real fact 3]</li>
-  <li>• [Real fact 4]</li>
-  <li>• [Real fact 5]</li>
+  <li>[Specific highlight 1 containing real facts/names/scores from the news]</li>
+  <li>[Specific highlight 2 containing real facts/names from the news]</li>
+  <li>[Specific highlight 3 containing real facts/names from the news]</li>
+  <li>[Specific highlight 4 containing real facts/names from the news]</li>
+  <li>[Specific highlight 5 containing real facts/names from the news]</li>
 </ul>
 
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>[English analysis]</p>
-<p>[Hindi analysis]</p>
+<p>[Detailed analysis paragraph in English...]</p>
+<p>[Detailed analysis paragraph in Hindi...]</p>
 
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-<p>[Expert opinion]</p>
-<blockquote>"[Quote in Hindi]"</blockquote>
+<p>[Expert/Industry review in English...]</p>
+<p>[Expert/Industry review in Hindi...]</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"[A realistic, highly specific expert quote in Hindi about this event]"</p>
+</blockquote>
 
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>[Impact]</p>
+<p>[Impact in English...]</p>
+<p>[Impact in Hindi...]</p>
 
 <h3>✅ निष्कर्ष - Conclusion</h3>
-<p>[Conclusion]</p>
+<p>[Conclusion in Hindi...]</p>
+<p>[Conclusion in English...]</p>
 """
         
         payload = {
-            "inputs": prompt,
-            "parameters": {"max_new_tokens": 1500, "temperature": 0.7}
+            "messages": [
+                {"role": "system", "content": "You are a professional news editor writing HTML output in Hinglish."},
+                {"role": "user", "content": prompt}
+            ],
+            "model": model,
+            "jsonMode": False
         }
         
-        # ✅ SSL bypass
-        res = requests.post(
-            api_url, 
-            json=payload, 
-            headers=headers, 
-            timeout=60,
-            verify=False
-        )
+        res = requests.post(api_url, json=payload, timeout=50)
         
         if res.status_code == 200:
-            result = res.json()
-            if isinstance(result, list) and len(result) > 0:
-                text = result[0].get("generated_text", "")
-                if "<h3>" in text:
-                    print("✅ AI Success!")
-                    return text
-        else:
-            print(f"⚠️ Status: {res.status_code}")
-            
+            clean_html = res.text.strip()
+            if "<h3>" in clean_html:
+                print("✅ AI successfully generated unique content via Pollinations!")
+                return clean_html
+        print(f"⚠️ AI API Status: {res.status_code}, using fallback...")
     except Exception as e:
         print(f"⚠️ AI Error: {e}")
-    
     return None
 
 # ✅ DYNAMIC CONTENT GENERATOR
 def generate_dynamic_content(title, full_content, category):
+    """AI से Content Generate करे, नहीं तो Fallback Template"""
+    
+    # पहले AI try करो
     ai_content = ask_ai_for_news(title, full_content, category)
     if ai_content:
         return ai_content
     
+    # AI fail हो तो Fallback Template
     print("🔄 Using fallback template...")
     today = datetime.now().strftime("%B %d, %Y")
     clean_title = clean_and_format_title(title)
     first_para = full_content[:500] if full_content else ""
     
-    if category == "Entertainment":
+    # Category-wise REAL Highlights
+    if category == "Sports":
+        highlights = [
+            f"<li>🏏 <strong>{clean_title[:50]}</strong> - मैच का सबसे बड़ा मोमेंट</li>",
+            f"<li>⭐ <strong>स्टार प्रदर्शन:</strong> {first_para[:60]}...</li>",
+            f"<li>📊 <strong>मैच विश्लेषण:</strong> टीम ने शानदार प्रदर्शन किया</li>",
+            f"<li>🏆 <strong>ऐतिहासिक जीत:</strong> यह टीम के लिए एक बड़ी उपलब्धि है</li>",
+            f"<li>⚡ <strong>अहम मोमेंट्स:</strong> {first_para[50:120]}...</li>",
+        ]
+    elif category == "Entertainment":
         highlights = [
             f"<li>🎬 <strong>{clean_title[:50]}</strong> - एंटरटेनमेंट इंडस्ट्री की बड़ी खबर</li>",
             f"<li>⭐ <strong>स्टार कास्ट:</strong> {first_para[:60]}...</li>",
@@ -406,6 +440,14 @@ def generate_dynamic_content(title, full_content, category):
             f"<li>🔍 <strong>एनालिसिस:</strong> विशेषज्ञों की राय</li>",
             f"<li>💡 <strong>इंपैक्ट:</strong> इसका क्या प्रभाव होगा</li>",
             f"<li>🚀 <strong>फ्यूचर:</strong> आगे क्या होगा</li>",
+        ]
+    elif category == "Space":
+        highlights = [
+            f"<li>🚀 <strong>{clean_title[:50]}</strong> - अंतरिक्ष में बड़ी उपलब्धि</li>",
+            f"<li>🌌 <strong>नई खोज:</strong> {first_para[:60]}...</li>",
+            f"<li>🛰️ <strong>मिशन अपडेट:</strong> नासा की नई जानकारी</li>",
+            f"<li>🔭 <strong>रिसर्च:</strong> वैज्ञानिकों की खोज</li>",
+            f"<li>📡 <strong>सिग्नल:</strong> अंतरिक्ष से नए संकेत</li>",
         ]
     else:
         highlights = [
@@ -499,11 +541,11 @@ def post_to_blogger(access_token, title, content, category):
 def main():
     print("🤖 Starting Viral News AI Blogger Bot...")
     print(f"📅 {datetime.now().strftime('%B %d, %Y')}")
+    fix_dns()
     
     print("\n--- Checking Secrets ---")
     secrets = {
         "BLOG_ID": BLOG_ID,
-        "HF_TOKEN": HF_TOKEN,
         "SHRINKME_API": SHRINKME_API,
         "BC_CLIENT_ID": BC_CLIENT_ID,
         "BC_CLIENT_SECRET": BC_CLIENT_SECRET,
@@ -628,6 +670,7 @@ def main():
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
+    # Generate DYNAMIC content
     print("🤖 Generating dynamic content...")
     ai_content = generate_long_content(title, full_content, category)
     
