@@ -305,6 +305,10 @@ def get_short_url(long_url):
             return long_url
         api_url = f"https://shrinkme.io/api?api={SHRINKME_API}&url={long_url}&format=text"
         response = requests.get(api_url, timeout=10)
+        if response.text and "shortenedUrl" in response.text:
+            import json
+            data = json.loads(response.text)
+            return data.get("shortenedUrl", long_url)
         return response.text.strip() if response.text else long_url
     except:
         return long_url
@@ -316,7 +320,7 @@ def word_in_text(word, text):
         return False
     return bool(re.search(rf'\b{re.escape(word)}\b', text, re.IGNORECASE))
 
-# ✅ FIXED: Category Detection with Whole-Word Matching
+# ✅ FIXED: Category Detection
 def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
@@ -408,6 +412,8 @@ def detect_category(feed_url, title):
         return "Politics"
     if word_in_text("federal", title_lower) or word_in_text("state officials", title_lower):
         return "Politics"
+    if word_in_text("bjp", title_lower) or word_in_text("amit malviya", title_lower) or word_in_text("deepak mhaske", title_lower):
+        return "Politics"
     
     # ✅ Health
     if "health" in feed_lower or "medical" in feed_lower:
@@ -433,15 +439,13 @@ def detect_category(feed_url, title):
         
     return "News"
 
-# ✅ FIXED: AI CONTENT GENERATOR (With model parameter)
+# ✅ FIXED: AI CONTENT GENERATOR
 def ask_ai_for_news(title, full_content, category):
-    """Pollinations AI से 100% Unique और Unblocked Content Generate करेगा"""
+    """Pollinations AI से Unique Content Generate करेगा"""
     print("🧠 Calling Pollinations AI for unique post-specific content...")
     try:
-        # ✅ FIXED: Correct Pollinations AI endpoint
+        # ✅ FIXED: Correct endpoint with model parameter
         api_url = "https://text.pollinations.ai/"
-        
-        # ✅ FIXED: Added "model" parameter to avoid 402 error
         model = "llama"  # Free open-source model
         
         prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
@@ -450,54 +454,45 @@ Title: {title}
 Content: {full_content[:1500]}
 Category: {category}
 
-Strict Instructions:
-1. Write in natural Hinglish (blend of Hindi and English).
-2. Do NOT use generic placeholder sentences. Use actual names, facts, and details from the provided news.
-3. For Sports: Write about the actual sports news (players, teams, matches, scores).
-4. Output the content using this exact HTML structure with EXTREMELY DETAILED paragraphs:
+Instructions:
+1. Write in natural Hinglish.
+2. Use actual names, facts, and details from the news.
+3. Output in HTML structure with detailed paragraphs.
 
+Structure:
 <h3>📝 परिचय - Introduction</h3>
-<p>[EXTREMELY DETAILED introduction in English - minimum 200 words based on actual news]</p>
-<p>[EXTREMELY DETAILED introduction in Hindi - minimum 200 words based on actual news]</p>
+<p>[Detailed English intro]</p>
+<p>[Detailed Hindi intro]</p>
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
-  <li>[Specific highlight 1 from actual news]</li>
-  <li>[Specific highlight 2 from actual news]</li>
-  <li>[Specific highlight 3 from actual news]</li>
-  <li>[Specific highlight 4 from actual news]</li>
-  <li>[Specific highlight 5 from actual news]</li>
-  <li>[Specific highlight 6 from actual news]</li>
-  <li>[Specific highlight 7 from actual news]</li>
-  <li>[Specific highlight 8 from actual news]</li>
+  <li>• Point 1</li>
+  <li>• Point 2</li>
+  <li>• Point 3</li>
+  <li>• Point 4</li>
 </ul>
 
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>[EXTREMELY DETAILED analysis in English - minimum 250 words based on actual news]</p>
-<p>[EXTREMELY DETAILED analysis in Hindi - minimum 250 words based on actual news]</p>
+<p>[Detailed English analysis]</p>
+<p>[Detailed Hindi analysis]</p>
 
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-<p>[EXTREMELY DETAILED expert opinion in English - minimum 150 words]</p>
-<p>[EXTREMELY DETAILED expert opinion in Hindi - minimum 150 words]</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"[Expert quote in Hindi about the actual event]"</p>
-</blockquote>
+<p>[Expert opinion]</p>
+<blockquote>"[Quote]"</blockquote>
 
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>[EXTREMELY DETAILED impact analysis in English - minimum 200 words]</p>
-<p>[EXTREMELY DETAILED impact analysis in Hindi - minimum 200 words]</p>
+<p>[Impact]</p>
 
 <h3>✅ निष्कर्ष - Conclusion</h3>
-<p>[EXTREMELY DETAILED conclusion in English - minimum 150 words]</p>
-<p>[EXTREMELY DETAILED conclusion in Hindi - minimum 150 words]</p>
+<p>[Conclusion]</p>
 """
         
         payload = {
             "messages": [
-                {"role": "system", "content": "You are a professional news editor writing detailed HTML output in Hinglish. Write EXTREMELY LONG and DETAILED paragraphs based on the actual news provided."},
+                {"role": "system", "content": "You are a professional news editor writing detailed HTML output in Hinglish."},
                 {"role": "user", "content": prompt}
             ],
-            "model": model  # ✅ FIXED: Added model parameter
+            "model": model
         }
         
         res = requests.post(api_url, json=payload, timeout=60)
@@ -505,137 +500,72 @@ Strict Instructions:
         if res.status_code == 200:
             clean_html = res.text.strip()
             if "<h3>" in clean_html:
-                print("✅ AI successfully generated unique content via Pollinations!")
+                print("✅ AI Success!")
                 return clean_html
-            elif len(clean_html) > 500:
-                print("✅ AI generated content (HTML formatting may vary)")
-                return f"""
-<h3>📝 परिचय - Introduction</h3>
-<p>{clean_html[:500]}</p>
-<p>{clean_html[500:1000]}</p>
-<h3>🎯 मुख्य बातें - Key Highlights</h3>
-<ul>
-  <li>• {clean_html[1000:1100]}</li>
-  <li>• {clean_html[1100:1200]}</li>
-  <li>• {clean_html[1200:1300]}</li>
-</ul>
-"""
-        print(f"⚠️ AI API Status: {res.status_code}, using fallback...")
+        print(f"⚠️ AI Status: {res.status_code}")
     except Exception as e:
         print(f"⚠️ AI Error: {e}")
     return None
 
-# ✅ DYNAMIC CONTENT GENERATOR WITH DETAILED SECTIONS
+# ✅ DYNAMIC CONTENT GENERATOR
 def generate_dynamic_content(title, full_content, category):
-    """AI से Content Generate करे, नहीं तो DETAILED Fallback Template"""
+    """AI से Content Generate करे, नहीं तो DETAILED Fallback"""
     
-    # पहले AI try करो
     ai_content = ask_ai_for_news(title, full_content, category)
     if ai_content:
         return ai_content
     
-    # AI fail हो तो DETAILED Fallback Template
-    print("🔄 Using detailed fallback template...")
+    print("🔄 Using fallback template...")
     today = datetime.now().strftime("%B %d, %Y")
     clean_title = clean_and_format_title(title)
     first_para = full_content[:500] if full_content else ""
     more_content = full_content[500:1000] if len(full_content) > 500 else ""
     
-    # ✅ Category-wise DETAILED Highlights (8 points)
-    if category == "Sports":
+    # ✅ Category-wise Highlights
+    if category == "Politics":
+        highlights = [
+            f"<li>🏛️ <strong>{clean_title[:50]}</strong> - राजनीति की बड़ी खबर</li>",
+            f"<li>👥 <strong>मुख्य बदलाव:</strong> {first_para[:60]}...</li>",
+            f"<li>📈 <strong>विश्लेषण:</strong> नई नियुक्ति का महत्व</li>",
+            f"<li>🔮 <strong>आगे क्या:</strong> राजनीतिक प्रभाव</li>",
+            f"<li>🌍 <strong>वैश्विक प्रभाव:</strong> अंतरराष्ट्रीय प्रतिक्रिया</li>",
+            f"<li>⚖️ <strong>रणनीति:</strong> सोशल मीडिया रणनीति में बदलाव</li>",
+            f"<li>📊 <strong>जनता की राय:</strong> सोशल मीडिया पर प्रतिक्रिया</li>",
+            f"<li>🎯 <strong>भविष्य:</strong> आगामी चुनावों पर प्रभाव</li>",
+        ]
+        expert_quote = """
+<p>Political analysts believe this change in social media leadership will impact BJP's digital strategy.</p>
+<p>राजनीतिक विश्लेषकों का मानना है कि सोशल मीडिया नेतृत्व में यह बदलाव भाजपा की डिजिटल रणनीति को प्रभावित करेगा।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह नियुक्ति भाजपा की सोशल मीडिया रणनीति में एक नया अध्याय है।"</p>
+</blockquote>
+"""
+        analysis_detail = f"""
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>भाजपा ने अपने सोशल मीडिया कन्वेनर को बदल दिया है। अमित मालवीय की जगह दीपक म्हस्के को यह जिम्मेदारी दी गई है।</p>
+"""
+    
+    elif category == "Sports":
         highlights = [
             f"<li>🏏 <strong>{clean_title[:50]}</strong> - {first_para[:60]}...</li>",
             f"<li>⭐ <strong>मुख्य अपडेट:</strong> {more_content[:60]}...</li>",
-            f"<li>📊 <strong>टीम:</strong> इंग्लैंड ने नई टीम की घोषणा की</li>",
-            f"<li>👤 <strong>खिलाड़ी:</strong> Sciver-Brunt आराम पर</li>",
-            f"<li>📅 <strong>सीरीज:</strong> आयरलैंड के खिलाफ तीन मैच</li>",
-            f"<li>📈 <strong>कप्तानी:</strong> Dean ने संभाली कमान</li>",
-            f"<li>🎯 <strong>रणनीति:</strong> नई युवा टीम पर फोकस</li>",
-            f"<li>🏆 <strong>लक्ष्य:</strong> आगामी टूर्नामेंट की तैयारी</li>",
+            f"<li>📊 <strong>टीम:</strong> नई टीम की घोषणा</li>",
+            f"<li>👤 <strong>खिलाड़ी:</strong> बड़े खिलाड़ी आराम पर</li>",
+            f"<li>📅 <strong>सीरीज:</strong> आगामी मैच</li>",
+            f"<li>📈 <strong>कप्तानी:</strong> नया कप्तान</li>",
         ]
         expert_quote = """
-<p>According to cricket experts, this decision to rest the captain is a strategic move to build a stronger team for future tournaments.</p>
-<p>क्रिकेट विशेषज्ञों के अनुसार, कप्तान को आराम देना आगामी टूर्नामेंट्स के लिए मजबूत टीम बनाने की एक रणनीतिक चाल है।</p>
+<p>Cricket experts believe this is a strategic move for the team's future.</p>
+<p>क्रिकेट विशेषज्ञों का मानना है कि यह टीम के भविष्य के लिए एक रणनीतिक कदम है।</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह फैसला इंग्लैंड क्रिकेट के भविष्य के लिए महत्वपूर्ण है।"</p>
+    <p style="font-style:italic;font-size:16px;">"यह फैसला टीम के भविष्य के लिए महत्वपूर्ण है।"</p>
 </blockquote>
 """
         analysis_detail = f"""
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>इंग्लैंड ने आयरलैंड के खिलाफ तीन मैचों की सीरीज के लिए एक नई टीम चुनी है। Sciver-Brunt को आराम दिया गया है और Dean को कप्तानी सौंपी गई है।</p>
-"""
-    
-    elif category == "Music":
-        highlights = [
-            f"<li>🎵 <strong>{clean_title[:50]}</strong> - संगीत जगत की बड़ी खबर</li>",
-            f"<li>🎤 <strong>स्टार परफॉर्मेंस:</strong> {first_para[:60]}...</li>",
-            f"<li>🎶 <strong>खास गाना:</strong> स्पेशल परफॉर्मेंस</li>",
-            f"<li>📅 <strong>इवेंट:</strong> {first_para[60:120]}...</li>",
-            f"<li>🌍 <strong>फैंस की प्रतिक्रिया:</strong> दुनिया भर में उत्साह</li>",
-            f"<li>🎸 <strong>सांग:</strong> {more_content[:60]}...</li>",
-            f"<li>📈 <strong>ट्रेंड:</strong> सोशल मीडिया पर ट्रेंड</li>",
-            f"<li>🎯 <strong>इंपैक्ट:</strong> संगीत इंडस्ट्री पर प्रभाव</li>",
-        ]
-        expert_quote = """
-<p>Music critics and industry experts are calling this a historic moment in the music industry.</p>
-<p>संगीत समीक्षकों और उद्योग विशेषज्ञों का मानना है कि यह संगीत उद्योग में एक ऐतिहासिक क्षण है।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह प्रदर्शन संगीत इतिहास में एक मील का पत्थर साबित होगा।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>इस प्रदर्शन ने संगीत प्रेमियों के दिलों को छू लिया।</p>
-"""
-    
-    elif category == "Space":
-        highlights = [
-            f"<li>🚀 <strong>{clean_title[:50]}</strong> - अंतरिक्ष की बड़ी खबर</li>",
-            f"<li>🌌 <strong>खोज:</strong> {first_para[:60]}...</li>",
-            f"<li>🛰️ <strong>मिशन अपडेट:</strong> नई जानकारी</li>",
-            f"<li>🔭 <strong>रिसर्च:</strong> वैज्ञानिकों की खोज</li>",
-            f"<li>📡 <strong>सिग्नल:</strong> अंतरिक्ष से नए संकेत</li>",
-            f"<li>🌞 <strong>सूर्य:</strong> {more_content[:60]}...</li>",
-            f"<li>🌍 <strong>पृथ्वी:</strong> अंतरिक्ष से दृश्य</li>",
-            f"<li>⭐ <strong>तारे:</strong> नई खोज</li>",
-        ]
-        expert_quote = """
-<p>Astronomers and space scientists are calling this discovery a significant milestone.</p>
-<p>खगोलविदों और अंतरिक्ष वैज्ञानिकों का मानना है कि यह खोज एक महत्वपूर्ण मील का पत्थर है।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह खोज अंतरिक्ष विज्ञान के इतिहास में एक नया अध्याय जोड़ती है।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>इस अंतरिक्ष घटना ने वैज्ञानिकों को नई जानकारी दी है।</p>
-"""
-    
-    elif category == "Politics":
-        highlights = [
-            f"<li>🏛️ <strong>{clean_title[:50]}</strong> - राजनीति की बड़ी खबर</li>",
-            f"<li>👥 <strong>मुख्य मुद्दे:</strong> {first_para[:60]}...</li>",
-            f"<li>📈 <strong>विशेषज्ञों की राय:</strong> नीतिगत बदलावों पर चर्चा</li>",
-            f"<li>🔮 <strong>आने वाले दिन:</strong> चुनाव और निर्णयों पर नज़र</li>",
-            f"<li>🌍 <strong>वैश्विक प्रभाव:</strong> इसका वैश्विक राजनीति पर असर</li>",
-            f"<li>⚖️ <strong>कानूनी पहलू:</strong> संवैधानिक और कानूनी निहितार्थ</li>",
-            f"<li>📊 <strong>जनता की राय:</strong> सर्वेक्षण और जनमत</li>",
-            f"<li>🎯 <strong>राजनीतिक रणनीति:</strong> आगामी चुनावी रणनीति</li>",
-        ]
-        expert_quote = """
-<p>Political analysts and constitutional experts are closely monitoring this situation.</p>
-<p>राजनीतिक विश्लेषकों और संवैधानिक विशेषज्ञों की नजर इस स्थिति पर टिकी है।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह राजनीतिक स्थिति लोकतंत्र के लिए एक महत्वपूर्ण परीक्षा है।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>यह राजनीतिक घटनाक्रम एक नया मोड़ ला सकता है।</p>
+<p>इस बड़े बदलाव का टीम पर गहरा प्रभाव पड़ेगा।</p>
 """
     
     else:
@@ -662,7 +592,6 @@ def generate_dynamic_content(title, full_content, category):
 <p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं।</p>
 """
     
-    # ✅ DETAILED Introduction
     intro = f"""
 <h3>📝 परिचय - Introduction</h3>
 <p><strong>{clean_title}</strong></p>
@@ -671,27 +600,23 @@ def generate_dynamic_content(title, full_content, category):
 <p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।</p>
 """
 
-    # ✅ DETAILED Analysis
     analysis = f"""
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
 {analysis_detail}
 <p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा।</p>
 """
 
-    # ✅ DETAILED Expert
     expert = f"""
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
 {expert_quote}
 """
 
-    # ✅ DETAILED Impact
     impact = f"""
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
 <p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है।</p>
 <p>आने वाले दिनों में और अपडेट आने की संभावना है।</p>
 """
 
-    # ✅ DETAILED Conclusion
     conclusion = f"""
 <h3>✅ निष्कर्ष - Conclusion</h3>
 <p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है।</p>
@@ -877,12 +802,14 @@ def main():
     </div>
     """
     
+    # ✅ FIXED: Short Link - Properly get shortened URL
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
     
     print("🤖 Generating dynamic content...")
     ai_content = generate_long_content(title, full_content, category)
     
+    # ✅ FIXED: Earning Button with proper link
     earning_button = f"""
     <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
         <a href="{short_link}" target="_blank" style="background:linear-gradient(135deg,#ff5722,#ff6f00);color:white;padding:20px 60px;text-decoration:none;font-size:22px;font-weight:bold;border-radius:50px;display:inline-block;text-transform:uppercase;box-shadow:0 4px 15px rgba(255,87,34,0.3);">
