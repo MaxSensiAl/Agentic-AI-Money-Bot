@@ -13,14 +13,12 @@ import urllib3.util.connection as urllib3_connection
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SMART TCP REDIRECT PATCH (Hugging Face, Google और अन्य Pings के लिए) ---
+# --- SMART TCP REDIRECT PATCH (Google, Pings और अन्य Pings के लिए) ---
 def apply_smart_connection_patch():
     print("🌐 Initializing Smart TCP Connection Redirect Patch...")
     original_create_connection = urllib3_connection.create_connection
 
     HARDCODED_IPS = {
-        "api-inference.huggingface.co": "104.18.22.48",
-        "huggingface.co": "104.18.22.48",
         "rpc.weblogs.com": "216.92.112.55",
         "blogsearch.google.com": "142.250.190.46"
     }
@@ -50,8 +48,6 @@ def fix_dns():
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
-HF_TOKEN = os.getenv('HF_TOKEN')
-GEMINI_API = os.getenv('GEMINI_API')
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
@@ -59,7 +55,7 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL')
 
-# --- 🇮🇳 INDIA-FOCUSED RSS FEEDS (Trending India News) ---
+# --- INDIA-FOCUSED RSS FEEDS (11 Diverse Categories) ---
 RSS_FEEDS = [
     # 🇮🇳 भारत की मुख्य राजनीति और ब्रेकिंग न्यूज़
     "https://feeds.feedburner.com/ndtvnews-top-stories",
@@ -84,7 +80,7 @@ RSS_FEEDS = [
     "https://www.bollywoodhungama.com/feed/",
     "https://www.filmibeat.com/rss/bollywood.xml",
     
-    # 🚀 विज्ञान और वैश्विक टेक समाचार
+    # 🚀 विज्ञान, टेक्नोलॉजी और गैजेट लॉन्च
     "https://techcrunch.com/feed/",
     "https://www.theverge.com/rss/index.xml",
     "https://www.gadgets360.com/rss/news"
@@ -96,7 +92,7 @@ UNSPLASH_IMAGES = {
     "Gaming": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
     "Entertainment": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80",
     "Space": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
-    "Sports": "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80",
+    "Sports": "https://images.unsplash.com/photo-1531415074968-036ba1b775da?auto=format&fit=crop&w=1200&q=80",
     "Business": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80",
     "Music": "https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1200&q=80",
     "Politics": "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=1200&q=80",
@@ -330,12 +326,13 @@ def get_short_url(long_url):
     except:
         return long_url
 
+# Word Boundary Function
 def word_in_text(word, text):
     if not text:
         return False
     return bool(re.search(rf'\b{re.escape(word)}\b', text, re.IGNORECASE))
 
-# ✅ INDIA-FOCUSED CATEGORY DETECTION
+# ✅ 11 DIVERSE INDIA-FOCUSED CATEGORIES DETECTION (Anti-Collision Fixed)
 def detect_category(feed_url, title):
     feed_lower = feed_url.lower()
     title_lower = title.lower()
@@ -370,10 +367,10 @@ def detect_category(feed_url, title):
     if match_words(["stocks", "inflation", "market", "economy", "trade", "finance", "investing", "crypto", "rupee", "gdp", "nifty", "sensex"]):
         return "Business"
     
-    # 🚀 Technology
+    # 🚀 Technology & Mobile Launch
     if any(x in feed_lower for x in ["techcrunch", "theverge", "gadgets360"]):
         return "Technology"
-    if match_words(["smartphone", "apple", "samsung", "software", "chatgpt", "iphone", "gadget", "spyware", "cybersecurity", "ai", "google", "microsoft"]):
+    if match_words(["smartphone", "apple", "samsung", "software", "chatgpt", "iphone", "gadget", "spyware", "cybersecurity", "ai", "google", "microsoft", "oneplus", "xiaomi", "redmi", "realme", "launch", "chipset", "processor"]):
         return "Technology"
     
     # 🎮 Gaming
@@ -382,20 +379,36 @@ def detect_category(feed_url, title):
     if match_words(["nintendo", "xbox", "playstation", "ps5", "gta", "gamer", "gameplay", "castlevania", "minecraft", "fortnite"]):
         return "Gaming"
     
-    # 🚗 Automobile
-    if match_words(["car", "suv", "vehicle", "electric vehicle", "ev", "tesla", "engine", "motorcycle", "bike", "toyota", "hyundai", "maruti", "tata", "mahindra"]):
+    # 🚗 Automobile & Car Launch
+    if match_words(["car", "suv", "vehicle", "electric vehicle", "ev", "tesla", "engine", "motorcycle", "bike", "toyota", "hyundai", "maruti", "tata", "mahindra", "honda", "suzuki", "sedan", "launch"]):
         return "Automobile"
+    
+    # 🌌 Space (ISRO/NASA)
+    if "space" in feed_lower or "nasa" in feed_lower:
+        return "Space"
+    if match_words(["isro", "nasa", "spacex", "satellite", "rocket", "chandrayaan", "gaganyaan", "galaxy", "planet", "moon", "mars", "universe", "cosmos", "astronaut", "asteroid"]):
+        return "Space"
+
+    # 🎵 Music
+    if match_words(["music", "album", "song", "singer", "concert", "tour", "spotify", "billboard", "grammy"]):
+        return "Music"
+
+    # 🩺 Health & Medicine
+    if "health" in feed_lower or "medical" in feed_lower:
+        return "Health"
+    if match_words(["health", "mental", "doctor", "cancer", "vaccine", "disease", "fitness", "nutrition", "diet", "virus", "outbreak", "fda", "covid"]):
+        return "Health"
     
     return "News"
 
 # --- CORE SINGLE-ENGINE ORCHESTRATOR ---
 def call_ai_engine(prompt):
-    """सुरक्षित, 100% अनब्लॉक और पेमेंट-फ्री एआई कनेक्टर (Llama-3-70B Raw POST)"""
+    """सुरक्षित, 100% अनब्लॉक और पेमेंट-फ्री एआई कनेक्टर (OpenAI-Compatible Llama-3-70B POST)"""
     try:
-        # ✅ एंडपॉइंट को सीधे बिना किसी आखिरी स्लैश के सेट किया गया (404/402 FIXED)
-        api_url = "https://text.pollinations.ai"
+        # ✅ FIX: एंडपॉइंट को v1/chat/completions किया गया ताकि 404 एरर न आए
+        api_url = "https://text.pollinations.ai/v1/chat/completions"
         model = "llama"  # स्टेबल, फ्री और अनब्लॉक मॉडल
-        
+
         payload = {
             "messages": [
                 {"role": "system", "content": "You are a professional Hindi/English news editor. You write extremely detailed, unique, and engaging news articles. Respond directly with the HTML content."},
@@ -406,7 +419,9 @@ def call_ai_engine(prompt):
         
         res = requests.post(api_url, json=payload, timeout=60)
         if res.status_code == 200:
-            clean_text = res.text.strip()
+            data = res.json()
+            # सही JSON ऑब्जेक्ट पार्सिंग
+            clean_text = data["choices"][0]["message"]["content"].strip()
             # किसी भी तरह के अनचाहे एआई फॉर्मेटिंग ब्लॉक्स को साफ़ करें
             clean_text = clean_text.replace("```html", "").replace("```", "").strip()
             if len(clean_text) > 100:
@@ -524,6 +539,119 @@ Format exactly as HTML:
     # तीनों पार्ट्स को जोड़ना
     combined_content = f"{section_1}\n{section_2}\n{section_3}"
     return viral_title, combined_content
+
+# DYNAMIC FALLBACK SYSTEM (यदि तीनों AI इंजन फेल हो जाएं)
+def get_detailed_fallback_content(title, full_content, category):
+    print("🔄 Using detailed fallback template...")
+    today = get_current_date()
+    clean_title = clean_and_format_title(title)
+    first_para = full_content[:500] if full_content else ""
+    more_content = full_content[500:1000] if len(full_content) > 500 else ""
+    
+    # Category-wise Highlights
+    if category == "Sports":
+        highlights = [
+            f"<li>🏏 <strong>{clean_title[:50]}</strong> - खेल जगत की बड़ी खबर</li>",
+            f"<li>⭐ <strong>मुख्य घटना:</strong> {first_para[:60]}...</li>",
+            f"<li>📊 <strong>विश्लेषण:</strong> {more_content[:60]}...</li>",
+            f"<li>🏆 <strong>मैच अपडेट:</strong> ताज़ा जानकारी</li>",
+            f"<li>📈 <strong>आंकड़े:</strong> खिलाड़ियों के प्रदर्शन</li>",
+            f"<li>🎯 <strong>रणनीति:</strong> टीम की रणनीति</li>",
+            f"<li>🏅 <strong>खिलाड़ी:</strong> स्टार खिलाड़ियों का योगदान</li>",
+            f"<li>🇮🇳 <strong>इंडिया:</strong> भारतीय टीम का प्रदर्शन</li>",
+        ]
+        expert_quote = """
+<p>Sports experts believe this performance will boost team morale for upcoming tournaments.</p>
+<p>खेल विशेषज्ञों का मानना है कि यह प्रदर्शन आगामी टूर्नामेंट्स के लिए टीम का मनोबल बढ़ाएगा।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह जीत भारतीय क्रिकेट के लिए एक महत्वपूर्ण क्षण है।"</p>
+</blockquote>
+"""
+        analysis_detail = f"""
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>यह खेल घटनाक्रम भारतीय खेल जगत में चर्चा का विषय बना हुआ है।</p>
+"""
+    else:
+        highlights = [
+            f"<li>🔴 <strong>{clean_title[:50]}</strong> - आज की बड़ी खबर</li>",
+            f"<li>📰 <strong>विस्तार:</strong> {first_para[:60]}...</li>",
+            f"<li>📊 <strong>विश्लेषण:</strong> विशेषज्ञों की राय</li>",
+            f"<li>🔮 <strong>आगे क्या:</strong> आने वाले अपडेट</li>",
+            f"<li>🌍 <strong>ग्लोबल इंपैक्ट:</strong> दुनिया भर में प्रभाव</li>",
+            f"<li>🇮🇳 <strong>इंडिया:</strong> भारत पर क्या प्रभाव होगा</li>",
+            f"<li>📈 <strong>ट्रेंड:</strong> इस सेक्टर में रुझान</li>",
+            f"<li>🎯 <strong>फ्यूचर:</strong> आने वाला भविष्य</li>",
+        ]
+        expert_quote = f"""
+<p>Experts from around the world are weighing in on this significant development.</p>
+<p>दुनिया भर के विशेषज्ञ इस महत्वपूर्ण विकास पर अपनी राय दे रहे हैं।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर के इतिहास में एक महत्वपूर्ण मोड़ है।"</p>
+</blockquote>
+"""
+        analysis_detail = f"""
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं।</p>
+"""
+    
+    intro = f"""
+<h3>📝 परिचय - Introduction</h3>
+<p><strong>{clean_title}</strong></p>
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।</p>
+"""
+
+    analysis = f"""
+<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+{analysis_detail}
+<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा।</p>
+"""
+
+    expert = f"""
+<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
+{expert_quote}
+"""
+
+    impact = f"""
+<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
+<p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है।</p>
+<p>आने वाले दिनों में और अपडेट आने की संभावना है।</p>
+"""
+
+    conclusion = f"""
+<h3>✅ निष्कर्ष - Conclusion</h3>
+<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है।</p>
+<p>विशेषज्ञ इस बात पर सहमत हैं कि यह {category} के भविष्य को आकार देने वाला एक महत्वपूर्ण कदम है।</p>
+"""
+    
+    return f"""
+<h2>🚨 BREAKING NEWS: {clean_title}</h2>
+
+<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
+    <p><strong>📅 Published: {today}</strong></p>
+    <p><strong>📂 Category: {category}</strong></p>
+</div>
+
+{intro}
+
+<h3>🎯 मुख्य बातें - Key Highlights</h3>
+<ul>
+    {''.join(highlights)}
+</ul>
+
+{analysis}
+
+{expert}
+
+{impact}
+
+{conclusion}
+
+<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
+"""
 
 def post_to_blogger(access_token, title, content, category):
     try:
@@ -669,13 +797,15 @@ def main():
     print("🤖 Commencing Multi-Section Deep Generation...")
     ai_result = generate_super_long_content(raw_title, full_content, category)
     
-    if not ai_result:
-        print("❌ AI Content Generation failed completely!")
-        return
+    if ai_result:
+        viral_title, ai_content = ai_result
+        print(f"🔥 AI Generated Viral Title: {viral_title}")
+    else:
+        # ✅ FIX: यदि एआई पूरी तरह फेल हो जाए, तो क्रैश होने के बजाय डिटेल बैकअप लोड करे
+        print("⚠️ AI Content Generation failed completely! Switching to Detailed Fallback...")
+        viral_title = raw_title
+        ai_content = get_detailed_fallback_content(raw_title, full_content, category)
         
-    viral_title, ai_content = ai_result
-    print(f"🔥 AI Generated Viral Title: {viral_title}")
-    
     image_html = f"""
     <div style="text-align:center;margin-bottom:25px;">
         <img src='{image_url}' alt='{viral_title}' style='width:100%;max-width:800px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);'>
