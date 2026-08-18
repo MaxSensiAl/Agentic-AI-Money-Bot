@@ -327,111 +327,127 @@ def detect_category(feed_url, title):
                 return True
         return False
     
-    if any(x in feed_lower for x in ["ndtv", "indiatoday", "timesofindia", "thehindu", "hindustantimes", "news18", "business-standard"]):
-        if match_words(["election", "modi", "parliament", "politics", "minister", "government", "bjp", "congress", "rahul", "amit shah", "yogi", "kejriwal", "mamata"]):
+    if any(x in feed_lower for x in ["ndtv", "indiatoday", "timesofindia", "thehindu", "hindustantimes", "news18"]):
+        if match_words(["election", "modi", "parliament", "politics", "minister", "bjp", "congress"]):
             return "Politics"
         return "News"
     
     if "cric" in feed_lower or "sports" in feed_lower:
         return "Sports"
-    if match_words(["cricket", "century", "wicket", "odi", "test match", "ipl", "world cup", "kohli", "rohit", "dhoni", "bumrah"]):
+    if match_words(["cricket", "century", "wicket", "odi", "test", "ipl", "world cup", "kohli", "rohit"]):
         return "Sports"
     
     if any(x in feed_lower for x in ["pinkvilla", "bollywoodhungama", "filmibeat"]):
         return "Entertainment"
-    if match_words(["movie", "film", "bollywood", "hollywood", "actor", "actress", "song", "singer", "celebrity", "srk", "salman", "deepika", "alia", "ranbir"]):
+    if match_words(["movie", "film", "bollywood", "hollywood", "actor", "actress", "song", "singer", "celebrity", "kbc", "amitabh"]):
         return "Entertainment"
     
     if any(x in feed_lower for x in ["livemint", "economictimes"]):
         return "Business"
-    if match_words(["stocks", "inflation", "market", "economy", "finance", "rupee", "gdp", "nifty", "sensex"]):
+    if match_words(["stocks", "market", "economy", "finance", "nifty", "sensex"]):
         return "Business"
     
     if any(x in feed_lower for x in ["techcrunch", "theverge", "gadgets360"]):
         return "Technology"
-    if match_words(["smartphone", "apple", "samsung", "software", "chatgpt", "iphone", "gadget", "spyware", "cybersecurity", "ai", "google", "oneplus", "xiaomi", "launch"]):
+    if match_words(["smartphone", "apple", "samsung", "software", "chatgpt", "iphone", "gadget", "ai"]):
         return "Technology"
     
     if any(x in feed_lower for x in ["gamespot", "ign"]):
         return "Gaming"
-    if match_words(["nintendo", "xbox", "playstation", "ps5", "gta", "gamer", "gameplay", "castlevania", "minecraft", "fortnite"]):
+    if match_words(["nintendo", "xbox", "playstation", "ps5", "gta", "gaming"]):
         return "Gaming"
     
-    if match_words(["car", "suv", "vehicle", "electric vehicle", "ev", "tesla", "engine", "motorcycle", "bike", "toyota", "hyundai", "maruti", "tata", "mahindra", "honda"]):
+    if match_words(["car", "suv", "vehicle", "electric vehicle", "ev", "tesla", "toyota", "hyundai", "maruti", "tata"]):
         return "Automobile"
     
     if "space" in feed_lower or "nasa" in feed_lower:
         return "Space"
-    if match_words(["isro", "nasa", "spacex", "satellite", "rocket", "chandrayaan", "gaganyaan", "galaxy", "planet", "moon", "mars"]):
+    if match_words(["isro", "nasa", "spacex", "satellite", "rocket", "chandrayaan", "moon", "mars"]):
         return "Space"
 
-    if match_words(["music", "album", "song", "singer", "concert", "tour", "spotify"]):
+    if match_words(["music", "album", "song", "singer", "concert"]):
         return "Music"
 
     if "health" in feed_lower or "medical" in feed_lower:
         return "Health"
-    if match_words(["health", "mental", "doctor", "cancer", "vaccine", "disease", "fitness", "virus", "covid"]):
+    if match_words(["health", "doctor", "cancer", "vaccine", "disease", "fitness"]):
         return "Health"
     
     return "News"
 
-# ✅ AI CONTENT GENERATOR (Pollinations AI)
+# ✅ FIXED: AI CONTENT GENERATOR (Multiple Fallback)
 def call_ai_engine(prompt):
-    try:
-        api_url = "https://text.pollinations.ai/v1/chat/completions"
-        model = "llama"
-
-        payload = {
-            "messages": [
-                {"role": "system", "content": "You are a professional Hindi/English news editor. You write extremely detailed, unique, and engaging news articles. Respond directly with the HTML content."},
-                {"role": "user", "content": prompt}
-            ],
-            "model": model
-        }
+    """Multiple AI engines with fallback"""
+    engines = [
+        ("Pollinations", "https://text.pollinations.ai/v1/chat/completions", "llama"),
+        ("Pollinations Fallback", "https://text.pollinations.ai/v1/chat/completions", "mistral"),
+    ]
+    
+    for engine_name, api_url, model in engines:
+        try:
+            print(f"🧠 Trying {engine_name} with model: {model}...")
+            payload = {
+                "messages": [
+                    {"role": "system", "content": "You are a professional Hindi/English news editor. Write extremely detailed, unique, and engaging news articles with 3000+ words. Respond directly with HTML content."},
+                    {"role": "user", "content": prompt}
+                ],
+                "model": model
+            }
+            
+            res = requests.post(api_url, json=payload, timeout=60)
+            
+            if res.status_code == 200:
+                data = res.json()
+                clean_text = data["choices"][0]["message"]["content"].strip()
+                clean_text = clean_text.replace("```html", "").replace("```", "").strip()
+                if len(clean_text) > 200:
+                    print(f"✅ {engine_name} success!")
+                    return clean_text
+            else:
+                print(f"⚠️ {engine_name} Status: {res.status_code}")
+        except Exception as e:
+            print(f"⚠️ {engine_name} Error: {e}")
         
-        res = requests.post(api_url, json=payload, timeout=60)
-        if res.status_code == 200:
-            data = res.json()
-            clean_text = data["choices"][0]["message"]["content"].strip()
-            clean_text = clean_text.replace("```html", "").replace("```", "").strip()
-            if len(clean_text) > 100:
-                return clean_text
-        print(f"⚠️ AI API Connection Status: {res.status_code}")
-    except Exception as e:
-        print(f"⚠️ AI API Error: {e}")
+        time.sleep(2)
+    
     return None
 
-# ✅ SUPER LONG ARTICLE GENERATOR
-def generate_super_long_content(title, full_content, category):
-    print("🤖 Step 1: Generating Introduction & Highlights...")
-    prompt_1 = f"""Based on this trending news:
+# ✅ SUPER DETAILED ARTICLE GENERATOR (3000+ Words)
+def generate_super_detailed_content(title, full_content, category):
+    """Generate 3000+ words detailed article"""
+    print("🤖 Generating Super Detailed Article (3000+ words)...")
+    
+    # Step 1: Introduction + Highlights
+    prompt_1 = f"""Based on this news:
 Title: {title}
-Content: {full_content[:1500]}
+Content: {full_content[:2000]}
 Category: {category}
 
-Task:
-1. Generate an EXTREMELY catchy, viral title in Hindi/Hinglish. Put it inside [TITLE]...[/TITLE] brackets.
-2. Write a highly detailed, hooking Introduction (minimum 500 words) in English.
-3. Write a highly detailed, hooking Introduction (minimum 500 words) in natural Hinglish/Hindi.
-4. Write 8 highly specific, detailed Key Highlights with real facts from the news.
+Write a COMPLETE, EXTREMELY DETAILED article in Hinglish (Hindi + English).
 
-Format:
-[TITLE] Viral Title Here [/TITLE]
+FIRST, create a VIRAL TITLE inside [TITLE] tags.
+
+THEN create these sections with MINIMUM 500 words EACH:
+1. Introduction (English + Hindi)
+2. Key Highlights (8-10 specific points with real facts)
+
+Format exactly:
+[TITLE] Viral Hinglish Title Here [/TITLE]
 
 <h3>📝 परिचय - Introduction</h3>
-<p>[Detailed English intro...]</p>
-<p>[Detailed Hinglish/Hindi intro...]</p>
+<p>[Detailed introduction in English - minimum 500 words]</p>
+<p>[Detailed introduction in Hindi - minimum 500 words]</p>
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
-  <li>[Fact 1]</li>
-  <li>[Fact 2]</li>
-  <li>[Fact 3]</li>
-  <li>[Fact 4]</li>
-  <li>[Fact 5]</li>
-  <li>[Fact 6]</li>
-  <li>[Fact 7]</li>
-  <li>[Fact 8]</li>
+  <li>[Specific fact with numbers/names]</li>
+  <li>[Specific fact with numbers/names]</li>
+  <li>[Specific fact with numbers/names]</li>
+  <li>[Specific fact with numbers/names]</li>
+  <li>[Specific fact with numbers/names]</li>
+  <li>[Specific fact with numbers/names]</li>
+  <li>[Specific fact with numbers/names]</li>
+  <li>[Specific fact with numbers/names]</li>
 </ul>
 """
     section_1 = call_ai_engine(prompt_1)
@@ -439,117 +455,153 @@ Format:
         return None
 
     viral_title = title
-    title_match = re.search(r'\[TITLE\](.*?)\[/TITLE\]', section_1, re.IGNORECASE)
+    title_match = re.search(r'\[TITLE\](.*?)\[/TITLE\]', section_1, re.IGNORECASE | re.DOTALL)
     if title_match:
         viral_title = title_match.group(1).strip()
         section_1 = section_1.replace(title_match.group(0), "")
 
-    time.sleep(2)
+    time.sleep(3)
 
-    print("🤖 Step 2: Generating Analysis & Expert Opinions...")
+    # Step 2: Deep Analysis + Expert Opinions
+    print("🤖 Generating Deep Analysis & Expert Opinions...")
     prompt_2 = f"""Based on this news:
 Title: {title}
-Content: {full_content[:1500]}
+Content: {full_content[:2000]}
 Category: {category}
 
-Task:
-1. Write an EXTREMELY detailed analysis of the event (minimum 1000 words) in English.
-2. Write an EXTREMELY detailed analysis in Hinglish/Hindi (minimum 1000 words).
-3. Write an Expert Opinions section (minimum 300 words).
-4. Write a realistic, specific expert quote in Hindi.
+Write EXTREMELY DETAILED sections (MINIMUM 800 words EACH):
+
+1. Detailed Analysis in English (minimum 800 words - deep dive into the topic)
+2. Detailed Analysis in Hinglish/Hindi (minimum 800 words)
+3. Expert Opinions section with specific quotes (minimum 400 words)
 
 Format:
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>[Deep English analysis...]</p>
-<p>[Deep Hinglish/Hindi analysis...]</p>
+<p>[Deep analysis in English - minimum 800 words]</p>
+<p>[Deep analysis in Hinglish - minimum 800 words]</p>
 
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-<p>[Expert context in English...]</p>
-<p>[Expert context in Hinglish/Hindi...]</p>
+<p>[Expert context in English - minimum 200 words]</p>
+<p>[Expert context in Hinglish - minimum 200 words]</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"[Specific expert quote in Hindi]"</p>
+    <p style="font-style:italic;font-size:16px;">"[Specific expert quote in Hindi about this event]"</p>
 </blockquote>
 """
     section_2 = call_ai_engine(prompt_2)
     if not section_2:
         section_2 = ""
 
-    time.sleep(2)
+    time.sleep(3)
 
-    print("🤖 Step 3: Generating Impact & Conclusion...")
+    # Step 3: Impact + Future + Conclusion
+    print("🤖 Generating Impact, Future & Conclusion...")
     prompt_3 = f"""Based on this news:
 Title: {title}
-Content: {full_content[:1500]}
+Content: {full_content[:2000]}
 Category: {category}
 
-Task:
-1. Write a detailed section on the national and global impact in English and Hinglish (minimum 500 words).
-2. Write a section on 'What's Next' (minimum 400 words) in English and Hinglish.
-3. Write a powerful Conclusion in English (minimum 300 words) and Hinglish (minimum 300 words).
+Write EXTREMELY DETAILED sections (MINIMUM 500 words EACH):
+
+1. National and Global Impact (English + Hindi)
+2. What's Next / Future Outlook (English + Hindi)
+3. Powerful Conclusion (English + Hindi)
 
 Format:
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>[Impact in English...]</p>
-<p>[Impact in Hinglish...]</p>
+<p>[Impact in English - minimum 500 words]</p>
+<p>[Impact in Hinglish - minimum 500 words]</p>
 
 <h3>✅ निष्कर्ष - Conclusion</h3>
-<p>[Conclusion in English...]</p>
-<p>[Conclusion in Hinglish...]</p>
+<p>[Conclusion in English - minimum 400 words]</p>
+<p>[Conclusion in Hinglish - minimum 400 words]</p>
 """
     section_3 = call_ai_engine(prompt_3)
     if not section_3:
         section_3 = ""
 
-    combined_content = f"{section_1}\n{section_2}\n{section_3}"
-    return viral_title, combined_content
+    combined = f"{section_1}\n{section_2}\n{section_3}"
+    return viral_title, combined
 
-# ✅ FALLBACK CONTENT
+# ✅ DETAILED FALLBACK CONTENT (When AI fails)
 def get_detailed_fallback_content(title, full_content, category):
+    """Generate detailed fallback content (2000+ words)"""
     print("🔄 Using detailed fallback template...")
     today = get_current_date()
     clean_title = clean_and_format_title(title)
-    first_para = full_content[:500] if full_content else ""
-    more_content = full_content[500:1000] if len(full_content) > 500 else ""
+    first_para = full_content[:800] if full_content else ""
+    more_content = full_content[800:1600] if len(full_content) > 800 else ""
     
-    if category == "Sports":
+    # Category-specific detailed highlights
+    if category == "Entertainment":
+        highlights = [
+            f"<li>🎬 <strong>{clean_title[:50]}</strong> - बॉलीवुड/एंटरटेनमेंट की बड़ी खबर</li>",
+            f"<li>⭐ <strong>मुख्य घटना:</strong> {first_para[:80]}...</li>",
+            f"<li>📅 <strong>तारीख:</strong> {more_content[:60]}...</li>",
+            f"<li>🎥 <strong>प्रोडक्शन:</strong> इस प्रोजेक्ट पर काम जारी</li>",
+            f"<li>🍿 <strong>फैंस की प्रतिक्रिया:</strong> सोशल मीडिया पर उत्साह</li>",
+            f"<li>📈 <strong>बॉक्स ऑफिस:</strong> कलेक्शन अपडेट</li>",
+            f"<li>🇮🇳 <strong>इंडिया:</strong> भारतीय फिल्म इंडस्ट्री की खबर</li>",
+            f"<li>🎯 <strong>इंपैक्ट:</strong> फिल्म इंडस्ट्री पर प्रभाव</li>",
+        ]
+        expert_quote = """
+<p>Film industry experts are calling this a major development for Indian cinema. The combination of star power and meaningful content is what audiences are craving.</p>
+<p>फिल्म इंडस्ट्री के विशेषज्ञों का मानना है कि यह भारतीय सिनेमा के लिए एक बड़ा विकास है। स्टार पावर और सार्थक कंटेंट का संयोजन ही दर्शकों को आकर्षित कर रहा है।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह फिल्म बॉलीवुड के लिए एक मील का पत्थर साबित होगी।"</p>
+</blockquote>
+"""
+        analysis_detail = f"""
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>यह खबर भारतीय मनोरंजन जगत में हलचल मचा रही है। इस घटनाक्रम का असर आने वाले दिनों में और स्पष्ट होगा। विशेषज्ञों का मानना है कि यह बॉलीवुड के लिए एक नई शुरुआत है।</p>
+"""
+    
+    elif category == "Sports":
         highlights = [
             f"<li>🏏 <strong>{clean_title[:50]}</strong> - खेल जगत की बड़ी खबर</li>",
-            f"<li>⭐ <strong>मुख्य घटना:</strong> {first_para[:60]}...</li>",
+            f"<li>⭐ <strong>मुख्य घटना:</strong> {first_para[:80]}...</li>",
             f"<li>📊 <strong>विश्लेषण:</strong> {more_content[:60]}...</li>",
             f"<li>🏆 <strong>मैच अपडेट:</strong> ताज़ा जानकारी</li>",
             f"<li>📈 <strong>आंकड़े:</strong> खिलाड़ियों के प्रदर्शन</li>",
+            f"<li>🎯 <strong>रणनीति:</strong> टीम की रणनीति</li>",
+            f"<li>🏅 <strong>खिलाड़ी:</strong> स्टार खिलाड़ियों का योगदान</li>",
+            f"<li>🇮🇳 <strong>इंडिया:</strong> भारतीय टीम का प्रदर्शन</li>",
         ]
         expert_quote = """
-<p>Sports experts believe this performance will boost team morale.</p>
-<p>खेल विशेषज्ञों का मानना है कि यह प्रदर्शन टीम का मनोबल बढ़ाएगा।</p>
+<p>Sports experts believe this performance will boost team morale for upcoming tournaments. The team has shown remarkable resilience and skill.</p>
+<p>खेल विशेषज्ञों का मानना है कि यह प्रदर्शन आगामी टूर्नामेंट्स के लिए टीम का मनोबल बढ़ाएगा। टीम ने उल्लेखनीय लचीलापन और कौशल दिखाया है।</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह जीत भारतीय क्रिकेट के लिए महत्वपूर्ण है।"</p>
+    <p style="font-style:italic;font-size:16px;">"यह जीत भारतीय खेलों के लिए एक महत्वपूर्ण क्षण है।"</p>
 </blockquote>
 """
         analysis_detail = f"""
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>यह खेल घटनाक्रम भारतीय खेल जगत में चर्चा का विषय है।</p>
+<p>यह खेल घटनाक्रम भारतीय खेल जगत में चर्चा का विषय बना हुआ है। इस प्रदर्शन ने युवा खिलाड़ियों को प्रेरित किया है।</p>
 """
+    
     else:
         highlights = [
             f"<li>🔴 <strong>{clean_title[:50]}</strong> - आज की बड़ी खबर</li>",
-            f"<li>📰 <strong>विस्तार:</strong> {first_para[:60]}...</li>",
+            f"<li>📰 <strong>विस्तार:</strong> {first_para[:80]}...</li>",
             f"<li>📊 <strong>विश्लेषण:</strong> विशेषज्ञों की राय</li>",
             f"<li>🔮 <strong>आगे क्या:</strong> आने वाले अपडेट</li>",
             f"<li>🌍 <strong>ग्लोबल इंपैक्ट:</strong> दुनिया भर में प्रभाव</li>",
+            f"<li>🇮🇳 <strong>इंडिया:</strong> भारत पर क्या प्रभाव होगा</li>",
+            f"<li>📈 <strong>ट्रेंड:</strong> इस सेक्टर में रुझान</li>",
+            f"<li>🎯 <strong>फ्यूचर:</strong> आने वाला भविष्य</li>",
         ]
         expert_quote = f"""
-<p>Experts from around the world are weighing in on this development.</p>
-<p>दुनिया भर के विशेषज्ञ इस विकास पर अपनी राय दे रहे हैं।</p>
+<p>Experts from around the world are weighing in on this significant development. This event is expected to reshape the future of the {category} sector.</p>
+<p>दुनिया भर के विशेषज्ञ इस महत्वपूर्ण विकास पर अपनी राय दे रहे हैं। इस घटना से {category} सेक्टर का भविष्य बदलने की उम्मीद है।</p>
 <blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर में एक महत्वपूर्ण मोड़ है।"</p>
+    <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर के इतिहास में एक महत्वपूर्ण मोड़ है।"</p>
 </blockquote>
 """
         analysis_detail = f"""
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर नजर रखे हुए हैं।</p>
+<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं। यह {category} सेक्टर के लिए एक बड़ा बदलाव ला सकता है।</p>
 """
     
     intro = f"""
@@ -557,13 +609,13 @@ def get_detailed_fallback_content(title, full_content, category):
 <p><strong>{clean_title}</strong></p>
 <p>{first_para}</p>
 <p>{more_content}</p>
-<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।</p>
+<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है। यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
 """
 
     analysis = f"""
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
 {analysis_detail}
-<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा।</p>
+<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है। विशेषज्ञों का मानना है कि इस {category} सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
 """
 
     expert = f"""
@@ -573,14 +625,15 @@ def get_detailed_fallback_content(title, full_content, category):
 
     impact = f"""
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है।</p>
-<p>आने वाले दिनों में और अपडेट आने की संभावना है।</p>
+<p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है। आने वाले दिनों में और अपडेट आने की संभावना है। विशेषज्ञों का मानना है कि इस घटना के दीर्घकालिक प्रभाव आने वाले महीनों में देखने को मिलेंगे।</p>
+<p>कंपनियां अपनी रणनीतियों को इस नई जानकारी के अनुसार ढाल रही हैं। पूरी दुनिया में इस खबर पर चर्चा हो रही है और आने वाले समय में इससे जुड़ी और जानकारी सामने आएगी।</p>
 """
 
     conclusion = f"""
 <h3>✅ निष्कर्ष - Conclusion</h3>
-<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है।</p>
-<p>विशेषज्ञ इस बात पर सहमत हैं कि यह {category} के भविष्य को आकार देने वाला एक कदम है।</p>
+<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है। इसका प्रभाव आने वाले समय में और स्पष्ट होगा।</p>
+<p>विशेषज्ञ इस बात पर सहमत हैं कि यह {category} के भविष्य को आकार देने वाला एक महत्वपूर्ण कदम है। आने वाले दिनों में इससे जुड़ी और जानकारी सामने आएगी।</p>
+<p>यह खबर {category} सेक्टर में एक नई शुरुआत का संकेत है। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक रोमांचक समय है।</p>
 """
     
     return f"""
@@ -629,7 +682,7 @@ def post_to_blogger(access_token, title, content, category):
 # --- MAIN ---
 
 def main():
-    print("🤖 Starting Viral News AI Blogger Bot...")
+    print("🤖 Starting Viral News AI Blogger Bot (Super Detailed)...")
     print(f"📅 {get_current_date()}")
     fix_dns()
     
@@ -740,7 +793,6 @@ def main():
         print("\n❌ No new news found!")
         return
     
-    # ✅ FIXED: Syntax Error Fixed Here
     raw_title = entry.title
     link = entry.link
     full_content = get_full_content(entry)
@@ -750,15 +802,14 @@ def main():
     print(f"📂 Category: {category}")
     print(f"🖼️ Image: ✅ HD Quality")
     
-    # Multi-section AI content generation
-    print("🤖 Generating detailed content...")
-    ai_result = generate_super_long_content(raw_title, full_content, category)
+    print("🤖 Generating super detailed content (3000+ words)...")
+    ai_result = generate_super_detailed_content(raw_title, full_content, category)
     
     if ai_result:
         viral_title, ai_content = ai_result
         print(f"🔥 Viral Title: {viral_title}")
     else:
-        print("⚠️ AI failed, using fallback...")
+        print("⚠️ AI failed, using detailed fallback...")
         viral_title = raw_title
         ai_content = get_detailed_fallback_content(raw_title, full_content, category)
         
@@ -814,6 +865,7 @@ def main():
         share_to_discord(viral_title, post_url)
         print(f"\n📰 {viral_title}")
         print(f"📂 {category}")
+        print(f"📝 {approx_words}+ words")
         print(f"🔗 {short_link}")
     else:
         print("❌ Failed to post!")
