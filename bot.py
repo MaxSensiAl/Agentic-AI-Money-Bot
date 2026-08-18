@@ -13,12 +13,14 @@ import urllib3.util.connection as urllib3_connection
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SMART TCP REDIRECT PATCH ---
+# --- SMART TCP REDIRECT PATCH (Hugging Face, Google और अन्य Pings के लिए) ---
 def apply_smart_connection_patch():
     print("🌐 Initializing Smart TCP Connection Redirect Patch...")
     original_create_connection = urllib3_connection.create_connection
 
     HARDCODED_IPS = {
+        "api-inference.huggingface.co": "104.18.22.48",
+        "huggingface.co": "104.18.22.48",
         "rpc.weblogs.com": "216.92.112.55",
         "blogsearch.google.com": "142.250.190.46"
     }
@@ -34,6 +36,7 @@ def apply_smart_connection_patch():
     urllib3_connection.create_connection = patched_create_connection
     print("✅ Smart TCP Connection Redirect Patch applied globally")
 
+# पैच को लागू करें
 apply_smart_connection_patch()
 
 def fix_dns():
@@ -47,6 +50,8 @@ def fix_dns():
 # --- CONFIGURATION ---
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
+HF_TOKEN = os.getenv('HF_TOKEN')
+GEMINI_API = os.getenv('GEMINI_API')
 BC_CLIENT_ID = os.getenv('BC_CLIENT_ID')
 BC_CLIENT_SECRET = os.getenv('BC_CLIENT_SECRET')
 BC_REFRESH_TOKEN = os.getenv('BC_REFRESH_TOKEN')
@@ -54,9 +59,9 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL')
 
-# --- INDIA-FOCUSED RSS FEEDS (Trending India News) ---
+# --- 🇮🇳 INDIA-FOCUSED RSS FEEDS (Trending India News) ---
 RSS_FEEDS = [
-    # 🇮🇳 INDIA NEWS (Primary)
+    # 🇮🇳 भारत की मुख्य राजनीति और ब्रेकिंग न्यूज़
     "https://feeds.feedburner.com/ndtvnews-top-stories",
     "https://feeds.feedburner.com/ndtvnews-india-news",
     "https://www.indiatoday.in/rss/india",
@@ -66,27 +71,23 @@ RSS_FEEDS = [
     "https://www.news18.com/rss/india.xml",
     "https://www.business-standard.com/rss/current-affairs/india-news.rss",
     
-    # 🏏 Cricket/Sports India
+    # 🏏 भारतीय क्रिकेट और खेल समाचार
     "https://www.espncricinfo.com/rss/content/story/feeds/0.xml",
     "https://sports.ndtv.com/rss/cricket-news",
     
-    # 💰 Business India
+    # 💰 भारतीय बिज़नेस और लाइवमिंट फाइनेंस
     "https://www.livemint.com/rss/news",
     "https://economictimes.indiatimes.com/rssfeeds/13358356.cms",
     
-    # 🎬 Bollywood/Entertainment India
+    # 🎬 बॉलीवुड और मनोरंजन समाचार
     "https://www.pinkvilla.com/feed",
     "https://www.bollywoodhungama.com/feed/",
     "https://www.filmibeat.com/rss/bollywood.xml",
     
-    # 🚀 Technology India
+    # 🚀 विज्ञान और वैश्विक टेक समाचार
     "https://techcrunch.com/feed/",
     "https://www.theverge.com/rss/index.xml",
-    "https://www.gadgets360.com/rss/news",
-    
-    # 🎮 Gaming
-    "https://www.gamespot.com/feeds/game-news/",
-    "https://www.ign.com/rss/articles/all",
+    "https://www.gadgets360.com/rss/news"
 ]
 
 # --- IMAGE SOURCES ---
@@ -387,247 +388,150 @@ def detect_category(feed_url, title):
     
     return "News"
 
-# ✅ AI CONTENT GENERATOR (Pollinations AI - Fallback)
-def ask_ai_for_news(title, full_content, category):
-    print("🧠 Calling Pollinations AI...")
+# --- CORE SINGLE-ENGINE ORCHESTRATOR ---
+def call_ai_engine(prompt):
+    """सुरक्षित, 100% अनब्लॉक और पेमेंट-फ्री एआई कनेक्टर (Llama-3-70B Raw POST)"""
     try:
-        prompt = f"""You are a professional News Journalist writing in Hinglish (Hindi + English).
-Write a highly engaging, SEO-friendly news article based on this news:
+        # ✅ एंडपॉइंट को सीधे बिना किसी आखिरी स्लैश के सेट किया गया (404/402 FIXED)
+        api_url = "https://text.pollinations.ai"
+        model = "llama"  # स्टेबल, फ्री और अनब्लॉक मॉडल
+        
+        payload = {
+            "messages": [
+                {"role": "system", "content": "You are a professional Hindi/English news editor. You write extremely detailed, unique, and engaging news articles. Respond directly with the HTML content."},
+                {"role": "user", "content": prompt}
+            ],
+            "model": model
+        }
+        
+        res = requests.post(api_url, json=payload, timeout=60)
+        if res.status_code == 200:
+            clean_text = res.text.strip()
+            # किसी भी तरह के अनचाहे एआई फॉर्मेटिंग ब्लॉक्स को साफ़ करें
+            clean_text = clean_text.replace("```html", "").replace("```", "").strip()
+            if len(clean_text) > 100:
+                return clean_text
+        print(f"⚠️ AI API Connection Status: {res.status_code}")
+    except Exception as e:
+        print(f"⚠️ AI API Error: {e}")
+    return None
+
+# --- 🚀 MASTERSTROKE: SUPER LONG ARTICLE GENERATOR (3,000+ Words) ---
+def generate_super_long_content(title, full_content, category):
+    """
+    3 अलग-अलग चरणों (Multi-Section Generation) में लगातार एआई को कॉल करके
+    एक विशाल, अत्यंत विस्तृत और असली समाचारों से लैस 3,000+ शब्दों का आर्टिकल तैयार करेगा।
+    """
+    print("🤖 Step 1: Generating Viral Title, Hooking Introduction & Highlights...")
+    prompt_1 = f"""Based on this trending news:
 Title: {title}
 Content: {full_content[:1500]}
 Category: {category}
 
-Instructions:
-1. Write in natural Hinglish (blend of Hindi and English).
-2. Use actual names, facts, and details from the provided news.
-3. Output the content using this exact HTML structure:
+Task:
+1. Generate an EXTREMELY catchy, mysterious, CTR-boosting viral title in Hindi/Hinglish. Put it inside [TITLE]...[/TITLE] brackets on the first line.
+2. Write a highly detailed, hooking Introduction (minimum 500 words) in English.
+3. Write a highly detailed, hooking Introduction (minimum 500 words) in natural Hinglish/Hindi.
+4. Write 8 highly specific, detailed Key Highlights with real facts and numbers from the news (minimum 300 words).
+
+Format exactly as HTML:
+[TITLE] Viral Hinglish Title Here [/TITLE]
 
 <h3>📝 परिचय - Introduction</h3>
-<p>[Detailed intro in English]</p>
-<p>[Detailed intro in Hindi]</p>
+<p>[Detailed English intro...]</p>
+<p>[Detailed Hinglish/Hindi intro...]</p>
 
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
 <ul>
-  <li>• [Fact 1]</li>
-  <li>• [Fact 2]</li>
-  <li>• [Fact 3]</li>
-  <li>• [Fact 4]</li>
+  <li>[Real specific fact 1]</li>
+  <li>[Real specific fact 2]</li>
+  <li>[Real specific fact 3]</li>
+  <li>[Real specific fact 4]</li>
+  <li>[Real specific fact 5]</li>
+  <li>[Real specific fact 6]</li>
+  <li>[Real specific fact 7]</li>
+  <li>[Real specific fact 8]</li>
 </ul>
+"""
+    section_1 = call_ai_engine(prompt_1)
+    if not section_1:
+        return None
 
+    # वायरल टाइटल को एक्सट्रेक्ट करना और मुख्य लेख से हटाना
+    viral_title = title
+    title_match = re.search(r'\[TITLE\](.*?)\[/TITLE\]', section_1, re.IGNORECASE)
+    if title_match:
+        viral_title = title_match.group(1).strip()
+        section_1 = section_1.replace(title_match.group(0), "")
+
+    # थोड़ी देर रुकें ताकि एपीआई ओवरलोड न हो
+    time.sleep(2)
+
+    print("🤖 Step 2: Generating Deep Technical Analysis & Expert Opinions...")
+    prompt_2 = f"""Based on this news:
+Title: {title}
+Content: {full_content[:1500]}
+Category: {category}
+
+Task:
+1. Write an EXTREMELY detailed, comprehensive, and professional analysis of the event (minimum 1000 words) in English.
+2. Write an EXTREMELY detailed, comprehensive, and professional analysis of the event (minimum 1000 words) in Hinglish/Hindi.
+3. Write an Expert Opinions section explaining the industry view (minimum 300 words).
+4. Write a realistic, highly specific expert quote in Hindi/Hinglish (minimum 150 words) specifically about this news.
+
+Format exactly as HTML:
 <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-<p>[Analysis in English]</p>
-<p>[Analysis in Hindi]</p>
+<p>[Deep English analysis...]</p>
+<p>[Deep Hinglish/Hindi analysis...]</p>
 
 <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-<p>[Expert opinion]</p>
-<blockquote>"[Quote]"</blockquote>
+<p>[Expert context in English...]</p>
+<p>[Expert context in Hinglish/Hindi...]</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"[Highly specific expert quote in Hindi/Hinglish about this event]"</p>
+</blockquote>
+"""
+    section_2 = call_ai_engine(prompt_2)
+    if not section_2:
+        section_2 = ""
 
+    time.sleep(2)
+
+    print("🤖 Step 3: Generating National/Global Impact, Future Outlook & Conclusion...")
+    prompt_3 = f"""Based on this news:
+Title: {title}
+Content: {full_content[:1500]}
+Category: {category}
+
+Task:
+1. Write a very detailed section on the national and global impact of this event in English and Hinglish (minimum 500 words).
+2. Write a section on 'What's Next' and the future outlook (minimum 400 words) in English and Hinglish.
+3. Write a powerful, memorable, and solid Conclusion in English (minimum 300 words) and Hinglish (minimum 300 words).
+
+Format exactly as HTML:
 <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>[Impact]</p>
+<p>[Impact in English...]</p>
+<p>[Impact in Hinglish/Hindi...]</p>
 
 <h3>✅ निष्कर्ष - Conclusion</h3>
-<p>[Conclusion]</p>
+<p>[Conclusion in English...]</p>
+<p>[Conclusion in Hinglish/Hindi...]</p>
 """
-        
-        api_url = "https://text.pollinations.ai/v1/chat/completions"
-        payload = {
-            "messages": [
-                {"role": "system", "content": "You are a professional news editor writing HTML output in Hinglish."},
-                {"role": "user", "content": prompt}
-            ],
-            "model": "llama"
-        }
-        
-        res = requests.post(api_url, json=payload, timeout=60)
-        
-        if res.status_code == 200:
-            data = res.json()
-            clean_html = data["choices"][0]["message"]["content"].strip()
-            if "<h3>" in clean_html:
-                print("✅ Pollinations AI generated content!")
-                return clean_html
-        print(f"⚠️ Pollinations Status: {res.status_code}")
-    except Exception as e:
-        print(f"⚠️ Pollinations Error: {e}")
-    return None
+    section_3 = call_ai_engine(prompt_3)
+    if not section_3:
+        section_3 = ""
 
-# ✅ DYNAMIC CONTENT GENERATOR
-def generate_dynamic_content(title, full_content, category):
-    ai_content = ask_ai_for_news(title, full_content, category)
-    if ai_content:
-        return ai_content
-    
-    print("🔄 Using fallback template...")
-    today = get_current_date()
-    clean_title = clean_and_format_title(title)
-    first_para = full_content[:500] if full_content else ""
-    more_content = full_content[500:1000] if len(full_content) > 500 else ""
-    
-    # Category-specific Highlights
-    if category == "Sports":
-        highlights = [
-            f"<li>🏏 <strong>{clean_title[:50]}</strong> - खेल जगत की बड़ी खबर</li>",
-            f"<li>⭐ <strong>मुख्य घटना:</strong> {first_para[:60]}...</li>",
-            f"<li>📊 <strong>विश्लेषण:</strong> {more_content[:60]}...</li>",
-            f"<li>🏆 <strong>मैच अपडेट:</strong> ताज़ा जानकारी</li>",
-            f"<li>📈 <strong>आंकड़े:</strong> खिलाड़ियों के प्रदर्शन</li>",
-            f"<li>🎯 <strong>रणनीति:</strong> टीम की रणनीति</li>",
-            f"<li>🏅 <strong>खिलाड़ी:</strong> स्टार खिलाड़ियों का योगदान</li>",
-            f"<li>🇮🇳 <strong>इंडिया:</strong> भारतीय टीम का प्रदर्शन</li>",
-        ]
-        expert_quote = """
-<p>Sports experts believe this performance will boost team morale for upcoming tournaments.</p>
-<p>खेल विशेषज्ञों का मानना है कि यह प्रदर्शन आगामी टूर्नामेंट्स के लिए टीम का मनोबल बढ़ाएगा।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह जीत भारतीय क्रिकेट के लिए एक महत्वपूर्ण क्षण है।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>यह खेल घटनाक्रम भारतीय खेल जगत में चर्चा का विषय बना हुआ है।</p>
-"""
-    
-    elif category == "Entertainment" or category == "Bollywood":
-        highlights = [
-            f"<li>🎬 <strong>{clean_title[:50]}</strong> - मनोरंजन जगत की बड़ी खबर</li>",
-            f"<li>⭐ <strong>स्टार कास्ट:</strong> {first_para[:60]}...</li>",
-            f"<li>📅 <strong>अपडेट:</strong> नई जानकारी सामने आई</li>",
-            f"<li>🍿 <strong>फैंस की प्रतिक्रिया:</strong> सोशल मीडिया पर उत्साह</li>",
-            f"<li>🎥 <strong>प्रोडक्शन:</strong> इस प्रोजेक्ट पर काम जारी</li>",
-            f"<li>🇮🇳 <strong>बॉलीवुड:</strong> भारतीय फिल्म इंडस्ट्री की खबर</li>",
-            f"<li>📈 <strong>बॉक्स ऑफिस:</strong> कलेक्शन अपडेट</li>",
-            f"<li>🎯 <strong>इंपैक्ट:</strong> फिल्म इंडस्ट्री पर प्रभाव</li>",
-        ]
-        expert_quote = """
-<p>Film industry experts are calling this a major development for Indian cinema.</p>
-<p>फिल्म इंडस्ट्री के विशेषज्ञों का मानना है कि यह भारतीय सिनेमा के लिए एक बड़ा विकास है।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह फिल्म बॉलीवुड के लिए एक मील का पत्थर साबित होगी।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>यह खबर भारतीय मनोरंजन जगत में हलचल मचा रही है।</p>
-"""
-    
-    elif category == "Politics":
-        highlights = [
-            f"<li>🏛️ <strong>{clean_title[:50]}</strong> - राजनीति की बड़ी खबर</li>",
-            f"<li>👥 <strong>मुख्य मुद्दे:</strong> {first_para[:60]}...</li>",
-            f"<li>📈 <strong>विशेषज्ञों की राय:</strong> नीतिगत बदलावों पर चर्चा</li>",
-            f"<li>🔮 <strong>आने वाले दिन:</strong> चुनाव और निर्णयों पर नज़र</li>",
-            f"<li>🌍 <strong>वैश्विक प्रभाव:</strong> इसका वैश्विक राजनीति पर असर</li>",
-            f"<li>🇮🇳 <strong>इंडिया:</strong> भारतीय राजनीति का बड़ा घटनाक्रम</li>",
-            f"<li>📊 <strong>जनता की राय:</strong> सर्वेक्षण और जनमत</li>",
-            f"<li>🎯 <strong>राजनीतिक रणनीति:</strong> आगामी चुनावी रणनीति</li>",
-        ]
-        expert_quote = """
-<p>Political analysts are closely monitoring this development as it could reshape India's political landscape.</p>
-<p>राजनीतिक विश्लेषकों का मानना है कि यह विकास भारत के राजनीतिक परिदृश्य को नया आकार दे सकता है।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह राजनीतिक घटनाक्रम भारत के लोकतंत्र के लिए महत्वपूर्ण है।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>यह राजनीतिक घटनाक्रम भारत की राजनीति में एक नया मोड़ ला सकता है।</p>
-"""
-    
-    else:
-        highlights = [
-            f"<li>🔴 <strong>{clean_title[:50]}</strong> - आज की बड़ी खबर</li>",
-            f"<li>📰 <strong>विस्तार:</strong> {first_para[:60]}...</li>",
-            f"<li>📊 <strong>विश्लेषण:</strong> विशेषज्ञों की राय</li>",
-            f"<li>🔮 <strong>आगे क्या:</strong> आने वाले अपडेट</li>",
-            f"<li>🌍 <strong>ग्लोबल इंपैक्ट:</strong> दुनिया भर में प्रभाव</li>",
-            f"<li>🇮🇳 <strong>इंडिया:</strong> भारत पर क्या प्रभाव होगा</li>",
-            f"<li>📈 <strong>ट्रेंड:</strong> इस सेक्टर में रुझान</li>",
-            f"<li>🎯 <strong>फ्यूचर:</strong> आने वाला भविष्य</li>",
-        ]
-        expert_quote = f"""
-<p>Experts from around the world are weighing in on this significant development.</p>
-<p>दुनिया भर के विशेषज्ञ इस महत्वपूर्ण विकास पर अपनी राय दे रहे हैं।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर के इतिहास में एक महत्वपूर्ण मोड़ है।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं।</p>
-"""
-    
-    intro = f"""
-<h3>📝 परिचय - Introduction</h3>
-<p><strong>{clean_title}</strong></p>
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है।</p>
-"""
-
-    analysis = f"""
-<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-{analysis_detail}
-<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा।</p>
-"""
-
-    expert = f"""
-<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-{expert_quote}
-"""
-
-    impact = f"""
-<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है।</p>
-<p>आने वाले दिनों में और अपडेट आने की संभावना है।</p>
-"""
-
-    conclusion = f"""
-<h3>✅ निष्कर्ष - Conclusion</h3>
-<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है।</p>
-<p>विशेषज्ञ इस बात पर सहमत हैं कि यह {category} के भविष्य को आकार देने वाला एक महत्वपूर्ण कदम है।</p>
-"""
-    
-    return f"""
-<h2>🚨 BREAKING NEWS: {clean_title}</h2>
-
-<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
-    <p><strong>📅 Published: {today}</strong></p>
-    <p><strong>📂 Category: {category}</strong></p>
-</div>
-
-{intro}
-
-<h3>🎯 मुख्य बातें - Key Highlights</h3>
-<ul>
-    {''.join(highlights)}
-</ul>
-
-{analysis}
-
-{expert}
-
-{impact}
-
-{conclusion}
-
-<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
-"""
-
-def generate_long_content(title, full_content, category):
-    return generate_dynamic_content(title, full_content, category)
+    # तीनों पार्ट्स को जोड़ना
+    combined_content = f"{section_1}\n{section_2}\n{section_3}"
+    return viral_title, combined_content
 
 def post_to_blogger(access_token, title, content, category):
     try:
         post_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts"
         headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
-        cleaned = clean_and_format_title(title)
         post_body = {
             "kind": "blogger#post",
-            "title": cleaned,
+            "title": title,
             "content": content,
             "labels": ["Breaking News", category, "Hinglish", datetime.now().strftime("%Y")]
         }
@@ -641,7 +545,7 @@ def post_to_blogger(access_token, title, content, category):
 # --- MAIN ---
 
 def main():
-    print("🤖 Starting Viral News AI Blogger Bot (India Focused)...")
+    print("🤖 Starting Viral News AI Blogger Bot (Super-Detailed Indian Version)...")
     print(f"📅 {get_current_date()}")
     fix_dns()
     
@@ -661,7 +565,7 @@ def main():
             all_loaded = False
     
     if not all_loaded:
-        print("\n❌ Secrets missing!")
+        print("\n❌ Mandatory Secrets missing!")
         return
     
     access_token = get_blogger_access_token()
@@ -753,27 +657,34 @@ def main():
         return
     
     raw_title = entry.title
-    title = clean_and_format_title(raw_title)
     link = entry.link
     full_content = get_full_content(entry)
-    category = detect_category(selected_feed, title)
+    category = detect_category(selected_feed, raw_title)
     
-    print(f"\n📰 Title: {title}")
+    print(f"\n📰 Title: {raw_title}")
     print(f"📂 Category: {category}")
     print(f"🖼️ Image: ✅ HD Quality")
     
+    # ✅ Multi-turn super long content generation
+    print("🤖 Commencing Multi-Section Deep Generation...")
+    ai_result = generate_super_long_content(raw_title, full_content, category)
+    
+    if not ai_result:
+        print("❌ AI Content Generation failed completely!")
+        return
+        
+    viral_title, ai_content = ai_result
+    print(f"🔥 AI Generated Viral Title: {viral_title}")
+    
     image_html = f"""
     <div style="text-align:center;margin-bottom:25px;">
-        <img src='{image_url}' alt='{title}' style='width:100%;max-width:800px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);'>
+        <img src='{image_url}' alt='{viral_title}' style='width:100%;max-width:800px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);'>
         <p style="font-size:12px;color:#999;margin-top:5px;">📸 Viral News AI | HD Quality</p>
     </div>
     """
     
     short_link = get_short_url(link)
     print(f"🔗 Short Link: {short_link}")
-    
-    print("🤖 Generating dynamic content...")
-    ai_content = generate_long_content(title, full_content, category)
     
     earning_button = f"""
     <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
@@ -783,6 +694,10 @@ def main():
         <p style="font-size:12px;color:#999;margin-top:10px;">Click to read the complete story on the original source</p>
     </div>
     """
+    
+    # Calculate word count of generated content dynamically
+    approx_words = len(ai_content.split())
+    print(f"📝 Total words generated: {approx_words}")
     
     final_content = f"""
     {image_html}
@@ -794,7 +709,7 @@ def main():
     <div style="text-align:center;color:#999;font-size:14px;">
         <p>📅 Published: {get_current_date()}</p>
         <p>📂 Category: {category}</p>
-        <p>📝 Word Count: 2000+ words</p>
+        <p>📝 Word Count: {approx_words}+ words</p>
         <p>🌐 Language: Hinglish (Hindi + English)</p>
         <p>🖼️ Image: HD Quality</p>
         <p>🤖 AI-Generated News Summary</p>
@@ -804,16 +719,16 @@ def main():
     """
     
     print(f"\n📝 Posting to Blogger...")
-    post_url = post_to_blogger(access_token, title, final_content, category)
+    post_url = post_to_blogger(access_token, viral_title, final_content, category)
     
     if post_url:
-        save_posted_news(title)
+        save_posted_news(viral_title)
         print("\n✅✅✅ POSTED SUCCESSFULLY! ✅✅✅")
         print(f"🔗 {post_url}")
         ping_search_engines("Viral News AI", post_url)
-        share_to_telegram(title, post_url)
-        share_to_discord(title, post_url)
-        print(f"\n📰 {title}")
+        share_to_telegram(viral_title, post_url)
+        share_to_discord(viral_title, post_url)
+        print(f"\n📰 {viral_title}")
         print(f"📂 {category}")
         print(f"🔗 {short_link}")
     else:
