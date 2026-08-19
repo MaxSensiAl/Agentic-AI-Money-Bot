@@ -374,39 +374,106 @@ def detect_category(feed_url, title):
     
     return "News"
 
-# --- AI CALL COMPONENT ---
+# --- USER OPTIMIZED: MULTI-STAGE AI ENGINE WITH WORK ROUTER ---
 def call_ai_engine(prompt):
-    engines = [
-        ("Pollinations", "https://text.pollinations.ai/v1/chat/completions", "llama"),
-        ("Pollinations Fallback", "https://text.pollinations.ai/v1/chat/completions", "mistral"),
-    ]
+    """Multiple AI engines with working Pollinations & OpenRouter endpoints"""
     
-    for engine_name, api_url, model in engines:
-        try:
-            print(f"🧠 Trying {engine_name} with model: {model}...")
-            payload = {
-                "messages": [
-                    {"role": "system", "content": "You are a professional Hindi/English news journalist and SEO editor. Write high-quality, extremely detailed news reports in Hinglish/Hindi."},
-                    {"role": "user", "content": prompt}
-                ],
-                "model": model
-            }
-            res = requests.post(api_url, json=payload, timeout=60)
-            if res.status_code == 200:
+    # ===== OPTION 1: Direct Pollinations (Most Reliable) =====
+    try:
+        print("🧠 Trying Pollinations Direct API...")
+        url = "https://text.pollinations.ai/chat"
+        
+        payload = {
+            "messages": [
+                {"role": "system", "content": "You are a professional Hindi/English news journalist and SEO editor. Write high-quality, extremely detailed news reports in Hinglish/Hindi."},
+                {"role": "user", "content": prompt}
+            ]
+        }
+        
+        res = requests.post(url, json=payload, timeout=60)
+        
+        if res.status_code == 200:
+            try:
                 data = res.json()
-                clean_text = data["choices"][0]["message"]["content"].strip()
-                clean_text = clean_text.replace("```html", "").replace("```", "").strip()
-                if len(clean_text) > 300:
-                    print(f"✅ {engine_name} success!")
-                    return clean_text
-            else:
-                print(f"⚠️ {engine_name} Status: {res.status_code}")
-        except Exception as e:
-            print(f"⚠️ {engine_name} Error: {e}")
-        time.sleep(2)
+                if isinstance(data, dict) and "choices" in data:
+                    clean_text = data["choices"][0]["message"]["content"].strip()
+                elif isinstance(data, dict) and "response" in data:
+                    clean_text = data["response"].strip()
+                elif isinstance(data, dict) and "message" in data:
+                    clean_text = data["message"].strip()
+                else:
+                    clean_text = res.text.strip()
+            except ValueError:
+                clean_text = res.text.strip()
+            
+            clean_text = clean_text.replace("```html", "").replace("```", "").strip()
+            if len(clean_text) > 300:
+                print(f"✅ Pollinations Direct success! (Length: {len(clean_text)})")
+                return clean_text
+        else:
+            print(f"⚠️ Pollinations Direct Status: {res.status_code}")
+            
+    except Exception as e:
+        print(f"⚠️ Pollinations Direct Error: {e}")
+    
+    time.sleep(2)
+    
+    # ===== OPTION 2: OpenRouter (Free, Multiple Models) =====
+    OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+    
+    if OPENROUTER_API_KEY:
+        models = [
+            "google/gemini-2.0-flash-exp:free",
+            "meta-llama/llama-3.2-3b-instruct:free",
+            "microsoft/phi-3-mini-128k-instruct:free",
+            "deepseek/deepseek-chat:free"
+        ]
+        
+        for model in models:
+            try:
+                print(f"🧠 Trying OpenRouter: {model}")
+                response = requests.post(
+                    url="https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": "You are a professional Hindi/English news journalist."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "max_tokens": 2000
+                    },
+                    timeout=60
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    if len(content) > 300:
+                        print(f"✅ OpenRouter success with {model}!")
+                        return content
+            except Exception as e:
+                print(f"⚠️ OpenRouter {model} failed: {e}")
+            time.sleep(2)
+    
+    # ===== OPTION 3: Fallback - Simple GET Request =====
+    try:
+        print("🔄 Trying GET fallback...")
+        clean_prompt = prompt.replace(' ', '%20')[:1500]
+        url = f"https://text.pollinations.ai/{clean_prompt}?model=openai"
+        res = requests.get(url, timeout=60)
+        if res.status_code == 200 and len(res.text) > 300:
+            print(f"✅ GET fallback success! (Length: {len(res.text)})")
+            return res.text.strip()
+    except Exception as e:
+        print(f"⚠️ GET fallback error: {e}")
+    
     return None
 
-# ✅ UPDATED: JOURNALISTIC CONTENT GENERATOR (Dynamic Headings, USA Fiesta Style)
+# --- JOURNALISTIC CONTENT GENERATOR (Dynamic Headings, USA Fiesta Style) ---
 def generate_super_detailed_content(title, full_content, category):
     """Generate high-quality journalistic article with dynamic story-specific headings"""
     print("🤖 Generating professional, dynamic article (USA Fiesta style)...")
@@ -465,7 +532,7 @@ Format the HTML structure exactly as follows:
         
     return viral_title, result
 
-# ✅ UPDATED: DETAILED FALLBACK CONTENT (NO REPETITION / DUPLICATION)
+# --- DETAILED FALLBACK CONTENT (NO REPETITION / DUPLICATION) ---
 def get_detailed_fallback_content(title, full_content, category):
     """Generate detailed fallback content without duplicate paragraphs"""
     print("🔄 Using smart detailed fallback template...")
