@@ -10,12 +10,16 @@ import socket
 import xmlrpc.client
 import urllib3
 import urllib3.util.connection as urllib3_connection
-from google import genai  # ✅ Google GenAI SDK
-from google.genai import types  # ✅ Stable configuration types
+from google import genai
+from google.genai import types
+import pickle
+from functools import lru_cache, wraps
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SMART TCP REDIRECT PATCH ---
+# ============================================
+# 🔧 SMART TCP REDIRECT PATCH
+# ============================================
 def apply_smart_connection_patch():
     print("🌐 Initializing Smart TCP Connection Redirect Patch...")
     original_create_connection = urllib3_connection.create_connection
@@ -29,25 +33,17 @@ def apply_smart_connection_patch():
         host, port = address
         if host in HARDCODED_IPS:
             ip = HARDCODED_IPS[host]
-            print(f"🎯 Redirecting {host} connection to hardcoded IP: {ip}")
+            print(f"🎯 Redirecting {host} connection to {ip}")
             return original_create_connection((ip, port), *args, **kwargs)
         return original_create_connection(address, *args, **kwargs)
 
     urllib3_connection.create_connection = patched_create_connection
-    print("✅ Smart TCP Connection Redirect Patch applied globally")
+    print("✅ Smart TCP Patch applied")
 
 apply_smart_connection_patch()
 
-def fix_dns():
-    print("✅ Testing connection to Pollinations AI...")
-    try:
-        res = requests.get("https://text.pollinations.ai", timeout=10)
-        print(f"✅ Pollinations AI reachable (Status Code: {res.status_code})")
-    except Exception as e:
-        print(f"⚠️ Connection check failed: {e}")
-
 # ============================================
-# 🔐 CONFIGURATION & SECRETS
+# 🔐 CONFIGURATION
 # ============================================
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
@@ -59,9 +55,11 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') or os.getenv('GEMINI_API')
 
-# --- INDIA-FOCUSED RSS FEEDS ---
+# ============================================
+# 📰 RSS FEEDS (India Focused)
+# ============================================
 RSS_FEEDS = [
-    "https://usafiesta.com/feed/",  # ✅ Added USAFiesta Feed to target automatic news
+    "https://usafiesta.com/feed/",
     "https://feeds.feedburner.com/ndtvnews-top-stories",
     "https://feeds.feedburner.com/ndtvnews-india-news",
     "https://www.indiatoday.in/rss/india",
@@ -74,7 +72,9 @@ RSS_FEEDS = [
     "https://economictimes.indiatimes.com/rssfeeds/13358356.cms"
 ]
 
-# --- IMAGE SOURCES ---
+# ============================================
+# 🖼️ IMAGE SOURCES
+# ============================================
 UNSPLASH_IMAGES = {
     "Technology": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
     "Gaming": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
@@ -89,6 +89,9 @@ UNSPLASH_IMAGES = {
 
 POSTED_FILE = 'posted_news.txt'
 
+# ============================================
+# 🛠️ HELPER FUNCTIONS
+# ============================================
 def clean_and_format_title(title):
     if not title:
         return ""
@@ -154,6 +157,30 @@ def get_current_date():
     ist_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%B %d, %Y")
 
+# ============================================
+# 🔑 RETRY DECORATOR
+# ============================================
+def retry_on_failure(max_retries=3, delay=3):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    print(f"⚠️ Attempt {attempt+1}/{max_retries} failed: {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(delay * (attempt + 1))
+                    else:
+                        raise
+            return None
+        return wrapper
+    return decorator
+
+# ============================================
+# 🔐 BLOGGER AUTHENTICATION
+# ============================================
+@retry_on_failure(max_retries=3, delay=3)
 def get_blogger_access_token():
     try:
         token_url = "https://oauth2.googleapis.com/token"
@@ -205,6 +232,9 @@ def is_duplicate_title(new_title, existing_titles):
                 return True
     return False
 
+# ============================================
+# 📰 RSS PROCESSING
+# ============================================
 def get_full_content(entry):
     try:
         content = entry.get('content')
@@ -263,14 +293,14 @@ def get_hd_image_strict(entry, title, category):
     print("📸 Getting HD image...")
     image = get_entry_image(entry)
     if image and image.startswith('http') and 'logo' not in image.lower():
-        print("✅ RSS image!")
+        print("✅ RSS image found!")
         return image
     image = generate_hd_image_with_text(title, category)
     if image:
-        print("✅ AI HD image!")
+        print("✅ AI HD image generated!")
         return image
     if category in UNSPLASH_IMAGES:
-        print("✅ Category image")
+        print("✅ Category image used")
         return UNSPLASH_IMAGES[category]
     return "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80"
 
@@ -325,43 +355,47 @@ def detect_category(feed_url, title):
     return "News"
 
 # ============================================
-# 🤖 GOOGLE GEMINI STABLE PRODUCTION MODEL (FAST & RELIABLE)
+# 🤖 GEMINI CONTENT GENERATION (FIXED)
 # ============================================
 def generate_super_detailed_content_gemini(title, full_content, category):
     """
-    स्थिर और बिजली जैसी तेज़ गति वाले 'gemini-2.5-flash' का उपयोग करके
-    स्क्रीनशॉट की तरह बेहतरीन हिंदी समाचार ब्लॉग लिखेगा।
+    Uses Gemini 2.0 Flash for lightning-fast Hindi news blog generation
     """
     if not GEMINI_API_KEY:
-        print("⚠️ GEMINI_API_KEY नहीं मिली!")
+        print("⚠️ GEMINI_API_KEY not found!")
         return None
 
     try:
-        print("⏳ Google GenAI (gemini-2.5-flash) के माध्यम से पोस्ट जनरेट कर रहा हूँ...")
+        print("⏳ Generating post with Google GenAI (gemini-2.0-flash)...")
         client = genai.Client(api_key=GEMINI_API_KEY)
 
-        prompt = (
-            f"Write a comprehensive, professional, highly engaging Hindi/Hinglish news article. "
-            f"Source News Title: {title}\n"
-            f"Source Content: {full_content[:3000]}\n"
-            f"Category: {category}\n\n"
-            f"INSTRUCTIONS:\n"
-            f"1. Generate a viral, attractive Hinglish title and enclose it inside [TITLE] ... [/TITLE] tags.\n"
-            f"2. Write the article in standard, high-quality professional Hindi (समाचार पोर्टल की भाषा) with structured HTML tags.\n"
-            f"3. Strictly use these exact headings matching premium news layouts:\n"
-            f"   - <h3>📝 परिचय - Introduction</h3> (An elaborate intro in standard Hindi)\n"
-            f"   - <h3>🎯 मुख्य बिंदु और घटनाक्रम - Key Highlights</h3> (8 detailed points/facts in a bulleted list)\n"
-            f"   - <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3> (A deep journalistic analysis of the issue)\n"
-            f"   - <h3>🔮 अब आगे क्या? - What's Next?</h3> (Future prospects, official responses, and future steps)\n"
-            f"   - <h3>✅ निष्कर्ष - Conclusion</h3> (A powerful wrap-up paragraph)\n"
-            f"4. The word count must be extremely detailed (minimum 1500+ words of deep value)."
-        )
+        prompt = f"""
+        Write a professional, engaging Hindi/Hinglish news article.
+        
+        Title: {title}
+        Category: {category}
+        Source Content: {full_content[:3000]}
+        
+        Instructions:
+        1. Create a viral Hinglish title inside [TITLE]...[/TITLE] tags
+        2. Write in professional Hindi (समाचार पोर्टल की भाषा)
+        3. Use these exact sections:
+           - <h3>📝 परिचय - Introduction</h3>
+           - <h3>🎯 मुख्य बिंदु - Key Highlights</h3>
+           - <h3>📊 विश्लेषण - Analysis</h3>
+           - <h3>🔮 आगे क्या? - What's Next?</h3>
+           - <h3>✅ निष्कर्ष - Conclusion</h3>
+        4. Minimum 1000+ words
+        5. Include relevant facts and context
+        """
 
-        # ✅ रीयल-टाइम गूगल सर्च ग्राउंडिंग के साथ प्रोडक्शन जेमिनी मॉडल
+        # Using gemini-2.0-flash for speed
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash',
             contents=prompt,
             config=types.GenerateContentConfig(
+                temperature=0.7,
+                max_output_tokens=4096,
                 tools=[{"google_search": {}}],
             ),
         )
@@ -369,9 +403,8 @@ def generate_super_detailed_content_gemini(title, full_content, category):
         output_text = response.text
 
         if output_text and len(output_text) > 200:
-            print("✅ जेमिनी ने रीयल-टाइम सर्च के साथ लेख सफलतापूर्वक जनरेट कर लिया है!")
+            print("✅ Article generated successfully!")
             
-            # Title और Content को अलग करना
             viral_title = title
             title_match = re.search(r'\[TITLE\](.*?)\[/TITLE\]', output_text, re.IGNORECASE | re.DOTALL)
             if title_match:
@@ -381,12 +414,12 @@ def generate_super_detailed_content_gemini(title, full_content, category):
             return viral_title, output_text
 
     except Exception as e:
-        print(f"⚠️ जेमिनी एपीआई के दौरान गंभीर समस्या: {e}")
+        print(f"⚠️ Gemini API error: {e}")
         
     return None
 
 # ============================================
-# 📝 DETAILED FALLBACK CONTENT (When AI fails)
+# 📝 FALLBACK CONTENT
 # ============================================
 def get_detailed_fallback_content(title, full_content, category):
     print("🔄 Using detailed fallback template...")
@@ -448,6 +481,9 @@ def get_detailed_fallback_content(title, full_content, category):
 {conclusion}
 """
 
+# ============================================
+# 📝 POST TO BLOGGER
+# ============================================
 def post_to_blogger(access_token, title, content, category):
     try:
         post_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts"
@@ -466,114 +502,176 @@ def post_to_blogger(access_token, title, content, category):
         return None
 
 # ============================================
-# 🚀 MAIN RUNNER (OPTIMIZED)
+# 🏥 HEALTH CHECK
+# ============================================
+def check_bot_health():
+    """Check if all services are available"""
+    print("\n🏥 Running Health Check...")
+    checks = {
+        "Gemini API": lambda: bool(GEMINI_API_KEY),
+        "Blogger Token": lambda: bool(get_blogger_access_token()),
+        "RSS Feeds": lambda: len(RSS_FEEDS) > 0,
+    }
+    
+    all_ok = True
+    for name, check in checks.items():
+        try:
+            status = "✅" if check() else "❌"
+            print(f"{status} {name}")
+            if "❌" in status:
+                all_ok = False
+        except:
+            print(f"❌ {name} (Error)")
+            all_ok = False
+    
+    return all_ok
+
+def fix_dns():
+    print("✅ Testing connection to Pollinations AI...")
+    try:
+        res = requests.get("https://text.pollinations.ai", timeout=10)
+        print(f"✅ Pollinations AI reachable (Status Code: {res.status_code})")
+    except Exception as e:
+        print(f"⚠️ Connection check failed: {e}")
+
+# ============================================
+# 🚀 MAIN FUNCTION (WORKING)
 # ============================================
 def main():
-    print("🤖 Starting Viral News AI Blogger Bot...")
+    print("\n🤖 Starting Viral News AI Blogger Bot...")
     print(f"📅 {get_current_date()}")
-    fix_dns()
+    print(f"🔑 Gemini API: {'✅ Set' if GEMINI_API_KEY else '❌ Not Set'}")
     
-    access_token = get_blogger_access_token()
-    if not access_token:
-        print("❌ Invalid Blogger Token!")
-        return
+    # Health check first
+    if not check_bot_health():
+        print("❌ Health check failed! But continuing with available features...")
     
-    MANUAL_URL = os.getenv('MANUAL_URL')
-    
-    if MANUAL_URL:
-        print(f"🎯 मैनुअल मोड सक्रिय! इस लिंक की खबर प्रोसेस की जा रही है: {MANUAL_URL}")
-        raw_title = "Trending News Update"
-        full_content = f"Please read and write about this URL: {MANUAL_URL}"
-        category = "News"
-        link = MANUAL_URL
-        image_url = generate_hd_image_with_text("Trending India News", category)
-    else:
-        print("🔍 सामान्य मोड: RSS फीड्स से ताज़ा खबर खोज रहा हूँ...")
-        existing_titles = get_all_blogger_titles(access_token)
-        local_posted = load_posted_news()
-        all_posted = existing_titles.union(local_posted)
+    try:
+        fix_dns()
+        access_token = get_blogger_access_token()
         
-        found_news = False
-        entry = None
-        selected_feed = None
-        image_url = None
-        
-        shuffled_feeds = RSS_FEEDS.copy()
-        random.shuffle(shuffled_feeds)
-        
-        for feed_url in shuffled_feeds:
-            try:
-                response = requests.get(feed_url, timeout=15)
-                if response.status_code == 200:
-                    feed = feedparser.parse(response.content)
-                    for i in range(min(15, len(feed.entries))):
-                        temp_entry = feed.entries[i]
-                        temp_title = temp_entry.title
-                        
-                        # 🚫 CATEGORY BOTTLENECK REMOVED
-                        if is_duplicate_title(temp_title, all_posted):
-                            continue
-                        
-                        category = detect_category(feed_url, temp_title)
-                        image_url = get_hd_image_strict(temp_entry, temp_title, category)
-                        if image_url:
-                            entry = temp_entry
-                            selected_feed = feed_url
-                            found_news = True
-                            break
-                    if found_news:
-                        break
-            except:
-                continue
-                
-        if not found_news or not entry:
-            print("❌ कोई नई न्यूज़ नहीं मिली!")
+        if not access_token:
+            print("❌ Invalid Blogger Token!")
             return
+        
+        MANUAL_URL = os.getenv('MANUAL_URL')
+        
+        if MANUAL_URL:
+            print(f"🎯 Manual mode active! Processing: {MANUAL_URL}")
+            raw_title = "Trending News Update"
+            full_content = f"Please read and write about this URL: {MANUAL_URL}"
+            category = "News"
+            link = MANUAL_URL
+            image_url = generate_hd_image_with_text("Trending India News", category)
+        else:
+            print("🔍 Normal mode: Searching RSS feeds...")
+            existing_titles = get_all_blogger_titles(access_token)
+            local_posted = load_posted_news()
+            all_posted = existing_titles.union(local_posted)
             
-        raw_title = entry.title
-        link = entry.link
-        full_content = get_full_content(entry)
-        category = detect_category(selected_feed, raw_title)
-    
-    ai_result = generate_super_detailed_content_gemini(raw_title, full_content, category)
-    
-    if ai_result:
-        viral_title, ai_content = ai_result
-    else:
-        print("⚠️ जेमिनी फ़ेल रहा! बेसिक ऑफ़लाइन जनरेटर का उपयोग कर रहा हूँ...")
-        viral_title = raw_title
-        ai_content = get_detailed_fallback_content(raw_title, full_content, category)
+            found_news = False
+            entry = None
+            selected_feed = None
+            image_url = None
+            
+            shuffled_feeds = RSS_FEEDS.copy()
+            random.shuffle(shuffled_feeds)
+            
+            for feed_url in shuffled_feeds:
+                try:
+                    response = requests.get(feed_url, timeout=15)
+                    if response.status_code == 200:
+                        feed = feedparser.parse(response.content)
+                        for i in range(min(15, len(feed.entries))):
+                            temp_entry = feed.entries[i]
+                            temp_title = temp_entry.title
+                            
+                            if is_duplicate_title(temp_title, all_posted):
+                                continue
+                            
+                            category = detect_category(feed_url, temp_title)
+                            image_url = get_hd_image_strict(temp_entry, temp_title, category)
+                            if image_url:
+                                entry = temp_entry
+                                selected_feed = feed_url
+                                found_news = True
+                                break
+                        if found_news:
+                            break
+                except Exception as e:
+                    print(f"⚠️ Error with feed {feed_url}: {e}")
+                    continue
+                    
+            if not found_news or not entry:
+                print("❌ No new news found!")
+                return
+                
+            raw_title = entry.title
+            link = entry.link
+            full_content = get_full_content(entry)
+            category = detect_category(selected_feed, raw_title)
+        
+        # Generate content with Gemini
+        ai_result = generate_super_detailed_content_gemini(raw_title, full_content, category)
+        
+        if ai_result:
+            viral_title, ai_content = ai_result
+        else:
+            print("⚠️ Gemini failed! Using fallback content...")
+            viral_title = raw_title
+            ai_content = get_detailed_fallback_content(raw_title, full_content, category)
 
-    image_html = f"""
-    <div style="text-align:center;margin-bottom:25px;">
-        <img src='{image_url}' alt='{viral_title}' style='width:100%;max-width:800px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);'>
-        <p style="font-size:12px;color:#999;margin-top:5px;">📸 Viral News AI | HD Quality</p>
-    </div>
-    """
-    
-    short_link = get_short_url(link)
-    earning_button = f"""
-    <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
-        <a href="{short_link}" target="_blank" style="background:linear-gradient(135deg,#ff5722,#ff6f00);color:white;padding:20px 60px;text-decoration:none;font-size:22px;font-weight:bold;border-radius:50px;display:inline-block;text-transform:uppercase;box-shadow:0 4px 15px rgba(255,87,34,0.3);">
-            📖 पूरी खबर पढ़ें - READ FULL STORY
-        </a>
-    </div>
-    """
-    
-    final_content = f"{image_html}\n{ai_content}\n{earning_button}"
-    
-    print(f"📝 Blogger पर पोस्ट अपलोड कर रहा हूँ...")
-    post_url = post_to_blogger(access_token, viral_title, final_content, category)
-    
-    if post_url:
-        save_posted_news(viral_title)
-        print("\n✅✅✅ POSTED SUCCESSFULLY! ✅✅✅")
-        print(f"🔗 {post_url}")
-        ping_search_engines("Viral News AI", post_url)
-        share_to_telegram(viral_title, post_url)
-        share_to_discord(viral_title, post_url)
-    else:
-        print("❌ पोस्टिंग विफल!")
+        # Build final post
+        image_html = f"""
+        <div style="text-align:center;margin-bottom:25px;">
+            <img src='{image_url}' alt='{viral_title}' style='width:100%;max-width:800px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);'>
+            <p style="font-size:12px;color:#999;margin-top:5px;">📸 Viral News AI | HD Quality</p>
+        </div>
+        """
+        
+        short_link = get_short_url(link)
+        earning_button = f"""
+        <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
+            <a href="{short_link}" target="_blank" style="background:linear-gradient(135deg,#ff5722,#ff6f00);color:white;padding:20px 60px;text-decoration:none;font-size:22px;font-weight:bold;border-radius:50px;display:inline-block;text-transform:uppercase;box-shadow:0 4px 15px rgba(255,87,34,0.3);">
+                📖 पूरी खबर पढ़ें - READ FULL STORY
+            </a>
+        </div>
+        """
+        
+        final_content = f"{image_html}\n{ai_content}\n{earning_button}"
+        
+        print(f"📝 Uploading to Blogger...")
+        post_url = post_to_blogger(access_token, viral_title, final_content, category)
+        
+        if post_url:
+            save_posted_news(viral_title)
+            print("\n✅✅✅ POSTED SUCCESSFULLY! ✅✅✅")
+            print(f"🔗 {post_url}")
+            
+            # SEO and Social Sharing
+            ping_search_engines("Viral News AI", post_url)
+            share_to_telegram(viral_title, post_url)
+            share_to_discord(viral_title, post_url)
+            
+            # Save to log
+            with open('success_log.txt', 'a', encoding='utf-8') as f:
+                f.write(f"{datetime.now()}: {viral_title} -> {post_url}\n")
+        else:
+            print("❌ Posting failed!")
 
+    except Exception as e:
+        print(f"❌ Critical error in main: {e}")
+        with open('error_log.txt', 'a', encoding='utf-8') as f:
+            f.write(f"{datetime.now()}: {str(e)}\n")
+        return
+
+# ============================================
+# 🚀 ENTRY POINT
+# ============================================
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n🛑 Bot stopped by user")
+    except Exception as e:
+        print(f"❌ Fatal error: {e}")
