@@ -424,6 +424,147 @@ def generate_super_detailed_content_gemini(title, full_content, category):
         
     return None
 
+# ============================================
+# 📝 DETAILED FALLBACK CONTENT (When AI fails)
+# ============================================
+def get_detailed_fallback_content(title, full_content, category):
+    """Generate detailed fallback content (2000+ words)"""
+    print("🔄 Using detailed fallback template...")
+    today = get_current_date()
+    clean_title = clean_and_format_title(title)
+    first_para = full_content[:800] if full_content else ""
+    more_content = full_content[800:1600] if len(full_content) > 800 else ""
+    
+    if category == "Entertainment":
+        highlights = [
+            f"<li>🎬 <strong>{clean_title[:50]}</strong> - बॉलीवुड/एंटरटेनमेंट की बड़ी खबर</li>",
+            f"<li>⭐ <strong>मुख्य घटना:</strong> {first_para[:80]}...</li>",
+            f"<li>📅 <strong>तारीख:</strong> {more_content[:60]}...</li>",
+            f"<li>🎥 <strong>प्रोडक्शन:</strong> इस प्रोजेक्ट पर काम जारी</li>",
+            f"<li>🍿 <strong>फैंस की प्रतिक्रिया:</strong> सोशल मीडिया पर उत्साह</li>",
+            f"<li>📈 <strong>बॉक्स ऑफिस:</strong> कलेक्शन अपडेट</li>",
+            f"<li>🇮🇳 <strong>इंडिया:</strong> भारतीय फिल्म इंडस्ट्री की खबर</li>",
+            f"<li>🎯 <strong>इंपैक्ट:</strong> फिल्म इंडस्ट्री पर प्रभाव</li>",
+        ]
+        expert_quote = """
+<p>Film industry experts are calling this a major development for Indian cinema. The combination of star power and meaningful content is what audiences are craving.</p>
+<p>फिल्म इंडस्ट्री के विशेषज्ञों का मानना है कि यह भारतीय सिनेमा के लिए एक बड़ा विकास है। स्टार पावर और सार्थक कंटेंट का संयोजन ही दर्शकों को आकर्षित कर रहा है।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह फिल्म बॉलीवुड के लिए एक मील का पत्थर साबित होगी।"</p>
+</blockquote>
+"""
+        analysis_detail = f"""
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>यह खबर भारतीय मनोरंजन जगत में हलचल मचा रही है। इस घटनाक्रम का असर आने वाले दिनों में और स्पष्ट होगा। विशेषज्ञों का मानना है कि यह बॉलीवुड के लिए एक नई शुरुआत है।</p>
+"""
+    
+    elif category == "Sports":
+        highlights = [
+            f"<li>🏏 <strong>{clean_title[:50]}</strong> - खेल जगत की बड़ी खबर</li>",
+            f"<li>⭐ <strong>मुख्य घटना:</strong> {first_para[:80]}...</li>",
+            f"<li>📊 <strong>विश्लेषण:</strong> {more_content[:60]}...</li>",
+            f"<li>🏆 <strong>मैच अपडेट:</strong> ताज़ा जानकारी</li>",
+            f"<li>📈 <strong>आंकड़े:</strong> खिलाड़ियों के प्रदर्शन</li>",
+            f"<li>🎯 <strong>रणनीति:</strong> टीम की रणनीति</li>",
+            f"<li>🏅 <strong>खिलाड़ी:</strong> स्टार खिलाड़ियों का योगदान</li>",
+            f"<li>🇮🇳 <strong>इंडिया:</strong> भारतीय टीम का प्रदर्शन</li>",
+        ]
+        expert_quote = """
+<p>Sports experts believe this performance will boost team morale for upcoming tournaments. The team has shown remarkable resilience and skill.</p>
+<p>खेल विशेषज्ञों का मानना है कि यह प्रदर्शन आगामी टूर्नामेंट्स के लिए टीम का मनोबल बढ़ाएगा। टीम ने उल्लेखनीय लचीलापन और कौशल दिखाया है।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह जीत भारतीय खेलों के लिए एक महत्वपूर्ण क्षण है।"</p>
+</blockquote>
+"""
+        analysis_detail = f"""
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>यह खेल घटनाक्रम भारतीय खेल जगत में चर्चा का विषय बना हुआ है। इस प्रदर्शन ने युवा खिलाड़ियों को प्रेरित किया है।</p>
+"""
+    
+    else:
+        highlights = [
+            f"<li>🔴 <strong>{clean_title[:50]}</strong> - आज की बड़ी खबर</li>",
+            f"<li>📰 <strong>विस्तार:</strong> {first_para[:80]}...</li>",
+            f"<li>📊 <strong>विश्लेषण:</strong> विशेषज्ञों की राय</li>",
+            f"<li>🔮 <strong>आगे क्या:</strong> आने वाले अपडेट</li>",
+            f"<li>🌍 <strong>ग्लोबल इंपैक्ट:</strong> दुनिया भर में प्रभाव</li>",
+            f"<li>🇮🇳 <strong>इंडिया:</strong> भारत पर क्या प्रभाव होगा</li>",
+            f"<li>📈 <strong>ट्रेंड:</strong> इस सेक्टर में रुझान</li>",
+            f"<li>🎯 <strong>फ्यूचर:</strong> आने वाला भविष्य</li>",
+        ]
+        expert_quote = f"""
+<p>Experts from around the world are weighing in on this significant development. This event is expected to reshape the future of the {category} sector.</p>
+<p>दुनिया भर के विशेषज्ञ इस महत्वपूर्ण विकास पर अपनी राय दे रहे हैं। इस घटना से {category} सेक्टर का भविष्य बदलने की उम्मीद है।</p>
+<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
+    <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर के इतिहास में एक महत्वपूर्ण मोड़ है।"</p>
+</blockquote>
+"""
+        analysis_detail = f"""
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं। यह {category} सेक्टर के लिए एक बड़ा बदलाव ला सकता है।</p>
+"""
+    
+    intro = f"""
+<h3>📝 परिचय - Introduction</h3>
+<p><strong>{clean_title}</strong></p>
+<p>{first_para}</p>
+<p>{more_content}</p>
+<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है। यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
+"""
+
+    analysis = f"""
+<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+{analysis_detail}
+<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है। विशेषज्ञों का मानना है कि इस {category} सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
+"""
+
+    expert = f"""
+<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
+{expert_quote}
+"""
+
+    impact = f"""
+<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
+<p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है। आने वाले दिनों में और अपडेट आने की संभावना है। विशेषज्ञों का मानना है कि इस घटना के दीर्घकालिक प्रभाव आने वाले महीनों में देखने को मिलेंगे।</p>
+<p>कंपनियां अपनी रणनीतियों को इस नई जानकारी के अनुसार ढाल रही हैं। पूरी दुनिया में इस खबर पर चर्चा हो रही है और आने वाले समय में इससे जुड़ी और जानकारी सामने आएगी।</p>
+"""
+
+    conclusion = f"""
+<h3>✅ निष्कर्ष - Conclusion</h3>
+<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है। इसका प्रभाव आने वाले समय में और स्पष्ट होगा।</p>
+<p>विशेषज्ञ इस बात पर सहमत हैं कि यह {category} के भविष्य को आकार देने वाला एक महत्वपूर्ण कदम है। आने वाले दिनों में इससे जुड़ी और जानकारी सामने आएगी।</p>
+<p>यह खबर {category} सेक्टर में एक नई शुरुआत का संकेत है। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक रोमांचक समय है।</p>
+"""
+    
+    return f"""
+<h2>🚨 BREAKING NEWS: {clean_title}</h2>
+
+<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
+    <p><strong>📅 Published: {today}</strong></p>
+    <p><strong>📂 Category: {category}</strong></p>
+</div>
+
+{intro}
+
+<h3>🎯 मुख्य बातें - Key Highlights</h3>
+<ul>
+    {''.join(highlights)}
+</ul>
+
+{analysis}
+
+{expert}
+
+{impact}
+
+{conclusion}
+
+<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
+"""
+
 def post_to_blogger(access_token, title, content, category):
     try:
         post_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts"
@@ -511,8 +652,7 @@ def main():
         viral_title, ai_content = ai_result
     else:
         print("⚠️ जेमिनी फ़ेल रहा! बेसिक एआई/ऑफ़लाइन जनरेटर का उपयोग कर रहा हूँ...")
-        # (पुराना टेम्पलेट फॉलबैक के रूप में काम करेगा)
-        from main import get_detailed_fallback_content
+        # ✅ FIXED: सीधे लोकल फंक्शन का उपयोग करें (इम्पोर्ट एरर समाप्त!)
         viral_title = raw_title
         ai_content = get_detailed_fallback_content(raw_title, full_content, category)
 
