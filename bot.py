@@ -10,8 +10,8 @@ import socket
 import xmlrpc.client
 import urllib3
 import urllib3.util.connection as urllib3_connection
-from google import genai  # ✅ Google GenAI SDK
-from google.genai import types  # ✅ Stable configuration types
+from google import genai
+from google.genai import types
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -40,14 +40,6 @@ def apply_smart_connection_patch():
 
 apply_smart_connection_patch()
 
-def fix_dns():
-    print("✅ Testing connection to Pollinations AI...")
-    try:
-        res = requests.get("https://text.pollinations.ai", timeout=10)
-        print(f"✅ Pollinations AI reachable (Status Code: {res.status_code})")
-    except Exception as e:
-        print(f"⚠️ Connection check failed: {e}")
-
 # ============================================
 # 🔐 CONFIGURATION & SECRETS
 # ============================================
@@ -63,7 +55,7 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') or os.getenv('GEMINI_API')
 
 # --- INDIA-FOCUSED RSS FEEDS ---
 RSS_FEEDS = [
-    "https://usafiesta.com/feed/",  # ✅ Added USAFiesta Feed to target automatic news
+    "https://usafiesta.com/feed/",
     "https://feeds.feedburner.com/ndtvnews-top-stories",
     "https://feeds.feedburner.com/ndtvnews-india-news",
     "https://www.indiatoday.in/rss/india",
@@ -160,30 +152,8 @@ def get_current_date():
     return ist_time.strftime("%B %d, %Y")
 
 # ============================================
-# 🔑 RETRY DECORATOR
-# ============================================
-def retry_on_failure(max_retries=3, delay=3):
-    def decorator(func):
-        import functools
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            for attempt in range(max_retries):
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    print(f"⚠️ Attempt {attempt+1}/{max_retries} failed: {e}")
-                    if attempt < max_retries - 1:
-                        time.sleep(delay * (attempt + 1))
-                    else:
-                        raise
-            return None
-        return wrapper
-    return decorator
-
-# ============================================
 # 🔐 BLOGGER AUTHENTICATION
 # ============================================
-@retry_on_failure(max_retries=3, delay=3)
 def get_blogger_access_token():
     try:
         token_url = "https://oauth2.googleapis.com/token"
@@ -358,132 +328,169 @@ def detect_category(feed_url, title):
     return "News"
 
 # ============================================
-# 🤖 GEMINI CONTENT GENERATION (gemini-3.6-flash FIXED)
+# 🤖 GEMINI WITH QUOTA HANDLING & RETRY
 # ============================================
 def generate_super_detailed_content_gemini(title, full_content, category):
     """
-    जेमिनी के नए मॉडल gemini-3.6-flash का उपयोग करके
-    बेहद सटीक और सजीव हिंदी ब्लॉग जनरेट करेगा।
+    Gemini 3.6 Flash with quota handling and retry mechanism
     """
     if not GEMINI_API_KEY:
         print("⚠️ GEMINI_API_KEY not found!")
         return None
 
-    try:
-        print("⏳ Generating post with Google GenAI (gemini-3.6-flash)...")
-        client = genai.Client(api_key=GEMINI_API_KEY)
+    # Try Gemini 3.6 Flash first
+    models_to_try = [
+        'gemini-3.6-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash'
+    ]
+    
+    for model in models_to_try:
+        try:
+            print(f"⏳ Trying {model}...")
+            client = genai.Client(api_key=GEMINI_API_KEY)
 
-        prompt = f"""
-        Write a professional, engaging Hindi/Hinglish news article.
-        
-        Title: {title}
-        Category: {category}
-        Source Content: {full_content[:3000]}
-        
-        Instructions:
-        1. Create a viral Hinglish title inside [TITLE]...[/TITLE] tags
-        2. Write in professional Hindi (समाचार पोर्टल की भाषा)
-        3. Use these exact sections:
-           - <h3>📝 परिचय - Introduction</h3>
-           - <h3>🎯 मुख्य बिंदु - Key Highlights</h3>
-           - <h3>📊 विश्लेषण - Analysis</h3>
-           - <h3>🔮 आगे क्या? - What's Next?</h3>
-           - <h3>✅ निष्कर्ष - Conclusion</h3>
-        4. Minimum 1000+ words
-        5. Include relevant facts and context
-        """
-
-        # ✅ gemini-3.6-flash
-        response = client.models.generate_content(
-            model='gemini-3.6-flash',
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.7,
-                max_output_tokens=4096,
-                tools=[{"google_search": {}}],
-            ),
-        )
-        
-        output_text = response.text
-
-        if output_text and len(output_text) > 200:
-            print("✅ Article generated successfully with gemini-3.6-flash!")
+            prompt = f"""
+            Write a professional, engaging Hindi/Hinglish news article.
             
-            viral_title = title
-            title_match = re.search(r'\[TITLE\](.*?)\[/TITLE\]', output_text, re.IGNORECASE | re.DOTALL)
-            if title_match:
-                viral_title = title_match.group(1).strip()
-                output_text = output_text.replace(title_match.group(0), "")
+            Title: {title}
+            Category: {category}
+            Source Content: {full_content[:3000]}
             
-            return viral_title, output_text
+            Instructions:
+            1. Create a viral Hinglish title inside [TITLE]...[/TITLE] tags
+            2. Write in professional Hindi (समाचार पोर्टल की भाषा)
+            3. Use these sections:
+               - <h3>📝 परिचय - Introduction</h3>
+               - <h3>🎯 मुख्य बिंदु - Key Highlights</h3>
+               - <h3>📊 विश्लेषण - Analysis</h3>
+               - <h3>🔮 आगे क्या? - What's Next?</h3>
+               - <h3>✅ निष्कर्ष - Conclusion</h3>
+            4. Minimum 500+ words
+            5. Include relevant facts and context
+            """
 
-    except Exception as e:
-        print(f"⚠️ Gemini API error: {e}")
-        
+            response = client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.7,
+                    max_output_tokens=4096,
+                ),
+            )
+            
+            output_text = response.text
+
+            if output_text and len(output_text) > 200:
+                print(f"✅ Article generated successfully with {model}!")
+                
+                viral_title = title
+                title_match = re.search(r'\[TITLE\](.*?)\[/TITLE\]', output_text, re.IGNORECASE | re.DOTALL)
+                if title_match:
+                    viral_title = title_match.group(1).strip()
+                    output_text = output_text.replace(title_match.group(0), "")
+                
+                return viral_title, output_text
+
+        except Exception as e:
+            error_msg = str(e)
+            if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
+                print(f"⚠️ Quota exceeded for {model}, trying next model...")
+                time.sleep(2)  # Wait before retry
+                continue
+            else:
+                print(f"⚠️ Gemini API error with {model}: {e}")
+                continue
+    
+    print("❌ All Gemini models failed! Using fallback...")
     return None
 
 # ============================================
-# 📝 FALLBACK CONTENT
+# 📝 ENHANCED FALLBACK CONTENT (Better than before)
 # ============================================
 def get_detailed_fallback_content(title, full_content, category):
-    print("🔄 Using detailed fallback template...")
+    print("🔄 Using enhanced fallback template...")
     today = get_current_date()
     clean_title = clean_and_format_title(title)
     first_para = full_content[:800] if full_content else ""
     more_content = full_content[800:1600] if len(full_content) > 800 else ""
     
-    if category == "Entertainment":
-        highlights = [
-            f"<li>🎬 <strong>{clean_title[:50]}</strong> - बॉलीवुड/एंटरटेनमेंट की बड़ी खबर</li>",
-            f"<li>⭐ <strong>मुख्य घटना:</strong> {first_para[:80]}...</li>",
-            f"<li>📅 <strong>तारीख:</strong> {more_content[:60]}...</li>",
-            f"<li>🎥 <strong>प्रोडक्शन:</strong> इस प्रोजेक्ट पर काम जारी</li>",
-            f"<li>🍿 <strong>फैंस की प्रतिक्रिया:</strong> सोशल मीडिया पर उत्साह</li>",
-            f"<li>📈 <strong>बॉक्स ऑफिस:</strong> कलेक्शन अपडेट</li>",
-        ]
-        expert_quote = """
-<p>Film industry experts are calling this a major development for Indian cinema. The combination of star power and meaningful content is what audiences are craving.</p>
-<p>फिल्म इंडस्ट्री के विशेषज्ञों का मानना है कि यह भारतीय सिनेमा के लिए एक बड़ा विकास है।</p>
-"""
-        analysis_detail = f"<p>{first_para}</p><p>{more_content}</p>"
+    # Category-specific content
+    category_emoji = {
+        "News": "📰",
+        "Politics": "🏛️",
+        "Sports": "🏏",
+        "Entertainment": "🎬",
+        "Business": "💰",
+        "Technology": "💻",
+        "Health": "🏥",
+        "Automobile": "🚗"
+    }.get(category, "📰")
     
-    elif category == "Sports":
-        highlights = [
-            f"<li>🏏 <strong>{clean_title[:50]}</strong> - खेल जगत की बड़ी खबर</li>",
-            f"<li>⭐ <strong>मुख्य घटना:</strong> {first_para[:80]}...</li>",
-            f"<li>📊 <strong>विश्लेषण:</strong> {more_content[:60]}...</li>",
-        ]
-        expert_quote = """<p>Sports experts believe this performance will boost team morale.</p>"""
-        analysis_detail = f"<p>{first_para}</p><p>{more_content}</p>"
+    highlights = [
+        f"<li>🔴 <strong>{clean_title[:50]}</strong> - आज की बड़ी खबर</li>",
+        f"<li>📰 <strong>मुख्य घटना:</strong> {first_para[:100]}...</li>",
+    ]
     
-    else:
-        highlights = [
-            f"<li>🔴 <strong>{clean_title[:50]}</strong> - आज की बड़ी खबर</li>",
-            f"<li>📰 <strong>विस्तार:</strong> {first_para[:80]}...</li>",
-        ]
-        expert_quote = f"<p>Experts are weighing in on this significant development.</p>"
-        analysis_detail = f"<p>{first_para}</p><p>{more_content}</p>"
+    if len(more_content) > 50:
+        highlights.append(f"<li>📌 <strong>विस्तार:</strong> {more_content[:100]}...</li>")
     
-    intro = f"<h3>📝 परिचय - Introduction</h3><p>{clean_title}</p><p>{first_para}</p>"
-    analysis = f"<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>{analysis_detail}"
-    expert = f"<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>{expert_quote}"
-    impact = f"<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3><p>इस घटना के दूरगामी प्रभाव हो सकते हैं।</p>"
-    conclusion = f"<h3>✅ निष्कर्ष - Conclusion</h3><p>{clean_title} - यह एक महत्वपूर्ण घटनाक्रम है।</p>"
+    highlights.append(f"<li>📅 <strong>तारीख:</strong> {today}</li>")
+    highlights.append(f"<li>📂 <strong>श्रेणी:</strong> {category}</li>")
+    
+    intro = f"""
+    <h3>📝 परिचय - Introduction</h3>
+    <p>{category_emoji} <strong>{clean_title}</strong></p>
+    <p>{first_para}</p>
+    """
+    
+    analysis = f"""
+    <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+    <p>{first_para}</p>
+    {f'<p>{more_content}</p>' if more_content else ''}
+    <p>यह खबर भारत और दुनिया भर में चर्चा का विषय बनी हुई है। विशेषज्ञों का मानना है कि इस घटनाक्रम का दूरगामी प्रभाव हो सकता है।</p>
+    """
+    
+    expert = f"""
+    <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
+    <p>विशेषज्ञों के अनुसार, इस घटनाक्रम को गंभीरता से लेने की आवश्यकता है। यह भारतीय परिप्रेक्ष्य में एक महत्वपूर्ण मोड़ हो सकता है।</p>
+    <p>Experts believe this development requires serious attention and could be a significant turning point in the Indian context.</p>
+    """
+    
+    impact = f"""
+    <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
+    <p>इस घटना के कई संभावित प्रभाव हो सकते हैं:</p>
+    <ul>
+        <li>🇮🇳 भारत में इसका सीधा प्रभाव देखने को मिलेगा</li>
+        <li>📈 सोशल मीडिया पर लोगों की प्रतिक्रियाएं आ रही हैं</li>
+        <li>🔮 आने वाले दिनों में और अपडेट की संभावना</li>
+    </ul>
+    """
+    
+    conclusion = f"""
+    <h3>✅ निष्कर्ष - Conclusion</h3>
+    <p>{clean_title} - यह एक महत्वपूर्ण घटनाक्रम है जिस पर नजर रखना आवश्यक है। हम आपको इससे जुड़ी सभी अपडेट देते रहेंगे।</p>
+    <p>Stay tuned for more updates on this developing story.</p>
+    """
     
     return f"""
-<h2>🚨 BREAKING NEWS: {clean_title}</h2>
-<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
-    <p><strong>📅 Published: {today}</strong></p>
-    <p><strong>📂 Category: {category}</strong></p>
-</div>
-{intro}
-<h3>🎯 मुख्य बातें - Key Highlights</h3>
-<ul>{''.join(highlights)}</ul>
-{analysis}
-{expert}
-{impact}
-{conclusion}
-"""
+    <h2>🚨 {clean_title}</h2>
+    <div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
+        <p><strong>📅 Published: {today}</strong></p>
+        <p><strong>📂 Category: {category}</strong></p>
+    </div>
+    {intro}
+    <h3>🎯 मुख्य बातें - Key Highlights</h3>
+    <ul>{''.join(highlights)}</ul>
+    {analysis}
+    {expert}
+    {impact}
+    {conclusion}
+    <div style="background:#e8f5e9;padding:15px;border-radius:8px;margin:15px 0;text-align:center;">
+        <p>📱 <strong>इस खबर को सोशल मीडिया पर शेयर करें</strong></p>
+        <p style="font-size:14px;">#BreakingNews #India #{category}</p>
+    </div>
+    """
 
 # ============================================
 # 📝 POST TO BLOGGER
@@ -501,6 +508,9 @@ def post_to_blogger(access_token, title, content, category):
         post_res = requests.post(post_url, headers=headers, json=post_body, timeout=20)
         if post_res.status_code in [200, 201]:
             return post_res.json().get("url")
+        else:
+            print(f"⚠️ Blogger API Error: {post_res.status_code} - {post_res.text}")
+            return None
     except Exception as e:
         print(f"⚠️ Error posting to Blogger: {e}")
         return None
@@ -539,7 +549,7 @@ def fix_dns():
         print(f"⚠️ Connection check failed: {e}")
 
 # ============================================
-# 🚀 MAIN FUNCTION (WORKING)
+# 🚀 MAIN FUNCTION
 # ============================================
 def main():
     print("\n🤖 Starting Viral News AI Blogger Bot...")
@@ -547,7 +557,7 @@ def main():
     print(f"🔑 Gemini API: {'✅ Set' if GEMINI_API_KEY else '❌ Not Set'}")
     
     if not check_bot_health():
-        print("❌ Health check failed! But continuing with available features...")
+        print("⚠️ Health check failed! But continuing with available features...")
     
     try:
         fix_dns()
@@ -582,6 +592,7 @@ def main():
             
             for feed_url in shuffled_feeds:
                 try:
+                    print(f"📡 Checking feed: {feed_url}")
                     response = requests.get(feed_url, timeout=15)
                     if response.status_code == 200:
                         feed = feedparser.parse(response.content)
@@ -589,7 +600,6 @@ def main():
                             temp_entry = feed.entries[i]
                             temp_title = temp_entry.title
                             
-                            # 🚫 CATEGORY BOTTLENECK REMOVED (ताकि हर बार नई न्यूज़ पोस्ट हो सके)
                             if is_duplicate_title(temp_title, all_posted):
                                 continue
                             
@@ -599,6 +609,7 @@ def main():
                                 entry = temp_entry
                                 selected_feed = feed_url
                                 found_news = True
+                                print(f"✅ Found news: {temp_title[:50]}...")
                                 break
                         if found_news:
                             break
@@ -615,13 +626,14 @@ def main():
             full_content = get_full_content(entry)
             category = detect_category(selected_feed, raw_title)
         
-        # ✅ 'gemini-3.6-flash' से न्यूज़ आर्टिकल जनरेट करना
+        # Try Gemini with quota handling
         ai_result = generate_super_detailed_content_gemini(raw_title, full_content, category)
         
         if ai_result:
             viral_title, ai_content = ai_result
+            print("✅ Using Gemini-generated content")
         else:
-            print("⚠️ Gemini failed! Using fallback content...")
+            print("⚠️ Using enhanced fallback content...")
             viral_title = raw_title
             ai_content = get_detailed_fallback_content(raw_title, full_content, category)
 
@@ -652,12 +664,10 @@ def main():
             print("\n✅✅✅ POSTED SUCCESSFULLY! ✅✅✅")
             print(f"🔗 {post_url}")
             
-            # SEO and Social Sharing
             ping_search_engines("Viral News AI", post_url)
             share_to_telegram(viral_title, post_url)
             share_to_discord(viral_title, post_url)
             
-            # Save to log
             with open('success_log.txt', 'a', encoding='utf-8') as f:
                 f.write(f"{datetime.now()}: {viral_title} -> {post_url}\n")
         else:
