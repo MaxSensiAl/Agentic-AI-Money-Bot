@@ -583,7 +583,7 @@ def post_to_blogger(access_token, title, content, category):
         return None
 
 # ============================================
-# 🚀 MAIN RUNNER
+# 🚀 MAIN RUNNER (WITH MANUAL URL OVERRIDE)
 # ============================================
 def main():
     print("🤖 Starting Viral News AI Blogger Bot...")
@@ -595,64 +595,75 @@ def main():
         print("❌ Invalid Blogger Token!")
         return
     
-    existing_titles = get_all_blogger_titles(access_token)
-    local_posted = load_posted_news()
-    all_posted = existing_titles.union(local_posted)
+    # 🔗 मैनुअल यूआरएल की जांच करें (गिटहब एनवायरनमेंट से)
+    MANUAL_URL = os.getenv('MANUAL_URL')
     
-    recent_categories = get_recent_blogger_categories(access_token)
-    
-    found_news = False
-    entry = None
-    selected_feed = None
-    image_url = None
-    
-    shuffled_feeds = RSS_FEEDS.copy()
-    random.shuffle(shuffled_feeds)
-    
-    for feed_url in shuffled_feeds:
-        try:
-            response = requests.get(feed_url, timeout=15)
-            if response.status_code == 200:
-                feed = feedparser.parse(response.content)
-                for i in range(min(15, len(feed.entries))):
-                    temp_entry = feed.entries[i]
-                    temp_title = temp_entry.title
-                    
-                    if is_duplicate_title(temp_title, all_posted):
-                        continue
-                    
-                    category = detect_category(feed_url, temp_title)
-                    if category in recent_categories:
-                        continue
-                    
-                    image_url = get_hd_image_strict(temp_entry, temp_title, category)
-                    if image_url:
-                        entry = temp_entry
-                        selected_feed = feed_url
-                        found_news = True
-                        break
-                if found_news:
-                    break
-        except:
-            continue
-            
-    if not found_news or not entry:
-        print("❌ कोई नई न्यूज़ नहीं मिली!")
-        return
+    if MANUAL_URL:
+        print(f"🎯 मैनुअल मोड सक्रिय! इस लिंक की खबर प्रोसेस की जा रही है: {MANUAL_URL}")
+        raw_title = "Trending News Update"  # जेमिनी एजेंट खुद वायरल टाइटल जनरेट करेगा
+        full_content = f"Please read and write about this URL: {MANUAL_URL}"
+        category = "News"
+        link = MANUAL_URL
+        image_url = generate_hd_image_with_text("Trending India News", category)
+    else:
+        # यदि कोई मैनुअल लिंक नहीं है, तो सामान्य रूप से RSS फीड्स से खबर खोजें
+        print("🔍 सामान्य मोड: RSS फीड्स से ताज़ा खबर खोज रहा हूँ...")
+        existing_titles = get_all_blogger_titles(access_token)
+        local_posted = load_posted_news()
+        all_posted = existing_titles.union(local_posted)
+        recent_categories = get_recent_blogger_categories(access_token)
         
-    raw_title = entry.title
-    link = entry.link
-    full_content = get_full_content(entry)
-    category = detect_category(selected_feed, raw_title)
+        found_news = False
+        entry = None
+        selected_feed = None
+        image_url = None
+        
+        shuffled_feeds = RSS_FEEDS.copy()
+        random.shuffle(shuffled_feeds)
+        
+        for feed_url in shuffled_feeds:
+            try:
+                response = requests.get(feed_url, timeout=15)
+                if response.status_code == 200:
+                    feed = feedparser.parse(response.content)
+                    for i in range(min(15, len(feed.entries))):
+                        temp_entry = feed.entries[i]
+                        temp_title = temp_entry.title
+                        
+                        if is_duplicate_title(temp_title, all_posted):
+                            continue
+                        
+                        category = detect_category(feed_url, temp_title)
+                        if category in recent_categories:
+                            continue
+                        
+                        image_url = get_hd_image_strict(temp_entry, temp_title, category)
+                        if image_url:
+                            entry = temp_entry
+                            selected_feed = feed_url
+                            found_news = True
+                            break
+                    if found_news:
+                        break
+            except:
+                continue
+                
+        if not found_news or not entry:
+            print("❌ कोई नई न्यूज़ नहीं मिली!")
+            return
+            
+        raw_title = entry.title
+        link = entry.link
+        full_content = get_full_content(entry)
+        category = detect_category(selected_feed, raw_title)
     
-    # 🤖 जेमिनी एजेंट का उपयोग करके ब्लॉग जनरेट करना
+    # 🤖 जेमिनी एजेंट का उपयोग करके ब्लॉग जनरेट करना (यह लिंक पर जाकर सब कुछ पढ़ेगा)
     ai_result = generate_super_detailed_content_gemini(raw_title, full_content, category)
     
     if ai_result:
         viral_title, ai_content = ai_result
     else:
-        print("⚠️ जेमिनी फ़ेल रहा! बेसिक एआई/ऑफ़लाइन जनरेटर का उपयोग कर रहा हूँ...")
-        # ✅ FIXED: सीधे लोकल फंक्शन का उपयोग करें (इम्पोर्ट एरर समाप्त!)
+        print("⚠️ जेमिनी फ़ेल रहा! बेसिक ऑफ़लाइन जनरेटर का उपयोग कर रहा हूँ...")
         viral_title = raw_title
         ai_content = get_detailed_fallback_content(raw_title, full_content, category)
 
