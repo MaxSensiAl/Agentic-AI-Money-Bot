@@ -10,10 +10,8 @@ import socket
 import xmlrpc.client
 import urllib3
 import urllib3.util.connection as urllib3_connection
-from google import genai
-from google.genai import types
-import pickle
-from functools import lru_cache, wraps
+from google import genai  # ✅ Google GenAI SDK
+from google.genai import types  # ✅ Stable configuration types
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -42,8 +40,16 @@ def apply_smart_connection_patch():
 
 apply_smart_connection_patch()
 
+def fix_dns():
+    print("✅ Testing connection to Pollinations AI...")
+    try:
+        res = requests.get("https://text.pollinations.ai", timeout=10)
+        print(f"✅ Pollinations AI reachable (Status Code: {res.status_code})")
+    except Exception as e:
+        print(f"⚠️ Connection check failed: {e}")
+
 # ============================================
-# 🔐 CONFIGURATION
+# 🔐 CONFIGURATION & SECRETS
 # ============================================
 BLOG_ID = os.getenv('BLOG_ID')
 SHRINKME_API = os.getenv('SHRINKME_API')
@@ -55,11 +61,9 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') or os.getenv('GEMINI_API')
 
-# ============================================
-# 📰 RSS FEEDS (India Focused)
-# ============================================
+# --- INDIA-FOCUSED RSS FEEDS ---
 RSS_FEEDS = [
-    "https://usafiesta.com/feed/",
+    "https://usafiesta.com/feed/",  # ✅ Added USAFiesta Feed to target automatic news
     "https://feeds.feedburner.com/ndtvnews-top-stories",
     "https://feeds.feedburner.com/ndtvnews-india-news",
     "https://www.indiatoday.in/rss/india",
@@ -72,9 +76,7 @@ RSS_FEEDS = [
     "https://economictimes.indiatimes.com/rssfeeds/13358356.cms"
 ]
 
-# ============================================
-# 🖼️ IMAGE SOURCES
-# ============================================
+# --- IMAGE SOURCES ---
 UNSPLASH_IMAGES = {
     "Technology": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
     "Gaming": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
@@ -162,7 +164,8 @@ def get_current_date():
 # ============================================
 def retry_on_failure(max_retries=3, delay=3):
     def decorator(func):
-        @wraps(func)
+        import functools
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             for attempt in range(max_retries):
                 try:
@@ -355,18 +358,19 @@ def detect_category(feed_url, title):
     return "News"
 
 # ============================================
-# 🤖 GEMINI CONTENT GENERATION (FIXED)
+# 🤖 GEMINI CONTENT GENERATION (gemini-3.6-flash FIXED)
 # ============================================
 def generate_super_detailed_content_gemini(title, full_content, category):
     """
-    Uses Gemini 2.0 Flash for lightning-fast Hindi news blog generation
+    जेमिनी के नए मॉडल gemini-3.6-flash का उपयोग करके
+    बेहद सटीक और सजीव हिंदी ब्लॉग जनरेट करेगा।
     """
     if not GEMINI_API_KEY:
         print("⚠️ GEMINI_API_KEY not found!")
         return None
 
     try:
-        print("⏳ Generating post with Google GenAI (gemini-2.0-flash)...")
+        print("⏳ Generating post with Google GenAI (gemini-3.6-flash)...")
         client = genai.Client(api_key=GEMINI_API_KEY)
 
         prompt = f"""
@@ -389,9 +393,9 @@ def generate_super_detailed_content_gemini(title, full_content, category):
         5. Include relevant facts and context
         """
 
-        # Using gemini-2.0-flash for speed
+        # ✅ gemini-3.6-flash
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-3.6-flash',
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.7,
@@ -403,7 +407,7 @@ def generate_super_detailed_content_gemini(title, full_content, category):
         output_text = response.text
 
         if output_text and len(output_text) > 200:
-            print("✅ Article generated successfully!")
+            print("✅ Article generated successfully with gemini-3.6-flash!")
             
             viral_title = title
             title_match = re.search(r'\[TITLE\](.*?)\[/TITLE\]', output_text, re.IGNORECASE | re.DOTALL)
@@ -542,7 +546,6 @@ def main():
     print(f"📅 {get_current_date()}")
     print(f"🔑 Gemini API: {'✅ Set' if GEMINI_API_KEY else '❌ Not Set'}")
     
-    # Health check first
     if not check_bot_health():
         print("❌ Health check failed! But continuing with available features...")
     
@@ -586,6 +589,7 @@ def main():
                             temp_entry = feed.entries[i]
                             temp_title = temp_entry.title
                             
+                            # 🚫 CATEGORY BOTTLENECK REMOVED (ताकि हर बार नई न्यूज़ पोस्ट हो सके)
                             if is_duplicate_title(temp_title, all_posted):
                                 continue
                             
@@ -611,7 +615,7 @@ def main():
             full_content = get_full_content(entry)
             category = detect_category(selected_feed, raw_title)
         
-        # Generate content with Gemini
+        # ✅ 'gemini-3.6-flash' से न्यूज़ आर्टिकल जनरेट करना
         ai_result = generate_super_detailed_content_gemini(raw_title, full_content, category)
         
         if ai_result:
