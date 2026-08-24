@@ -60,6 +60,7 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') or os.getenv('GEMINI_API')
 
 # --- INDIA-FOCUSED RSS FEEDS ---
 RSS_FEEDS = [
+    "https://usafiesta.com/feed/",  # ✅ Added USAFiesta Feed to target automatic news
     "https://feeds.feedburner.com/ndtvnews-top-stories",
     "https://feeds.feedburner.com/ndtvnews-india-news",
     "https://www.indiatoday.in/rss/india",
@@ -113,28 +114,6 @@ def save_posted_news(title):
             f.write(cleaned + '\n')
     except:
         pass
-
-def get_recent_blogger_categories(access_token):
-    recent_categories = []
-    if not access_token:
-        return recent_categories
-    try:
-        url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts?maxResults=6"
-        headers = {"Authorization": f"Bearer {access_token}"}
-        res = requests.get(url, headers=headers, timeout=15)
-        if res.status_code == 200:
-            data = res.json()
-            allowed_categories = ["Technology", "Gaming", "Entertainment", "Space", "Sports", "Business", "Music", "Politics", "Health", "Automobile", "News"]
-            for post in data.get("items", []):
-                labels = post.get("labels", [])
-                for label in labels:
-                    if label in allowed_categories and label not in recent_categories:
-                        recent_categories.append(label)
-            print(f"📥 Blogger से सिंक की गई हालिया श्रेणियां: {recent_categories}")
-            return recent_categories[:3]
-    except Exception as e:
-        print(f"⚠️ Blogger कैटेगरीज सिंक करने में एरर: {e}")
-    return []
 
 def ping_search_engines(blog_name, blog_url):
     print("🚀 SEO Pinging...")
@@ -348,9 +327,6 @@ def detect_category(feed_url, title):
 # 🤖 GOOGLE GEMINI AGENT (LIVE SEARCH & WRITER)
 # ============================================
 def generate_super_detailed_content_gemini(title, full_content, category):
-    """
-    Antigravity Gemini Agent का उपयोग करके ब्लॉग को एकदम स्क्रीनशॉट जैसी शैली में लिखेगा।
-    """
     if not GEMINI_API_KEY:
         print("⚠️ GEMINI_API_KEY नहीं मिली!")
         return None
@@ -359,14 +335,12 @@ def generate_super_detailed_content_gemini(title, full_content, category):
         print("⏳ Google GenAI Antigravity Agent को सक्रिय कर रहा हूँ...")
         client = genai.Client(api_key=GEMINI_API_KEY)
 
-        # लाइव सर्च और कोड एग्जीक्यूशन टूल्स
         tools = [
             {'type': 'code_execution'},
             {'type': 'google_search'},
             {'type': 'url_context'}
         ]
 
-        # प्रोफ़ेशनल समाचार पोर्टल गाइडलाइंस
         prompt = (
             f"Write a comprehensive, professional, highly engaging Hindi/Hinglish news article. "
             f"Source News Title: {title}\n"
@@ -395,7 +369,6 @@ def generate_super_detailed_content_gemini(title, full_content, category):
             },
         )
 
-        # पोलिंग (Polling) लूप
         attempts = 0
         while attempts < 15:
             interaction = client.interactions.get(interaction.id)
@@ -403,7 +376,6 @@ def generate_super_detailed_content_gemini(title, full_content, category):
                 print("✅ जेमिनी एजेंट ने पूरी तरह से ब्लॉग आर्टिकल जनरेट कर लिया है!")
                 output_text = interaction.output_text
                 
-                # Title और Content को अलग करना
                 viral_title = title
                 title_match = re.search(r'\[TITLE\](.*?)\[/TITLE\]', output_text, re.IGNORECASE | re.DOTALL)
                 if title_match:
@@ -428,7 +400,6 @@ def generate_super_detailed_content_gemini(title, full_content, category):
 # 📝 DETAILED FALLBACK CONTENT (When AI fails)
 # ============================================
 def get_detailed_fallback_content(title, full_content, category):
-    """Generate detailed fallback content (2000+ words)"""
     print("🔄 Using detailed fallback template...")
     today = get_current_date()
     clean_title = clean_and_format_title(title)
@@ -443,126 +414,49 @@ def get_detailed_fallback_content(title, full_content, category):
             f"<li>🎥 <strong>प्रोडक्शन:</strong> इस प्रोजेक्ट पर काम जारी</li>",
             f"<li>🍿 <strong>फैंस की प्रतिक्रिया:</strong> सोशल मीडिया पर उत्साह</li>",
             f"<li>📈 <strong>बॉक्स ऑफिस:</strong> कलेक्शन अपडेट</li>",
-            f"<li>🇮🇳 <strong>इंडिया:</strong> भारतीय फिल्म इंडस्ट्री की खबर</li>",
-            f"<li>🎯 <strong>इंपैक्ट:</strong> फिल्म इंडस्ट्री पर प्रभाव</li>",
         ]
         expert_quote = """
 <p>Film industry experts are calling this a major development for Indian cinema. The combination of star power and meaningful content is what audiences are craving.</p>
-<p>फिल्म इंडस्ट्री के विशेषज्ञों का मानना है कि यह भारतीय सिनेमा के लिए एक बड़ा विकास है। स्टार पावर और सार्थक कंटेंट का संयोजन ही दर्शकों को आकर्षित कर रहा है।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह फिल्म बॉलीवुड के लिए एक मील का पत्थर साबित होगी।"</p>
-</blockquote>
+<p>फिल्म इंडस्ट्री के विशेषज्ञों का मानना है कि यह भारतीय सिनेमा के लिए एक बड़ा विकास है।</p>
 """
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>यह खबर भारतीय मनोरंजन जगत में हलचल मचा रही है। इस घटनाक्रम का असर आने वाले दिनों में और स्पष्ट होगा। विशेषज्ञों का मानना है कि यह बॉलीवुड के लिए एक नई शुरुआत है।</p>
-"""
+        analysis_detail = f"<p>{first_para}</p><p>{more_content}</p>"
     
     elif category == "Sports":
         highlights = [
             f"<li>🏏 <strong>{clean_title[:50]}</strong> - खेल जगत की बड़ी खबर</li>",
             f"<li>⭐ <strong>मुख्य घटना:</strong> {first_para[:80]}...</li>",
             f"<li>📊 <strong>विश्लेषण:</strong> {more_content[:60]}...</li>",
-            f"<li>🏆 <strong>मैच अपडेट:</strong> ताज़ा जानकारी</li>",
-            f"<li>📈 <strong>आंकड़े:</strong> खिलाड़ियों के प्रदर्शन</li>",
-            f"<li>🎯 <strong>रणनीति:</strong> टीम की रणनीति</li>",
-            f"<li>🏅 <strong>खिलाड़ी:</strong> स्टार खिलाड़ियों का योगदान</li>",
-            f"<li>🇮🇳 <strong>इंडिया:</strong> भारतीय टीम का प्रदर्शन</li>",
         ]
-        expert_quote = """
-<p>Sports experts believe this performance will boost team morale for upcoming tournaments. The team has shown remarkable resilience and skill.</p>
-<p>खेल विशेषज्ञों का मानना है कि यह प्रदर्शन आगामी टूर्नामेंट्स के लिए टीम का मनोबल बढ़ाएगा। टीम ने उल्लेखनीय लचीलापन और कौशल दिखाया है।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह जीत भारतीय खेलों के लिए एक महत्वपूर्ण क्षण है।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>यह खेल घटनाक्रम भारतीय खेल जगत में चर्चा का विषय बना हुआ है। इस प्रदर्शन ने युवा खिलाड़ियों को प्रेरित किया है।</p>
-"""
+        expert_quote = """<p>Sports experts believe this performance will boost team morale.</p>"""
+        analysis_detail = f"<p>{first_para}</p><p>{more_content}</p>"
     
     else:
         highlights = [
             f"<li>🔴 <strong>{clean_title[:50]}</strong> - आज की बड़ी खबर</li>",
             f"<li>📰 <strong>विस्तार:</strong> {first_para[:80]}...</li>",
-            f"<li>📊 <strong>विश्लेषण:</strong> विशेषज्ञों की राय</li>",
-            f"<li>🔮 <strong>आगे क्या:</strong> आने वाले अपडेट</li>",
-            f"<li>🌍 <strong>ग्लोबल इंपैक्ट:</strong> दुनिया भर में प्रभाव</li>",
-            f"<li>🇮🇳 <strong>इंडिया:</strong> भारत पर क्या प्रभाव होगा</li>",
-            f"<li>📈 <strong>ट्रेंड:</strong> इस सेक्टर में रुझान</li>",
-            f"<li>🎯 <strong>फ्यूचर:</strong> आने वाला भविष्य</li>",
         ]
-        expert_quote = f"""
-<p>Experts from around the world are weighing in on this significant development. This event is expected to reshape the future of the {category} sector.</p>
-<p>दुनिया भर के विशेषज्ञ इस महत्वपूर्ण विकास पर अपनी राय दे रहे हैं। इस घटना से {category} सेक्टर का भविष्य बदलने की उम्मीद है।</p>
-<blockquote style="border-left:5px solid #ff5722;padding:20px;background:#f9f9f9;border-radius:8px;margin:20px 0;">
-    <p style="font-style:italic;font-size:16px;">"यह {category} सेक्टर के इतिहास में एक महत्वपूर्ण मोड़ है।"</p>
-</blockquote>
-"""
-        analysis_detail = f"""
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>इस खबर के कई पहलू हैं और विशेषज्ञ इस पर लगातार नजर रखे हुए हैं। यह {category} सेक्टर के लिए एक बड़ा बदलाव ला सकता है।</p>
-"""
+        expert_quote = f"<p>Experts are weighing in on this significant development.</p>"
+        analysis_detail = f"<p>{first_para}</p><p>{more_content}</p>"
     
-    intro = f"""
-<h3>📝 परिचय - Introduction</h3>
-<p><strong>{clean_title}</strong></p>
-<p>{first_para}</p>
-<p>{more_content}</p>
-<p>{clean_title} - यह {category} सेक्टर की आज की सबसे बड़ी खबर है। यह घटना पूरे उद्योग में चर्चा का विषय बनी हुई है। विशेषज्ञ इस विकास पर लगातार नजर रखे हुए हैं।</p>
-"""
-
-    analysis = f"""
-<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-{analysis_detail}
-<p>इस खबर का प्रभाव आने वाले दिनों में और स्पष्ट होगा। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक महत्वपूर्ण समय है। विशेषज्ञों का मानना है कि इस {category} सेक्टर के लिए एक महत्वपूर्ण मोड़ है।</p>
-"""
-
-    expert = f"""
-<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-{expert_quote}
-"""
-
-    impact = f"""
-<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-<p>इस खबर का {category} सेक्टर पर महत्वपूर्ण प्रभाव पड़ने की उम्मीद है। आने वाले दिनों में और अपडेट आने की संभावना है। विशेषज्ञों का मानना है कि इस घटना के दीर्घकालिक प्रभाव आने वाले महीनों में देखने को मिलेंगे।</p>
-<p>कंपनियां अपनी रणनीतियों को इस नई जानकारी के अनुसार ढाल रही हैं। पूरी दुनिया में इस खबर पर चर्चा हो रही है और आने वाले समय में इससे जुड़ी और जानकारी सामने आएगी।</p>
-"""
-
-    conclusion = f"""
-<h3>✅ निष्कर्ष - Conclusion</h3>
-<p>{clean_title} - यह {category} सेक्टर के लिए एक महत्वपूर्ण विकास है। इसका प्रभाव आने वाले समय में और स्पष्ट होगा।</p>
-<p>विशेषज्ञ इस बात पर सहमत हैं कि यह {category} के भविष्य को आकार देने वाला एक महत्वपूर्ण कदम है। आने वाले दिनों में इससे जुड़ी और जानकारी सामने आएगी।</p>
-<p>यह खबर {category} सेक्टर में एक नई शुरुआत का संकेत है। जो लोग इस सेक्टर से जुड़े हैं, उनके लिए यह एक रोमांचक समय है।</p>
-"""
+    intro = f"<h3>📝 परिचय - Introduction</h3><p>{clean_title}</p><p>{first_para}</p>"
+    analysis = f"<h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>{analysis_detail}"
+    expert = f"<h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>{expert_quote}"
+    impact = f"<h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3><p>इस घटना के दूरगामी प्रभाव हो सकते हैं।</p>"
+    conclusion = f"<h3>✅ निष्कर्ष - Conclusion</h3><p>{clean_title} - यह एक महत्वपूर्ण घटनाक्रम है।</p>"
     
     return f"""
 <h2>🚨 BREAKING NEWS: {clean_title}</h2>
-
 <div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
     <p><strong>📅 Published: {today}</strong></p>
     <p><strong>📂 Category: {category}</strong></p>
 </div>
-
 {intro}
-
 <h3>🎯 मुख्य बातें - Key Highlights</h3>
-<ul>
-    {''.join(highlights)}
-</ul>
-
+<ul>{''.join(highlights)}</ul>
 {analysis}
-
 {expert}
-
 {impact}
-
 {conclusion}
-
-<p><em>Disclaimer: This is an AI-generated news summary. For complete details, please refer to the original source.</em></p>
 """
 
 def post_to_blogger(access_token, title, content, category):
@@ -583,7 +477,7 @@ def post_to_blogger(access_token, title, content, category):
         return None
 
 # ============================================
-# 🚀 MAIN RUNNER (WITH MANUAL URL OVERRIDE)
+# 🚀 MAIN RUNNER (OPTIMIZED)
 # ============================================
 def main():
     print("🤖 Starting Viral News AI Blogger Bot...")
@@ -595,23 +489,20 @@ def main():
         print("❌ Invalid Blogger Token!")
         return
     
-    # 🔗 मैनुअल यूआरएल की जांच करें (गिटहब एनवायरनमेंट से)
     MANUAL_URL = os.getenv('MANUAL_URL')
     
     if MANUAL_URL:
         print(f"🎯 मैनुअल मोड सक्रिय! इस लिंक की खबर प्रोसेस की जा रही है: {MANUAL_URL}")
-        raw_title = "Trending News Update"  # जेमिनी एजेंट खुद वायरल टाइटल जनरेट करेगा
+        raw_title = "Trending News Update"
         full_content = f"Please read and write about this URL: {MANUAL_URL}"
         category = "News"
         link = MANUAL_URL
         image_url = generate_hd_image_with_text("Trending India News", category)
     else:
-        # यदि कोई मैनुअल लिंक नहीं है, तो सामान्य रूप से RSS फीड्स से खबर खोजें
         print("🔍 सामान्य मोड: RSS फीड्स से ताज़ा खबर खोज रहा हूँ...")
         existing_titles = get_all_blogger_titles(access_token)
         local_posted = load_posted_news()
         all_posted = existing_titles.union(local_posted)
-        recent_categories = get_recent_blogger_categories(access_token)
         
         found_news = False
         entry = None
@@ -630,13 +521,11 @@ def main():
                         temp_entry = feed.entries[i]
                         temp_title = temp_entry.title
                         
+                        # 🚫 CATEGORY BOTTLENECK REMOVED (अब कभी फेल नहीं होगा!)
                         if is_duplicate_title(temp_title, all_posted):
                             continue
                         
                         category = detect_category(feed_url, temp_title)
-                        if category in recent_categories:
-                            continue
-                        
                         image_url = get_hd_image_strict(temp_entry, temp_title, category)
                         if image_url:
                             entry = temp_entry
@@ -657,7 +546,6 @@ def main():
         full_content = get_full_content(entry)
         category = detect_category(selected_feed, raw_title)
     
-    # 🤖 जेमिनी एजेंट का उपयोग करके ब्लॉग जनरेट करना (यह लिंक पर जाकर सब कुछ पढ़ेगा)
     ai_result = generate_super_detailed_content_gemini(raw_title, full_content, category)
     
     if ai_result:
