@@ -2,27 +2,27 @@ name: World's Powerful Blogger Bot
 
 on:
   schedule:
-    - cron: '0 * * * *'   # ✅ हर 1 घंटे में
-  workflow_dispatch:       # ✅ Manual run
+    - cron: '0 * * * *'  # ✅ हर 1 घंटे में चलेगा
+  workflow_dispatch:     # ✅ मैनुअल रन करने की सुविधा
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10'    # ✅ Python 3.10
-    
+        python-version: '3.10'   # ✅ Python 3.10 एनवायरनमेंट
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    
+
     - name: Execute Bot
       env:
         BLOG_ID: ${{ secrets.BLOG_ID }}
@@ -32,4 +32,5 @@ jobs:
         BC_CLIENT_SECRET: ${{ secrets.BC_CLIENT_SECRET }}
         BC_REFRESH_TOKEN: ${{ secrets.BC_REFRESH_TOKEN }}
         SERVICE_ACCOUNT_USERNAME: ${{ secrets.SERVICE_ACCOUNT_USERNAME }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} # ✅ जेमिनी की-मैपिंग जोड़ी गई ताकि एआई चल सके
       run: python bot.py
