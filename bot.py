@@ -358,15 +358,12 @@ def generate_super_detailed_content_gemini(title, full_content, category):
             f"4. The word count must be extremely detailed (minimum 1500+ words of deep value)."
         )
 
+        # ✅ 'environment' पैरामीटर को हटा दिया गया है ताकि 422 एरर दूर हो सके
         interaction = client.interactions.create(
             agent='antigravity-preview-05-2026',
             input=prompt,
             background=True,
             tools=tools,
-            environment={
-                'type': 'remote',
-                'network': 'disabled',
-            },
         )
 
         attempts = 0
@@ -521,7 +518,7 @@ def main():
                         temp_entry = feed.entries[i]
                         temp_title = temp_entry.title
                         
-                        # 🚫 CATEGORY BOTTLENECK REMOVED (अब कभी फेल नहीं होगा!)
+                        # 🚫 CATEGORY BOTTLENECK REMOVED
                         if is_duplicate_title(temp_title, all_posted):
                             continue
                         
