@@ -11,6 +11,7 @@ import xmlrpc.client
 import urllib3
 import urllib3.util.connection as urllib3_connection
 from google import genai  # ✅ Google GenAI SDK
+from google.genai import types  # ✅ Stable configuration types
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -324,22 +325,20 @@ def detect_category(feed_url, title):
     return "News"
 
 # ============================================
-# 🤖 GOOGLE GEMINI AGENT (LIVE SEARCH & WRITER)
+# 🤖 GOOGLE GEMINI STABLE PRODUCTION MODEL (FAST & RELIABLE)
 # ============================================
 def generate_super_detailed_content_gemini(title, full_content, category):
+    """
+    स्थिर और बिजली जैसी तेज़ गति वाले 'gemini-2.5-flash' का उपयोग करके
+    स्क्रीनशॉट की तरह बेहतरीन हिंदी समाचार ब्लॉग लिखेगा।
+    """
     if not GEMINI_API_KEY:
         print("⚠️ GEMINI_API_KEY नहीं मिली!")
         return None
 
     try:
-        print("⏳ Google GenAI Antigravity Agent को सक्रिय कर रहा हूँ...")
+        print("⏳ Google GenAI (gemini-2.5-flash) के माध्यम से पोस्ट जनरेट कर रहा हूँ...")
         client = genai.Client(api_key=GEMINI_API_KEY)
-
-        tools = [
-            {'type': 'code_execution'},
-            {'type': 'google_search'},
-            {'type': 'url_context'}
-        ]
 
         prompt = (
             f"Write a comprehensive, professional, highly engaging Hindi/Hinglish news article. "
@@ -358,35 +357,28 @@ def generate_super_detailed_content_gemini(title, full_content, category):
             f"4. The word count must be extremely detailed (minimum 1500+ words of deep value)."
         )
 
-        # ✅ 'environment' पैरामीटर को हटा दिया गया है ताकि 422 एरर दूर हो सके
-        interaction = client.interactions.create(
-            agent='antigravity-preview-05-2026',
-            input=prompt,
-            background=True,
-            tools=tools,
+        # ✅ रीयल-टाइम गूगल सर्च ग्राउंडिंग के साथ प्रोडक्शन जेमिनी मॉडल
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[{"google_search": {}}],
+            ),
         )
+        
+        output_text = response.text
 
-        attempts = 0
-        while attempts < 15:
-            interaction = client.interactions.get(interaction.id)
-            if interaction.status == "completed":
-                print("✅ जेमिनी एजेंट ने पूरी तरह से ब्लॉग आर्टिकल जनरेट कर लिया है!")
-                output_text = interaction.output_text
-                
-                viral_title = title
-                title_match = re.search(r'\[TITLE\](.*?)\[/TITLE\]', output_text, re.IGNORECASE | re.DOTALL)
-                if title_match:
-                    viral_title = title_match.group(1).strip()
-                    output_text = output_text.replace(title_match.group(0), "")
-                
-                return viral_title, output_text
-                
-            elif interaction.status == "failed":
-                print(f"❌ जेमिनी एजेंट विफल रहा: {interaction.error}")
-                break
-                
-            time.sleep(10)
-            attempts += 1
+        if output_text and len(output_text) > 200:
+            print("✅ जेमिनी ने रीयल-टाइम सर्च के साथ लेख सफलतापूर्वक जनरेट कर लिया है!")
+            
+            # Title और Content को अलग करना
+            viral_title = title
+            title_match = re.search(r'\[TITLE\](.*?)\[/TITLE\]', output_text, re.IGNORECASE | re.DOTALL)
+            if title_match:
+                viral_title = title_match.group(1).strip()
+                output_text = output_text.replace(title_match.group(0), "")
+            
+            return viral_title, output_text
 
     except Exception as e:
         print(f"⚠️ जेमिनी एपीआई के दौरान गंभीर समस्या: {e}")
