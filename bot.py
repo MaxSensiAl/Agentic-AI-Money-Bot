@@ -68,7 +68,7 @@ RSS_FEEDS = [
     "https://economictimes.indiatimes.com/rssfeeds/13358356.cms"
 ]
 
-# --- IMAGE SOURCES ---
+# --- IMAGE SOURCES (FALLBACK) ---
 UNSPLASH_IMAGES = {
     "Technology": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
     "Gaming": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
@@ -150,6 +150,50 @@ def share_to_discord(title, link):
 def get_current_date():
     ist_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
     return ist_time.strftime("%B %d, %Y")
+
+# ============================================
+# 🔍 WEB IMAGE SEARCH FUNCTION (NEW)
+# ============================================
+def search_web_image(query):
+    print(f"🔍 Internet par photo dhundh raha hai: {query[:50]}...")
+    try:
+        search_url = "https://duckduckgo.com/"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        params = {"q": query}
+        res = requests.get(search_url, params=params, headers=headers, timeout=10)
+        
+        vqd_match = re.search(r'vqd=([\d-]+)\&', res.text)
+        if not vqd_match:
+            vqd_match = re.search(r'vqd=["\']([\d-]+)["\']', res.text)
+            
+        if vqd_match:
+            vqd = vqd_match.group(1)
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "Referer": "https://duckduckgo.com/"
+            }
+            params = {
+                "l": "wt-wt",
+                "o": "json",
+                "q": query,
+                "vqd": vqd,
+                "f": ",,,",
+                "p": "1"
+            }
+            image_api_url = "https://duckduckgo.com/v.html"
+            img_res = requests.get(image_api_url, params=params, headers=headers, timeout=10)
+            data = img_res.json()
+            results = data.get("results", [])
+            
+            for r in results:
+                img_url = r.get("image")
+                if img_url and img_url.startswith("http"):
+                    if not any(x in img_url.lower() for x in ["logo", "avatar", "icon", "placeholder", "gif", "profile"]):
+                        print("✅ Real matching photo mil gayi!")
+                        return img_url
+    except Exception as e:
+        print(f"⚠️ Image search failed: {e}")
+    return None
 
 # ============================================
 # 🔐 BLOGGER AUTHENTICATION
@@ -252,29 +296,26 @@ def get_entry_image(entry):
         pass
     return None
 
-def generate_hd_image_with_text(title, category):
-    try:
-        clean = title.replace('"', '').replace("'", '')[:60]
-        prompt = f"{clean} {category} news banner style"
-        url = f"https://image.pollinations.ai/prompt/{prompt.replace(' ', '%20')}?width=1200&height=630&nologo=true&seed={random.randint(1, 9999)}"
-        return url
-    except:
-        pass
-    return None
-
 def get_hd_image_strict(entry, title, category):
     print("📸 Getting HD image...")
+    
+    # 1. RSS फ़ीड में इमेज है तो उसका उपयोग करें
     image = get_entry_image(entry)
     if image and image.startswith('http') and 'logo' not in image.lower():
         print("✅ RSS image found!")
         return image
-    image = generate_hd_image_with_text(title, category)
-    if image:
-        print("✅ AI HD image generated!")
-        return image
+        
+    # 2. नहीं तो इंटरनेट से खबर से मेल खाती हुई तस्वीर खोजें
+    clean_title = clean_and_format_title(title)
+    web_image = search_web_image(clean_title)
+    if web_image:
+        return web_image
+        
+    # 3. यदि सर्च विफल हो जाता है तो Unsplash की सुरक्षित तस्वीर का उपयोग करें
     if category in UNSPLASH_IMAGES:
-        print("✅ Category image used")
+        print("✅ Fallback Category image used")
         return UNSPLASH_IMAGES[category]
+        
     return "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80"
 
 def get_short_url(long_url):
@@ -331,14 +372,10 @@ def detect_category(feed_url, title):
 # 🤖 GEMINI WITH QUOTA HANDLING & RETRY
 # ============================================
 def generate_super_detailed_content_gemini(title, full_content, category):
-    """
-    Gemini 3.6 Flash with quota handling and retry mechanism
-    """
     if not GEMINI_API_KEY:
         print("⚠️ GEMINI_API_KEY not found!")
         return None
 
-    # Try Gemini 3.6 Flash first
     models_to_try = [
         'gemini-3.6-flash',
         'gemini-2.0-flash',
@@ -396,7 +433,7 @@ def generate_super_detailed_content_gemini(title, full_content, category):
             error_msg = str(e)
             if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
                 print(f"⚠️ Quota exceeded for {model}, trying next model...")
-                time.sleep(2)  # Wait before retry
+                time.sleep(2)
                 continue
             else:
                 print(f"⚠️ Gemini API error with {model}: {e}")
@@ -406,7 +443,7 @@ def generate_super_detailed_content_gemini(title, full_content, category):
     return None
 
 # ============================================
-# 📝 ENHANCED FALLBACK CONTENT (Better than before)
+# 📝 ENHANCED FALLBACK CONTENT
 # ============================================
 def get_detailed_fallback_content(title, full_content, category):
     print("🔄 Using enhanced fallback template...")
@@ -415,7 +452,6 @@ def get_detailed_fallback_content(title, full_content, category):
     first_para = full_content[:800] if full_content else ""
     more_content = full_content[800:1600] if len(full_content) > 800 else ""
     
-    # Category-specific content
     category_emoji = {
         "News": "📰",
         "Politics": "🏛️",
@@ -519,7 +555,6 @@ def post_to_blogger(access_token, title, content, category):
 # 🏥 HEALTH CHECK
 # ============================================
 def check_bot_health():
-    """Check if all services are available"""
     print("\n🏥 Running Health Check...")
     checks = {
         "Gemini API": lambda: bool(GEMINI_API_KEY),
@@ -575,7 +610,7 @@ def main():
             full_content = f"Please read and write about this URL: {MANUAL_URL}"
             category = "News"
             link = MANUAL_URL
-            image_url = generate_hd_image_with_text("Trending India News", category)
+            image_url = search_web_image("Trending India News") or UNSPLASH_IMAGES["News"]
         else:
             print("🔍 Normal mode: Searching RSS feeds...")
             existing_titles = get_all_blogger_titles(access_token)
@@ -626,7 +661,6 @@ def main():
             full_content = get_full_content(entry)
             category = detect_category(selected_feed, raw_title)
         
-        # Try Gemini with quota handling
         ai_result = generate_super_detailed_content_gemini(raw_title, full_content, category)
         
         if ai_result:
