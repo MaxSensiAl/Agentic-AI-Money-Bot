@@ -68,17 +68,62 @@ RSS_FEEDS = [
     "https://economictimes.indiatimes.com/rssfeeds/13358356.cms"
 ]
 
-# --- IMAGE SOURCES (FALLBACK) ---
+# --- MULTIPLE IMAGE SOURCES FOR VARIETY ---
 UNSPLASH_IMAGES = {
-    "Technology": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
-    "Gaming": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
-    "Entertainment": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80",
-    "Space": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
-    "Sports": "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80",
-    "Business": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80",
-    "Politics": "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=1200&q=80",
-    "Health": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1200&q=80",
-    "Automobile": "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=80",
+    "Technology": [
+        "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "Gaming": [
+        "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "Entertainment": [
+        "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "Space": [
+        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "Sports": [
+        "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "Business": [
+        "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "Politics": [
+        "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "Health": [
+        "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "Automobile": [
+        "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "News": [
+        "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1495020689067-958852a6565d?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1503428593586-e225b39bddbb?auto=format&fit=crop&w=1200&q=80"
+    ]
 }
 
 POSTED_FILE = 'posted_news.txt'
@@ -152,7 +197,7 @@ def get_current_date():
     return ist_time.strftime("%B %d, %Y")
 
 # ============================================
-# 🔍 WEB IMAGE SEARCH FUNCTION (NEW)
+# 🔍 WEB IMAGE SEARCH FUNCTION
 # ============================================
 def search_web_image(query):
     print(f"🔍 Internet par photo dhundh raha hai: {query[:50]}...")
@@ -250,6 +295,29 @@ def is_duplicate_title(new_title, existing_titles):
     return False
 
 # ============================================
+# 🧠 SMART KEYWORD OVERLAP CHECKER (NEW)
+# ============================================
+def is_similar_to_existing(new_title, existing_titles):
+    stop_words = {"in", "the", "and", "of", "to", "for", "with", "on", "at", "by", "an", "is", "vs", "me", "ko", "par", "se", "ka", "ki", "ke", "ne", "bada", "badi", "hui", "thi", "gaya", "macha", "hua", "huye", "says", "against", "over"}
+    
+    def get_keywords(text):
+        words = re.sub(r'[^\w\s]', '', text.lower()).split()
+        return {w for w in words if len(w) > 3 and w not in stop_words}
+    
+    new_keywords = get_keywords(new_title)
+    if not new_keywords:
+        return False
+        
+    for existing in existing_titles:
+        existing_keywords = get_keywords(existing)
+        overlap = new_keywords.intersection(existing_keywords)
+        # यदि 3 या उससे अधिक मुख्य शब्द मेल खाते हैं, तो इसे स्किप करें
+        if len(overlap) >= 3:
+            print(f"⚠️ Skip! Similar news detected: keywords {overlap} with '{existing[:50]}...'")
+            return True
+    return False
+
+# ============================================
 # 📰 RSS PROCESSING
 # ============================================
 def get_full_content(entry):
@@ -299,24 +367,26 @@ def get_entry_image(entry):
 def get_hd_image_strict(entry, title, category):
     print("📸 Getting HD image...")
     
-    # 1. RSS फ़ीड में इमेज है तो उसका उपयोग करें
+    # 1. यदि फ़ीड में अपनी तस्वीर है
     image = get_entry_image(entry)
     if image and image.startswith('http') and 'logo' not in image.lower():
         print("✅ RSS image found!")
         return image
         
-    # 2. नहीं तो इंटरनेट से खबर से मेल खाती हुई तस्वीर खोजें
+    # 2. नहीं तो इंटरनेट से खोजें
     clean_title = clean_and_format_title(title)
     web_image = search_web_image(clean_title)
     if web_image:
         return web_image
         
-    # 3. यदि सर्च विफल हो जाता है तो Unsplash की सुरक्षित तस्वीर का उपयोग करें
+    # 3. बैकअप: रैंडम तरीके से अलग-अलग तस्वीरें लगाना
     if category in UNSPLASH_IMAGES:
-        print("✅ Fallback Category image used")
-        return UNSPLASH_IMAGES[category]
+        fallback_list = UNSPLASH_IMAGES[category]
+        selected_fallback = random.choice(fallback_list)
+        print(f"✅ Fallback Category image used (Randomized)")
+        return selected_fallback
         
-    return "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80"
+    return random.choice(UNSPLASH_IMAGES["News"])
 
 def get_short_url(long_url):
     try:
@@ -576,10 +646,10 @@ def check_bot_health():
     return all_ok
 
 def fix_dns():
-    print("✅ Testing connection to Pollinations AI...")
+    print("✅ Testing connection...")
     try:
         res = requests.get("https://text.pollinations.ai", timeout=10)
-        print(f"✅ Pollinations AI reachable (Status Code: {res.status_code})")
+        print(f"✅ Connection check completed (Status Code: {res.status_code})")
     except Exception as e:
         print(f"⚠️ Connection check failed: {e}")
 
@@ -610,7 +680,7 @@ def main():
             full_content = f"Please read and write about this URL: {MANUAL_URL}"
             category = "News"
             link = MANUAL_URL
-            image_url = search_web_image("Trending India News") or UNSPLASH_IMAGES["News"]
+            image_url = search_web_image("Trending India News") or random.choice(UNSPLASH_IMAGES["News"])
         else:
             print("🔍 Normal mode: Searching RSS feeds...")
             existing_titles = get_all_blogger_titles(access_token)
@@ -635,7 +705,12 @@ def main():
                             temp_entry = feed.entries[i]
                             temp_title = temp_entry.title
                             
+                            # 1. एकदम डुप्लीकेट टाइटल रोकें
                             if is_duplicate_title(temp_title, all_posted):
+                                continue
+                                
+                            # 2. स्मार्ट चेक: एक ही टॉपिक पर मिलती-जुलती न्यूज को रोकें
+                            if is_similar_to_existing(temp_title, all_posted):
                                 continue
                             
                             category = detect_category(feed_url, temp_title)
