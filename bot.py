@@ -197,6 +197,25 @@ def get_current_date():
     return ist_time.strftime("%B %d, %Y")
 
 # ============================================
+# 🛡️ ACTIVE IMAGE VALIDATOR (NEW)
+# ============================================
+def is_valid_image_url(url):
+    try:
+        # केवल हेडर डेटा की जांच करके इमेज की सत्यता जांचें (फास्ट)
+        res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, stream=True, timeout=3)
+        if res.status_code == 200:
+            content_type = res.headers.get("Content-Type", "")
+            if "image" in content_type:
+                # यदि बहुत छोटी फाइल है तो छोड़ दें (जैसे खाली ट्रैकर पिक्सेल)
+                content_length = int(res.headers.get("Content-Length", 0))
+                if content_length > 0 and content_length < 5000:
+                    return False
+                return True
+    except:
+        pass
+    return False
+
+# ============================================
 # 🔍 WEB IMAGE SEARCH FUNCTION
 # ============================================
 def search_web_image(query):
@@ -234,8 +253,10 @@ def search_web_image(query):
                 img_url = r.get("image")
                 if img_url and img_url.startswith("http"):
                     if not any(x in img_url.lower() for x in ["logo", "avatar", "icon", "placeholder", "gif", "profile"]):
-                        print("✅ Real matching photo mil gayi!")
-                        return img_url
+                        # हॉटलिंकिंग और लिंक की सत्यता जांचें
+                        if is_valid_image_url(img_url):
+                            print("✅ Real matching photo mil gayi aur verified hai!")
+                            return img_url
     except Exception as e:
         print(f"⚠️ Image search failed: {e}")
     return None
@@ -366,7 +387,7 @@ def get_entry_image(entry):
 def get_hd_image_strict(entry, title, category):
     print("📸 Getting HD image...")
     
-    # 1. पहली प्राथमिकता: इंटरनेट से सीधे HD तस्वीर खोजें (Best Quality)
+    # 1. पहली प्राथमिकता: इंटरनेट से सीधे HD तस्वीर खोजें (Best Quality & Verified)
     clean_title = clean_and_format_title(title)
     web_image = search_web_image(clean_title)
     if web_image:
@@ -375,10 +396,12 @@ def get_hd_image_strict(entry, title, category):
     # 2. दूसरी प्राथमिकता: यदि सर्च विफल हो जाए, तो फ़ीड में दी गई तस्वीर का उपयोग करें (Backup)
     image = get_entry_image(entry)
     if image and image.startswith('http') and 'logo' not in image.lower():
-        print("✅ RSS image found!")
-        return image
+        # इसकी भी सत्यता जांचें
+        if is_valid_image_url(image):
+            print("✅ RSS image found and verified!")
+            return image
             
-    # 3. तीसरी प्राथमिकता: यदि दोनों विफल हो जाएं, तो रैंडम Unsplash तस्वीर का उपयोग करें
+    # 3. तीसरी प्राथमिकता: यदि दोनों विफल हो जाएं, तो रैंडम Unsplash तस्वीर का उपयोग करें (Safe Fallback)
     if category in UNSPLASH_IMAGES:
         fallback_list = UNSPLASH_IMAGES[category]
         selected_fallback = random.choice(fallback_list)
