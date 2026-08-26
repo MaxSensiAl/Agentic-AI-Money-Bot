@@ -295,7 +295,7 @@ def is_duplicate_title(new_title, existing_titles):
     return False
 
 # ============================================
-# 🧠 SMART KEYWORD OVERLAP CHECKER (NEW)
+# 🧠 SMART KEYWORD OVERLAP CHECKER
 # ============================================
 def is_similar_to_existing(new_title, existing_titles):
     stop_words = {"in", "the", "and", "of", "to", "for", "with", "on", "at", "by", "an", "is", "vs", "me", "ko", "par", "se", "ka", "ki", "ke", "ne", "bada", "badi", "hui", "thi", "gaya", "macha", "hua", "huye", "says", "against", "over"}
@@ -311,7 +311,6 @@ def is_similar_to_existing(new_title, existing_titles):
     for existing in existing_titles:
         existing_keywords = get_keywords(existing)
         overlap = new_keywords.intersection(existing_keywords)
-        # यदि 3 या उससे अधिक मुख्य शब्द मेल खाते हैं, तो इसे स्किप करें
         if len(overlap) >= 3:
             print(f"⚠️ Skip! Similar news detected: keywords {overlap} with '{existing[:50]}...'")
             return True
@@ -367,19 +366,19 @@ def get_entry_image(entry):
 def get_hd_image_strict(entry, title, category):
     print("📸 Getting HD image...")
     
-    # 1. यदि फ़ीड में अपनी तस्वीर है
-    image = get_entry_image(entry)
-    if image and image.startswith('http') and 'logo' not in image.lower():
-        print("✅ RSS image found!")
-        return image
-        
-    # 2. नहीं तो इंटरनेट से खोजें
+    # 1. पहली प्राथमिकता: इंटरनेट से सीधे HD तस्वीर खोजें (Best Quality)
     clean_title = clean_and_format_title(title)
     web_image = search_web_image(clean_title)
     if web_image:
         return web_image
         
-    # 3. बैकअप: रैंडम तरीके से अलग-अलग तस्वीरें लगाना
+    # 2. दूसरी प्राथमिकता: यदि सर्च विफल हो जाए, तो फ़ीड में दी गई तस्वीर का उपयोग करें (Backup)
+    image = get_entry_image(entry)
+    if image and image.startswith('http') and 'logo' not in image.lower():
+        print("✅ RSS image found!")
+        return image
+            
+    # 3. तीसरी प्राथमिकता: यदि दोनों विफल हो जाएं, तो रैंडम Unsplash तस्वीर का उपयोग करें
     if category in UNSPLASH_IMAGES:
         fallback_list = UNSPLASH_IMAGES[category]
         selected_fallback = random.choice(fallback_list)
