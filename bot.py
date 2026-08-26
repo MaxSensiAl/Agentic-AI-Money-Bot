@@ -197,16 +197,14 @@ def get_current_date():
     return ist_time.strftime("%B %d, %Y")
 
 # ============================================
-# 🛡️ ACTIVE IMAGE VALIDATOR (NEW)
+# 🛡️ ACTIVE IMAGE VALIDATOR
 # ============================================
 def is_valid_image_url(url):
     try:
-        # केवल हेडर डेटा की जांच करके इमेज की सत्यता जांचें (फास्ट)
         res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, stream=True, timeout=3)
         if res.status_code == 200:
             content_type = res.headers.get("Content-Type", "")
             if "image" in content_type:
-                # यदि बहुत छोटी फाइल है तो छोड़ दें (जैसे खाली ट्रैकर पिक्सेल)
                 content_length = int(res.headers.get("Content-Length", 0))
                 if content_length > 0 and content_length < 5000:
                     return False
@@ -253,7 +251,6 @@ def search_web_image(query):
                 img_url = r.get("image")
                 if img_url and img_url.startswith("http"):
                     if not any(x in img_url.lower() for x in ["logo", "avatar", "icon", "placeholder", "gif", "profile"]):
-                        # हॉटलिंकिंग और लिंक की सत्यता जांचें
                         if is_valid_image_url(img_url):
                             print("✅ Real matching photo mil gayi aur verified hai!")
                             return img_url
@@ -396,12 +393,11 @@ def get_hd_image_strict(entry, title, category):
     # 2. दूसरी प्राथमिकता: यदि सर्च विफल हो जाए, तो फ़ीड में दी गई तस्वीर का उपयोग करें (Backup)
     image = get_entry_image(entry)
     if image and image.startswith('http') and 'logo' not in image.lower():
-        # इसकी भी सत्यता जांचें
         if is_valid_image_url(image):
             print("✅ RSS image found and verified!")
             return image
             
-    # 3. तीसरी प्राथमिकता: यदि दोनों विफल हो जाएं, तो रैंडम Unsplash तस्वीर का उपयोग करें (Safe Fallback)
+    # 3. तीसरी प्राथमिकता: यदि दोनों विफल हो जाएं, तो रैंडम Unsplash तस्वीर का उपयोग करें
     if category in UNSPLASH_IMAGES:
         fallback_list = UNSPLASH_IMAGES[category]
         selected_fallback = random.choice(fallback_list)
@@ -768,10 +764,13 @@ def main():
             viral_title = raw_title
             ai_content = get_detailed_fallback_content(raw_title, full_content, category)
 
-        # Build final post
+        # HTML एट्रिब्यूट्स के लिए "Double Quotes" का उपयोग करें और सिंगल कोट्स को सुरक्षित HTML एंटिटी में बदलें
+        safe_viral_title = viral_title.replace("'", "&#39;").replace('"', "&quot;")
+        
+        # Build final post HTML
         image_html = f"""
         <div style="text-align:center;margin-bottom:25px;">
-            <img src='{image_url}' alt='{viral_title}' style='width:100%;max-width:800px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);'>
+            <img src="{image_url}" alt="{safe_viral_title}" style="width:100%;max-width:800px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);">
             <p style="font-size:12px;color:#999;margin-top:5px;">📸 Viral News AI | HD Quality</p>
         </div>
         """
