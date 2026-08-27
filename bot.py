@@ -68,61 +68,62 @@ RSS_FEEDS = [
     "https://economictimes.indiatimes.com/rssfeeds/13358356.cms"
 ]
 
+# --- SAFE AI IMAGE PROMPTS (NEW & SAFE) ---
+AI_SAFE_PROMPTS = {
+    "Technology": "high tech laboratory, software developers working on computers, modern artificial intelligence coding, professional technology news banner style",
+    "Gaming": "esports tournament arena, gaming setup with RGB lights, realistic professional gaming banner",
+    "Entertainment": "cinema hall screen, classic movie projector, golden trophy award night, entertainment news style",
+    "Space": "satellite orbiting earth, deep space exploration, galaxy, realistic scientific space news banner",
+    "Sports": "stadium lights, cricket pitch with wickets and bat, realistic sports news photography",
+    "Business": "financial district skyscrapers, corporate business meeting room, stock market charts, business news illustration",
+    "Politics": "government building assembly hall, national flag background, realistic political news banner",
+    "Health": "medical research laboratory, doctor checking reports, professional healthcare news banner style",
+    "Automobile": "modern electric car on road, futuristic luxury automobile design, realistic car news banner",
+    "News": "global news broadcasting studio room, camera and microphone, realistic world news banner style"
+}
+
 # --- MULTIPLE IMAGE SOURCES FOR VARIETY ---
 UNSPLASH_IMAGES = {
     "Technology": [
         "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
         "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80"
+        "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80"
     ],
     "Gaming": [
         "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80"
+        "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=1200&q=80"
     ],
     "Entertainment": [
         "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&w=1200&q=80"
+        "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&w=1200&q=80"
     ],
     "Space": [
         "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?auto=format&fit=crop&w=1200&q=80"
+        "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1200&q=80"
     ],
     "Sports": [
         "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=1200&q=80"
+        "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1200&q=80"
     ],
     "Business": [
         "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80"
+        "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80"
     ],
     "Politics": [
         "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80"
+        "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1200&q=80"
     ],
     "Health": [
         "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=1200&q=80"
+        "https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?auto=format&fit=crop&w=1200&q=80"
     ],
     "Automobile": [
         "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=1200&q=80"
+        "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80"
     ],
     "News": [
         "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1495020689067-958852a6565d?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1503428593586-e225b39bddbb?auto=format&fit=crop&w=1200&q=80"
+        "https://images.unsplash.com/photo-1495020689067-958852a6565d?auto=format&fit=crop&w=1200&q=80"
     ]
 }
 
@@ -212,6 +213,21 @@ def is_valid_image_url(url):
     except:
         pass
     return False
+
+# ============================================
+# 🤖 SAFE AI IMAGE GENERATOR (NEW & SAFE)
+# ============================================
+def generate_hd_image_with_text(category):
+    print(f"🎨 Generating Safe AI Image for Category: {category}...")
+    try:
+        prompt = AI_SAFE_PROMPTS.get(category, AI_SAFE_PROMPTS["News"])
+        url = f"https://image.pollinations.ai/prompt/{prompt.replace(' ', '%20')}?width=1200&height=630&nologo=true&seed={random.randint(1, 99999)}"
+        if is_valid_image_url(url):
+            print("✅ Safe AI Image generated successfully!")
+            return url
+    except Exception as e:
+        print(f"⚠️ Safe AI image generation failed: {e}")
+    return None
 
 # ============================================
 # 🔍 WEB IMAGE SEARCH FUNCTION
@@ -384,20 +400,25 @@ def get_entry_image(entry):
 def get_hd_image_strict(entry, title, category):
     print("📸 Getting HD image...")
     
-    # 1. पहली प्राथमिकता: इंटरनेट से सीधे HD तस्वीर खोजें (Best Quality & Verified)
+    # 1. पहली प्राथमिकता: इंटरनेट से सीधे असली HD तस्वीर खोजें
     clean_title = clean_and_format_title(title)
     web_image = search_web_image(clean_title)
     if web_image:
         return web_image
         
-    # 2. दूसरी प्राथमिकता: यदि सर्च विफल हो जाए, तो फ़ीड में दी गई तस्वीर का उपयोग करें (Backup)
+    # 2. दूसरी प्राथमिकता: यदि सर्च विफल हो जाए, तो फ़ीड में दी गई तस्वीर का उपयोग करें (सत्यापित करके)
     image = get_entry_image(entry)
     if image and image.startswith('http') and 'logo' not in image.lower():
         if is_valid_image_url(image):
             print("✅ RSS image found and verified!")
             return image
             
-    # 3. तीसरी प्राथमिकता: यदि दोनों विफल हो जाएं, तो रैंडम Unsplash तस्वीर का उपयोग करें
+    # 3. तीसरी प्राथमिकता: सुरक्षित AI इमेज बनाएं (Safe AI category image)
+    ai_image = generate_hd_image_with_text(category)
+    if ai_image:
+        return ai_image
+            
+    # 4. चौथी प्राथमिकता: रैंडम Unsplash तस्वीर का उपयोग करें (Absolute Fallback)
     if category in UNSPLASH_IMAGES:
         fallback_list = UNSPLASH_IMAGES[category]
         selected_fallback = random.choice(fallback_list)
