@@ -31,7 +31,7 @@ def apply_smart_connection_patch():
         host, port = address
         if host in HARDCODED_IPS:
             ip = HARDCODED_IPS[host]
-            print(f"🎯 Redirecting {host} connection to {ip}")
+            print(f"Redirecting {host} connection to {ip}")
             return original_create_connection((ip, port), *args, **kwargs)
         return original_create_connection(address, *args, **kwargs)
 
@@ -133,7 +133,6 @@ def ping_search_engines(blog_name, blog_url):
 def submit_to_google_indexing(blog_url):
     """Submit to Google Indexing API (if configured)"""
     try:
-        # Google Indexing API
         indexing_url = "https://indexing.googleapis.com/v3/urlNotifications:publish"
         headers = {
             "Authorization": f"Bearer {get_blogger_access_token()}",
@@ -148,10 +147,10 @@ def submit_to_google_indexing(blog_url):
     except:
         pass
 
-def generate_meta_tags(title, category, keywords):
+def generate_meta_tags(title, category, blog_url):
     """Generate SEO meta tags for better ranking"""
-    meta_keywords = f"{title[:50]}, {category}, Breaking News, India News, {keywords}"
     meta_description = title[:155]
+    meta_keywords = f"{title[:50]}, {category}, Breaking News, India News"
     
     return f"""
     <!-- SEO Meta Tags -->
@@ -170,15 +169,16 @@ def generate_meta_tags(title, category, keywords):
     <link rel="canonical" href="{blog_url}">
     """
 
-def add_schema_structured_data(title, category, content, blog_url):
+def add_schema_structured_data(title, content, blog_url):
     """Add JSON-LD structured data for better SEO"""
+    safe_content = content[:200].replace('"', '\\"').replace('\n', ' ')
     return f"""
     <script type="application/ld+json">
     {{
         "@context": "https://schema.org",
         "@type": "NewsArticle",
         "headline": "{title}",
-        "description": "{content[:200].replace('"', '\\"')}",
+        "description": "{safe_content}",
         "datePublished": "{get_current_datetime_iso()}",
         "dateModified": "{get_current_datetime_iso()}",
         "author": {{
@@ -187,18 +187,12 @@ def add_schema_structured_data(title, category, content, blog_url):
         }},
         "publisher": {{
             "@type": "Organization",
-            "name": "Viral News AI",
-            "logo": {{
-                "@type": "ImageObject",
-                "url": "https://viralnewsai24.blogspot.com/favicon.ico"
-            }}
+            "name": "Viral News AI"
         }},
         "mainEntityOfPage": {{
             "@type": "WebPage",
             "@id": "{blog_url}"
         }},
-        "keywords": "{category}, India News, Breaking News",
-        "articleSection": "{category}",
         "inLanguage": "hi-IN"
     }}
     </script>
@@ -230,9 +224,7 @@ def share_to_discord(title, link):
         pass
 
 def share_to_twitter(title, link):
-    """Share to Twitter/X via webhook"""
     try:
-        # Using a free webhook service or you can implement Twitter API
         print(f"🐦 Share on Twitter: {title[:50]}... {link}")
     except:
         pass
@@ -373,7 +365,7 @@ def get_hd_image_strict(entry):
     print("📸 Checking RSS for image...")
     image = get_entry_image(entry)
     if image and image.startswith('http'):
-        print(f"✅ RSS image found!")
+        print("✅ RSS image found!")
         return image
     print("❌ No image found in RSS, skipping image")
     return None
@@ -429,7 +421,7 @@ def detect_category(feed_url, title):
     return "News"
 
 # ============================================
-# 🤖 GEMINI WITH NEW MODEL (gemini-3.6-flash)
+# 🤖 GEMINI WITH NEW MODEL
 # ============================================
 def generate_super_detailed_content_gemini(title, full_content, category):
     if not GEMINI_API_KEY:
@@ -437,7 +429,7 @@ def generate_super_detailed_content_gemini(title, full_content, category):
         return None
 
     models_to_try = [
-        'gemini-3.6-flash',  # New model
+        'gemini-3.6-flash',
         'gemini-2.0-flash-001',
         'gemini-1.5-flash-001'
     ]
@@ -466,7 +458,6 @@ def generate_super_detailed_content_gemini(title, full_content, category):
                - <h3>✅ निष्कर्ष - Conclusion</h3>
             4. Minimum 1000+ words
             5. Include relevant facts, context, and background
-            6. Make it engaging and shareable
             """
 
             response = client.models.generate_content(
@@ -547,17 +538,16 @@ def get_detailed_fallback_content(title, full_content, category):
     <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
     <p>{first_para}</p>
     {f'<p>{more_content}</p>' if more_content else ''}
-    <p>यह खबर भारत और दुनिया भर में चर्चा का विषय बनी हुई है। विशेषज्ञों का मानना है कि इस घटनाक्रम का दूरगामी प्रभाव हो सकता है।</p>
+    <p>यह खबर भारत और दुनिया भर में चर्चा का विषय बनी हुई है।</p>
     """
     
     expert = f"""
     <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-    <p>विशेषज्ञों के अनुसार, इस घटनाक्रम को गंभीरता से लेने की आवश्यकता है। यह भारतीय परिप्रेक्ष्य में एक महत्वपूर्ण मोड़ हो सकता है।</p>
+    <p>विशेषज्ञों के अनुसार, इस घटनाक्रम को गंभीरता से लेने की आवश्यकता है।</p>
     """
     
     impact = f"""
     <h3>🔮 आगे क्या? - What's Next</h3>
-    <p>इस घटना के कई संभावित प्रभाव हो सकते हैं:</p>
     <ul>
         <li>🇮🇳 भारत में इसका सीधा प्रभाव देखने को मिलेगा</li>
         <li>📈 सोशल मीडिया पर लोगों की प्रतिक्रियाएं आ रही हैं</li>
@@ -567,8 +557,7 @@ def get_detailed_fallback_content(title, full_content, category):
     
     conclusion = f"""
     <h3>✅ निष्कर्ष - Conclusion</h3>
-    <p>{clean_title} - यह एक महत्वपूर्ण घटनाक्रम है जिस पर नजर रखना आवश्यक है। हम आपको इससे जुड़ी सभी अपडेट देते रहेंगे।</p>
-    <p>Stay tuned for more updates on this developing story.</p>
+    <p>{clean_title} - यह एक महत्वपूर्ण घटनाक्रम है।</p>
     """
     
     return f"""
@@ -584,10 +573,6 @@ def get_detailed_fallback_content(title, full_content, category):
     {expert}
     {impact}
     {conclusion}
-    <div style="background:#e8f5e9;padding:15px;border-radius:8px;margin:15px 0;text-align:center;">
-        <p>📱 <strong>इस खबर को सोशल मीडिया पर शेयर करें</strong></p>
-        <p style="font-size:14px;">#BreakingNews #India #{category}</p>
-    </div>
     """
 
 # ============================================
@@ -598,11 +583,9 @@ def post_to_blogger(access_token, title, content, category, blog_url):
         post_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts"
         headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
         
-        # SEO Optimized content
-        seo_meta = generate_meta_tags(title, category, "India, Breaking News, Latest News")
-        schema_data = add_schema_structured_data(title, category, content, blog_url)
+        seo_meta = generate_meta_tags(title, category, blog_url)
+        schema_data = add_schema_structured_data(title, content, blog_url)
         
-        # Full content with SEO
         full_content = f"""
         {seo_meta}
         {schema_data}
@@ -684,7 +667,7 @@ def main():
             full_content = f"Read about: {MANUAL_URL}"
             category = "News"
             link = MANUAL_URL
-            image_url = None  # No image in manual mode
+            image_url = None
         else:
             print("🔍 Searching RSS feeds...")
             existing_titles = get_all_blogger_titles(access_token)
@@ -716,8 +699,6 @@ def main():
                                 continue
                             
                             category = detect_category(feed_url, temp_title)
-                            
-                            # ONLY GET IMAGE FROM RSS - NO AI, NO FALLBACK
                             image_url = get_hd_image_strict(temp_entry)
                             
                             entry = temp_entry
@@ -740,7 +721,6 @@ def main():
             full_content = get_full_content(entry)
             category = detect_category(selected_feed, raw_title)
         
-        # Generate content with Gemini
         ai_result = generate_super_detailed_content_gemini(raw_title, full_content, category)
         
         if ai_result:
@@ -758,14 +738,13 @@ def main():
             image_html = f"""
             <div style="text-align:center;margin-bottom:25px;">
                 <img src="{image_url}" alt="{safe_viral_title}" style="width:100%;max-width:800px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);">
-                <p style="font-size:12px;color:#999;margin-top:5px;">📸 Source Image</p>
+                <p style="font-size:12px;color:#999;margin-top:5px;">Source Image</p>
             </div>
             """
             print("✅ Adding RSS image to post")
         else:
             print("ℹ️ No image found - posting without image")
         
-        # Short URL
         short_link = get_short_url(link)
         earning_button = f"""
         <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
@@ -785,29 +764,18 @@ def main():
             print("\n✅✅✅ POSTED SUCCESSFULLY! ✅✅✅")
             print(f"🔗 {post_url}")
             
-            # ============================================
-            # 🚀 AUTO TRAFFIC GROWTH - SEO & SOCIAL
-            # ============================================
             print("\n🚀 Starting Auto Traffic Growth System...")
-            
-            # 1. Ping Search Engines for indexing
             ping_search_engines("Viral News AI", post_url)
-            
-            # 2. Submit to Google Indexing
             submit_to_google_indexing(post_url)
-            
-            # 3. Share on Social Media
             share_to_telegram(viral_title, post_url)
             share_to_discord(viral_title, post_url)
             share_to_twitter(viral_title, post_url)
             
-            # 4. Save to success log
             with open(SUCCESS_LOG, 'a', encoding='utf-8') as f:
                 f.write(f"{datetime.now()}: {viral_title} -> {post_url}\n")
             
             print("\n✅ Auto Traffic Growth Complete!")
             print("📈 News will start ranking on Google soon...")
-            
         else:
             print("❌ Posting failed!")
 
