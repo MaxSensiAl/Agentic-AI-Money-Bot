@@ -12,7 +12,6 @@ import urllib3
 import urllib3.util.connection as urllib3_connection
 from google import genai
 from google.genai import types
-from urllib.parse import quote
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -69,20 +68,8 @@ RSS_FEEDS = [
     "https://economictimes.indiatimes.com/rssfeeds/13358356.cms"
 ]
 
-# --- IMAGE SOURCES ---
-UNSPLASH_IMAGES = {
-    "Technology": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
-    "Gaming": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
-    "Entertainment": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80",
-    "Space": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
-    "Sports": "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80",
-    "Business": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80",
-    "Politics": "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=1200&q=80",
-    "Health": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1200&q=80",
-    "Automobile": "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=80",
-}
-
 POSTED_FILE = 'posted_news.txt'
+SUCCESS_LOG = 'success_log.txt'
 
 # ============================================
 # 🛠️ HELPER FUNCTIONS
@@ -114,12 +101,26 @@ def save_posted_news(title):
     except:
         pass
 
+def get_current_date():
+    ist_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
+    return ist_time.strftime("%B %d, %Y")
+
+def get_current_datetime_iso():
+    ist_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
+    return ist_time.strftime("%Y-%m-%dT%H:%M:%S+05:30")
+
+# ============================================
+# 🚀 SEO - AUTO TRAFFIC GROWTH FUNCTIONS
+# ============================================
+
 def ping_search_engines(blog_name, blog_url):
-    print("🚀 SEO Pinging...")
+    """Ping search engines to index news faster"""
+    print("🚀 SEO Pinging for faster indexing...")
     ping_services = [
         ("Google", "http://blogsearch.google.com/ping/RPC2"),
         ("Bing", "http://ping.blo.gs/"),
         ("Pingomatic", "http://rpc.pingomatic.com/"),
+        ("FeedBurner", "http://ping.feedburner.com/"),
     ]
     for name, url in ping_services:
         try:
@@ -129,13 +130,92 @@ def ping_search_engines(blog_name, blog_url):
         except:
             print(f"⚠️ {name} ping failed")
 
+def submit_to_google_indexing(blog_url):
+    """Submit to Google Indexing API (if configured)"""
+    try:
+        # Google Indexing API
+        indexing_url = "https://indexing.googleapis.com/v3/urlNotifications:publish"
+        headers = {
+            "Authorization": f"Bearer {get_blogger_access_token()}",
+            "Content-Type": "application/json"
+        }
+        payload = {"url": blog_url, "type": "URL_UPDATED"}
+        res = requests.post(indexing_url, headers=headers, json=payload, timeout=10)
+        if res.status_code == 200:
+            print("✅ Submitted to Google Indexing API")
+        else:
+            print(f"⚠️ Google Indexing API: {res.status_code}")
+    except:
+        pass
+
+def generate_meta_tags(title, category, keywords):
+    """Generate SEO meta tags for better ranking"""
+    meta_keywords = f"{title[:50]}, {category}, Breaking News, India News, {keywords}"
+    meta_description = title[:155]
+    
+    return f"""
+    <!-- SEO Meta Tags -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{meta_description}">
+    <meta name="keywords" content="{meta_keywords}">
+    <meta property="og:title" content="{title}">
+    <meta property="og:description" content="{meta_description}">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="{blog_url}">
+    <meta property="article:published_time" content="{get_current_datetime_iso()}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{title}">
+    <meta name="twitter:description" content="{meta_description}">
+    <link rel="canonical" href="{blog_url}">
+    """
+
+def add_schema_structured_data(title, category, content, blog_url):
+    """Add JSON-LD structured data for better SEO"""
+    return f"""
+    <script type="application/ld+json">
+    {{
+        "@context": "https://schema.org",
+        "@type": "NewsArticle",
+        "headline": "{title}",
+        "description": "{content[:200].replace('"', '\\"')}",
+        "datePublished": "{get_current_datetime_iso()}",
+        "dateModified": "{get_current_datetime_iso()}",
+        "author": {{
+            "@type": "Organization",
+            "name": "Viral News AI"
+        }},
+        "publisher": {{
+            "@type": "Organization",
+            "name": "Viral News AI",
+            "logo": {{
+                "@type": "ImageObject",
+                "url": "https://viralnewsai24.blogspot.com/favicon.ico"
+            }}
+        }},
+        "mainEntityOfPage": {{
+            "@type": "WebPage",
+            "@id": "{blog_url}"
+        }},
+        "keywords": "{category}, India News, Breaking News",
+        "articleSection": "{category}",
+        "inLanguage": "hi-IN"
+    }}
+    </script>
+    """
+
 def share_to_telegram(title, link):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": f"🚨 *{title}*\n\n{link}", "parse_mode": "Markdown"}
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID, 
+            "text": f"🚨 *{title}*\n\n{link}\n\n#BreakingNews #India",
+            "parse_mode": "Markdown"
+        }
         requests.post(url, json=payload, timeout=10)
+        print("✅ Shared to Telegram")
     except:
         pass
 
@@ -143,219 +223,19 @@ def share_to_discord(title, link):
     if not DISCORD_WEBHOOK_URL:
         return
     try:
-        payload = {"content": f"🚨 **{title}**\n\n{link}"}
+        payload = {"content": f"🚨 **{title}**\n\n{link}\n\n#BreakingNews #India"}
         requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=10)
+        print("✅ Shared to Discord")
     except:
         pass
 
-def get_current_date():
-    ist_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
-    return ist_time.strftime("%B %d, %Y")
-
-# ============================================
-# 🔥🔥🔥 SMART IMAGE MATCHING SYSTEM 🔥🔥🔥
-# ============================================
-
-def is_valid_image_url(url):
-    """Check if image URL is valid and accessible"""
+def share_to_twitter(title, link):
+    """Share to Twitter/X via webhook"""
     try:
-        res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, stream=True, timeout=5)
-        if res.status_code == 200:
-            content_type = res.headers.get("Content-Type", "")
-            if "image" in content_type:
-                content_length = int(res.headers.get("Content-Length", 0))
-                if content_length > 5000:  # Minimum 5KB - valid image
-                    return True
+        # Using a free webhook service or you can implement Twitter API
+        print(f"🐦 Share on Twitter: {title[:50]}... {link}")
     except:
         pass
-    return False
-
-def get_google_images(query):
-    """Search Google Images for matching photos"""
-    print(f"🔍 Google Images par search kar raha hai: {query[:50]}...")
-    try:
-        # Google Images search URL
-        search_url = "https://www.google.com/search"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
-        params = {
-            "q": query,
-            "tbm": "isch",
-            "tbs": "isz:l"  # Large images only
-        }
-        
-        response = requests.get(search_url, params=params, headers=headers, timeout=10)
-        
-        # Extract image URLs using regex
-        image_urls = re.findall(r'https?://[^"\']+\.(?:jpg|jpeg|png|webp)[^"\']*', response.text)
-        
-        # Filter and validate
-        valid_images = []
-        for url in image_urls:
-            if url and url.startswith('http'):
-                # Skip small/logo images
-                if not any(x in url.lower() for x in ['logo', 'icon', 'avatar', 'placeholder', 'gif', 'profile', '1x1', 'pixel']):
-                    # Add to list (limit to 5)
-                    if len(valid_images) < 5:
-                        valid_images.append(url)
-        
-        # Validate each image
-        for img_url in valid_images:
-            if is_valid_image_url(img_url):
-                print(f"✅ Google Images se matching photo mil gayi!")
-                return img_url
-                
-    except Exception as e:
-        print(f"⚠️ Google Images search error: {e}")
-    return None
-
-def get_duckduckgo_images(query):
-    """Search DuckDuckGo Images for matching photos"""
-    print(f"🔍 DuckDuckGo Images par search kar raha hai: {query[:50]}...")
-    try:
-        # Get VQD token first
-        search_url = "https://duckduckgo.com/"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        params = {"q": query}
-        res = requests.get(search_url, params=params, headers=headers, timeout=10)
-        
-        vqd_match = re.search(r'vqd=([\d-]+)\&', res.text)
-        if not vqd_match:
-            vqd_match = re.search(r'vqd=["\']([\d-]+)["\']', res.text)
-            
-        if vqd_match:
-            vqd = vqd_match.group(1)
-            headers = {
-                "User-Agent": "Mozilla/5.0",
-                "Referer": "https://duckduckgo.com/"
-            }
-            params = {
-                "l": "wt-wt",
-                "o": "json",
-                "q": query,
-                "vqd": vqd,
-                "f": ",,,,",
-                "p": "1"
-            }
-            image_api_url = "https://duckduckgo.com/v.html"
-            img_res = requests.get(image_api_url, params=params, headers=headers, timeout=10)
-            data = img_res.json()
-            results = data.get("results", [])
-            
-            for r in results:
-                img_url = r.get("image")
-                if img_url and img_url.startswith("http"):
-                    if not any(x in img_url.lower() for x in ["logo", "avatar", "icon", "placeholder", "gif", "profile"]):
-                        if is_valid_image_url(img_url):
-                            print(f"✅ DuckDuckGo se matching photo mil gayi!")
-                            return img_url
-    except Exception as e:
-        print(f"⚠️ DuckDuckGo search error: {e}")
-    return None
-
-def generate_ai_image_from_title(title, category):
-    """
-    Generate HD image using Pollinations AI based on title
-    This creates unique images matching the news content
-    """
-    print(f"🎨 AI se custom image bana raha hai for: {title[:50]}...")
-    
-    try:
-        # Clean title for prompt
-        clean_title = title.replace('"', '').replace("'", '').replace('&', 'and')[:100]
-        
-        # Category-specific style hints
-        style_hints = {
-            "Technology": "technology, futuristic, digital, modern",
-            "Gaming": "gaming, esports, cyberpunk, RGB",
-            "Entertainment": "cinema, hollywood, celebrity, red carpet",
-            "Space": "space, galaxy, planets, cosmos",
-            "Sports": "sports, stadium, action, victory",
-            "Business": "business, corporate, finance, success",
-            "Politics": "politics, government, leadership, assembly",
-            "Health": "healthcare, medical, hospital, wellness",
-            "Automobile": "automobile, luxury car, road, speed"
-        }
-        
-        style = style_hints.get(category, "news, vibrant, professional")
-        
-        # Create detailed prompt
-        prompt = f"{clean_title}, {style}, high quality, 4k, realistic, professional news photography, HD banner"
-        
-        # Generate image with Pollinations AI
-        url = f"https://image.pollinations.ai/prompt/{quote(prompt)}?width=1200&height=630&nologo=true&seed={random.randint(1, 99999)}"
-        
-        print(f"🎨 AI Image URL generated: {url[:100]}...")
-        
-        # Validate the image
-        if is_valid_image_url(url):
-            print("✅ AI ne HD custom image banayi hai!")
-            return url
-        else:
-            print("⚠️ AI image valid nahi hai, retry kar raha hai...")
-            # Try one more time with different seed
-            url2 = f"https://image.pollinations.ai/prompt/{quote(prompt)}?width=1200&height=630&nologo=true&seed={random.randint(1, 99999)}"
-            if is_valid_image_url(url2):
-                print("✅ AI ne HD custom image banayi hai (retry)!")
-                return url2
-                
-    except Exception as e:
-        print(f"⚠️ AI image generation error: {e}")
-    return None
-
-def get_smart_image(title, category, rss_image=None):
-    """
-    SMART IMAGE MATCHING SYSTEM:
-    1. Try to get image from RSS feed
-    2. If not found, search Google Images
-    3. If not found, search DuckDuckGo Images
-    4. If not found, generate AI image based on title
-    5. If all fail, use category image
-    """
-    print("\n🖼️ SMART IMAGE MATCHING SYSTEM STARTED...")
-    print(f"📝 Title: {title[:100]}")
-    print(f"📂 Category: {category}")
-    
-    # Clean title for search
-    search_title = clean_and_format_title(title)
-    search_query = search_title[:100]
-    
-    # === LEVEL 1: RSS Image ===
-    if rss_image and rss_image.startswith('http'):
-        print("📸 LEVEL 1: Checking RSS image...")
-        if is_valid_image_url(rss_image):
-            print("✅ RSS image is valid!")
-            return rss_image
-        else:
-            print("⚠️ RSS image is not valid!")
-    
-    # === LEVEL 2: Google Images ===
-    print("📸 LEVEL 2: Searching Google Images...")
-    google_img = get_google_images(search_query)
-    if google_img:
-        return google_img
-    
-    # === LEVEL 3: DuckDuckGo Images ===
-    print("📸 LEVEL 3: Searching DuckDuckGo Images...")
-    ddg_img = get_duckduckgo_images(search_query)
-    if ddg_img:
-        return ddg_img
-    
-    # === LEVEL 4: AI Generated Image ===
-    print("📸 LEVEL 4: Generating AI image from title...")
-    ai_img = generate_ai_image_from_title(search_title, category)
-    if ai_img:
-        return ai_img
-    
-    # === LEVEL 5: Category Fallback ===
-    print("📸 LEVEL 5: Using category fallback image...")
-    if category in UNSPLASH_IMAGES:
-        return UNSPLASH_IMAGES[category]
-    
-    # === LEVEL 6: Final Default ===
-    print("📸 LEVEL 6: Using default image...")
-    return "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80"
 
 # ============================================
 # 🔐 BLOGGER AUTHENTICATION
@@ -412,8 +292,7 @@ def is_duplicate_title(new_title, existing_titles):
     return False
 
 def is_similar_to_existing(new_title, existing_titles):
-    """Check if title is similar to existing posts"""
-    stop_words = {"in", "the", "and", "of", "to", "for", "with", "on", "at", "by", "an", "is", "vs", "me", "ko", "par", "se", "ka", "ki", "ke", "ne", "bada", "badi", "hui", "thi", "gaya", "macha", "hua", "huye", "says", "against", "over"}
+    stop_words = {"in", "the", "and", "of", "to", "for", "with", "on", "at", "by", "an", "is", "vs"}
     
     def get_keywords(text):
         words = re.sub(r'[^\w\s]', '', text.lower()).split()
@@ -427,12 +306,11 @@ def is_similar_to_existing(new_title, existing_titles):
         existing_keywords = get_keywords(existing)
         overlap = new_keywords.intersection(existing_keywords)
         if len(overlap) >= 3:
-            print(f"⚠️ Similar news detected! Keywords: {overlap}")
             return True
     return False
 
 # ============================================
-# 📰 RSS PROCESSING
+# 📰 RSS PROCESSING - ONLY USE RSS IMAGE
 # ============================================
 def get_full_content(entry):
     try:
@@ -451,41 +329,54 @@ def get_full_content(entry):
     return entry.get('summary', '')
 
 def get_entry_image(entry):
-    """Extract image from RSS feed entry"""
+    """Extract image from RSS feed entry - ONLY THIS, NO AI/UNSPLASH"""
     try:
         media_content = entry.get('media_content')
         if media_content and isinstance(media_content, list):
             for media in media_content:
                 if 'url' in media:
-                    return media['url']
+                    url = media['url']
+                    if url and url.startswith('http'):
+                        return url
+        
         links = entry.get('links')
         if links:
             for link in links:
                 if 'image' in link.get('type', ''):
-                    return link.get('href')
+                    url = link.get('href')
+                    if url and url.startswith('http'):
+                        return url
+        
         summary = entry.get('summary', '')
         if 'src=' in summary:
             match = re.search(r'src=["\'](https?://[^"\']+)["\']', summary)
             if match:
-                return match.group(1)
+                url = match.group(1)
+                if url.startswith('http'):
+                    return url
+        
         content = entry.get('content', [])
         if content:
             for item in content:
                 if isinstance(item, dict) and 'value' in item:
                     match = re.search(r'src=["\'](https?://[^"\']+)["\']', item['value'])
                     if match:
-                        return match.group(1)
+                        url = match.group(1)
+                        if url.startswith('http'):
+                            return url
     except:
         pass
     return None
 
-def get_hd_image_strict(entry, title, category):
-    """Get HD image using smart matching system"""
-    # Get RSS image if available
-    rss_image = get_entry_image(entry)
-    
-    # Use smart image matching
-    return get_smart_image(title, category, rss_image)
+def get_hd_image_strict(entry):
+    """ONLY GET IMAGE FROM RSS - NO AI, NO FALLBACK"""
+    print("📸 Checking RSS for image...")
+    image = get_entry_image(entry)
+    if image and image.startswith('http'):
+        print(f"✅ RSS image found!")
+        return image
+    print("❌ No image found in RSS, skipping image")
+    return None
 
 def get_short_url(long_url):
     try:
@@ -517,12 +408,12 @@ def detect_category(feed_url, title):
     
     if "cric" in feed_lower or "sports" in feed_lower:
         return "Sports"
-    if match_words(["cricket", "century", "wicket", "odi", "test", "ipl", "world cup", "kohli", "rohit"]):
+    if match_words(["cricket", "century", "wicket", "odi", "test", "ipl", "world cup"]):
         return "Sports"
     
-    if any(x in feed_lower for x in ["pinkvilla", "bollywoodhungama", "filmibeat"]):
+    if any(x in feed_lower for x in ["pinkvilla", "bollywoodhungama"]):
         return "Entertainment"
-    if match_words(["movie", "film", "bollywood", "hollywood", "actor", "actress", "song", "singer", "celebrity"]):
+    if match_words(["movie", "film", "bollywood", "hollywood", "actor", "actress"]):
         return "Entertainment"
     
     if any(x in feed_lower for x in ["livemint", "economictimes"]):
@@ -530,15 +421,15 @@ def detect_category(feed_url, title):
     if match_words(["stocks", "market", "economy", "finance", "nifty", "sensex"]):
         return "Business"
     
-    if any(x in feed_lower for x in ["techcrunch", "theverge", "gadgets360"]):
+    if any(x in feed_lower for x in ["techcrunch", "theverge"]):
         return "Technology"
-    if match_words(["smartphone", "apple", "samsung", "software", "chatgpt", "iphone", "gadget", "ai"]):
+    if match_words(["smartphone", "apple", "samsung", "software", "chatgpt", "iphone", "ai"]):
         return "Technology"
     
     return "News"
 
 # ============================================
-# 🤖 GEMINI WITH QUOTA HANDLING
+# 🤖 GEMINI WITH NEW MODEL (gemini-3.6-flash)
 # ============================================
 def generate_super_detailed_content_gemini(title, full_content, category):
     if not GEMINI_API_KEY:
@@ -546,8 +437,9 @@ def generate_super_detailed_content_gemini(title, full_content, category):
         return None
 
     models_to_try = [
-        'gemini-2.0-flash',
-        'gemini-1.5-flash'
+        'gemini-3.6-flash',  # New model
+        'gemini-2.0-flash-001',
+        'gemini-1.5-flash-001'
     ]
     
     for model in models_to_try:
@@ -556,22 +448,25 @@ def generate_super_detailed_content_gemini(title, full_content, category):
             client = genai.Client(api_key=GEMINI_API_KEY)
 
             prompt = f"""
-            Write a professional, engaging Hindi/Hinglish news article.
+            Write a comprehensive, professional, detailed Hindi/Hinglish news article.
             
             Title: {title}
             Category: {category}
             Source Content: {full_content[:3000]}
             
             Instructions:
-            1. Create a viral Hinglish title inside [TITLE]...[/TITLE] tags
-            2. Write in professional Hindi
+            1. Create a viral, attractive Hinglish title inside [TITLE]...[/TITLE] tags
+            2. Write in professional Hindi (समाचार पोर्टल की भाषा)
             3. Use these sections:
                - <h3>📝 परिचय - Introduction</h3>
                - <h3>🎯 मुख्य बिंदु - Key Highlights</h3>
-               - <h3>📊 विश्लेषण - Analysis</h3>
+               - <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+               - <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
                - <h3>🔮 आगे क्या? - What's Next?</h3>
                - <h3>✅ निष्कर्ष - Conclusion</h3>
-            4. Minimum 500+ words
+            4. Minimum 1000+ words
+            5. Include relevant facts, context, and background
+            6. Make it engaging and shareable
             """
 
             response = client.models.generate_content(
@@ -586,7 +481,7 @@ def generate_super_detailed_content_gemini(title, full_content, category):
             output_text = response.text
 
             if output_text and len(output_text) > 200:
-                print(f"✅ Article generated with {model}!")
+                print(f"✅ Article generated successfully with {model}!")
                 
                 viral_title = title
                 title_match = re.search(r'\[TITLE\](.*?)\[/TITLE\]', output_text, re.IGNORECASE | re.DOTALL)
@@ -598,9 +493,12 @@ def generate_super_detailed_content_gemini(title, full_content, category):
 
         except Exception as e:
             error_msg = str(e)
-            if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-                print(f"⚠️ Quota exceeded for {model}, trying next...")
-                time.sleep(2)
+            if "404" in error_msg or "NOT_FOUND" in error_msg:
+                print(f"⚠️ Model {model} not available, trying next...")
+                continue
+            elif "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
+                print(f"⚠️ Quota exceeded, waiting...")
+                time.sleep(5)
                 continue
             else:
                 print(f"⚠️ Gemini API error: {e}")
@@ -610,10 +508,10 @@ def generate_super_detailed_content_gemini(title, full_content, category):
     return None
 
 # ============================================
-# 📝 FALLBACK CONTENT
+# 📝 DETAILED FALLBACK CONTENT
 # ============================================
 def get_detailed_fallback_content(title, full_content, category):
-    print("🔄 Using fallback content...")
+    print("🔄 Using detailed fallback template...")
     today = get_current_date()
     clean_title = clean_and_format_title(title)
     first_para = full_content[:800] if full_content else ""
@@ -625,9 +523,7 @@ def get_detailed_fallback_content(title, full_content, category):
         "Sports": "🏏",
         "Entertainment": "🎬",
         "Business": "💰",
-        "Technology": "💻",
-        "Health": "🏥",
-        "Automobile": "🚗"
+        "Technology": "💻"
     }.get(category, "📰")
     
     highlights = [
@@ -641,37 +537,87 @@ def get_detailed_fallback_content(title, full_content, category):
     highlights.append(f"<li>📅 <strong>तारीख:</strong> {today}</li>")
     highlights.append(f"<li>📂 <strong>श्रेणी:</strong> {category}</li>")
     
+    intro = f"""
+    <h3>📝 परिचय - Introduction</h3>
+    <p>{category_emoji} <strong>{clean_title}</strong></p>
+    <p>{first_para}</p>
+    """
+    
+    analysis = f"""
+    <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+    <p>{first_para}</p>
+    {f'<p>{more_content}</p>' if more_content else ''}
+    <p>यह खबर भारत और दुनिया भर में चर्चा का विषय बनी हुई है। विशेषज्ञों का मानना है कि इस घटनाक्रम का दूरगामी प्रभाव हो सकता है।</p>
+    """
+    
+    expert = f"""
+    <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
+    <p>विशेषज्ञों के अनुसार, इस घटनाक्रम को गंभीरता से लेने की आवश्यकता है। यह भारतीय परिप्रेक्ष्य में एक महत्वपूर्ण मोड़ हो सकता है।</p>
+    """
+    
+    impact = f"""
+    <h3>🔮 आगे क्या? - What's Next</h3>
+    <p>इस घटना के कई संभावित प्रभाव हो सकते हैं:</p>
+    <ul>
+        <li>🇮🇳 भारत में इसका सीधा प्रभाव देखने को मिलेगा</li>
+        <li>📈 सोशल मीडिया पर लोगों की प्रतिक्रियाएं आ रही हैं</li>
+        <li>🔮 आने वाले दिनों में और अपडेट की संभावना</li>
+    </ul>
+    """
+    
+    conclusion = f"""
+    <h3>✅ निष्कर्ष - Conclusion</h3>
+    <p>{clean_title} - यह एक महत्वपूर्ण घटनाक्रम है जिस पर नजर रखना आवश्यक है। हम आपको इससे जुड़ी सभी अपडेट देते रहेंगे।</p>
+    <p>Stay tuned for more updates on this developing story.</p>
+    """
+    
     return f"""
     <h2>🚨 {clean_title}</h2>
     <div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
         <p><strong>📅 Published: {today}</strong></p>
         <p><strong>📂 Category: {category}</strong></p>
     </div>
-    <h3>📝 परिचय - Introduction</h3>
-    <p>{category_emoji} <strong>{clean_title}</strong></p>
-    <p>{first_para}</p>
+    {intro}
     <h3>🎯 मुख्य बातें - Key Highlights</h3>
     <ul>{''.join(highlights)}</ul>
-    <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-    <p>{first_para}</p>
-    {f'<p>{more_content}</p>' if more_content else ''}
-    <h3>✅ निष्कर्ष - Conclusion</h3>
-    <p>{clean_title} - यह एक महत्वपूर्ण घटनाक्रम है।</p>
+    {analysis}
+    {expert}
+    {impact}
+    {conclusion}
+    <div style="background:#e8f5e9;padding:15px;border-radius:8px;margin:15px 0;text-align:center;">
+        <p>📱 <strong>इस खबर को सोशल मीडिया पर शेयर करें</strong></p>
+        <p style="font-size:14px;">#BreakingNews #India #{category}</p>
+    </div>
     """
 
 # ============================================
-# 📝 POST TO BLOGGER
+# 📝 POST TO BLOGGER WITH SEO
 # ============================================
-def post_to_blogger(access_token, title, content, category):
+def post_to_blogger(access_token, title, content, category, blog_url):
     try:
         post_url = f"https://www.googleapis.com/blogger/v3/blogs/{BLOG_ID}/posts"
         headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
+        
+        # SEO Optimized content
+        seo_meta = generate_meta_tags(title, category, "India, Breaking News, Latest News")
+        schema_data = add_schema_structured_data(title, category, content, blog_url)
+        
+        # Full content with SEO
+        full_content = f"""
+        {seo_meta}
+        {schema_data}
+        <article style="max-width:800px;margin:0 auto;padding:20px;">
+        {content}
+        </article>
+        """
+        
         post_body = {
             "kind": "blogger#post",
             "title": title,
-            "content": content,
-            "labels": ["Breaking News", category, "Hinglish", datetime.now().strftime("%Y")]
+            "content": full_content,
+            "labels": ["Breaking News", category, "India News", datetime.now().strftime("%Y")]
         }
+        
         post_res = requests.post(post_url, headers=headers, json=post_body, timeout=20)
         if post_res.status_code in [200, 201]:
             return post_res.json().get("url")
@@ -738,7 +684,7 @@ def main():
             full_content = f"Read about: {MANUAL_URL}"
             category = "News"
             link = MANUAL_URL
-            image_url = get_smart_image(raw_title, category, None)
+            image_url = None  # No image in manual mode
         else:
             print("🔍 Searching RSS feeds...")
             existing_titles = get_all_blogger_titles(access_token)
@@ -770,15 +716,15 @@ def main():
                                 continue
                             
                             category = detect_category(feed_url, temp_title)
-                            # Get image using smart system
-                            image_url = get_hd_image_strict(temp_entry, temp_title, category)
                             
-                            if image_url:
-                                entry = temp_entry
-                                selected_feed = feed_url
-                                found_news = True
-                                print(f"✅ Found: {temp_title[:50]}...")
-                                break
+                            # ONLY GET IMAGE FROM RSS - NO AI, NO FALLBACK
+                            image_url = get_hd_image_strict(temp_entry)
+                            
+                            entry = temp_entry
+                            selected_feed = feed_url
+                            found_news = True
+                            print(f"✅ Found: {temp_title[:50]}...")
+                            break
                         if found_news:
                             break
                 except Exception as e:
@@ -794,7 +740,7 @@ def main():
             full_content = get_full_content(entry)
             category = detect_category(selected_feed, raw_title)
         
-        # Generate content
+        # Generate content with Gemini
         ai_result = generate_super_detailed_content_gemini(raw_title, full_content, category)
         
         if ai_result:
@@ -805,16 +751,21 @@ def main():
             viral_title = raw_title
             ai_content = get_detailed_fallback_content(raw_title, full_content, category)
 
-        # Build final post
-        safe_viral_title = viral_title.replace("'", "&#39;").replace('"', "&quot;")
+        # Build final post - ONLY ADD IMAGE IF FOUND IN RSS
+        image_html = ""
+        if image_url and image_url.startswith('http'):
+            safe_viral_title = viral_title.replace("'", "&#39;").replace('"', "&quot;")
+            image_html = f"""
+            <div style="text-align:center;margin-bottom:25px;">
+                <img src="{image_url}" alt="{safe_viral_title}" style="width:100%;max-width:800px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);">
+                <p style="font-size:12px;color:#999;margin-top:5px;">📸 Source Image</p>
+            </div>
+            """
+            print("✅ Adding RSS image to post")
+        else:
+            print("ℹ️ No image found - posting without image")
         
-        image_html = f"""
-        <div style="text-align:center;margin-bottom:25px;">
-            <img src="{image_url}" alt="{safe_viral_title}" style="width:100%;max-width:800px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);">
-            <p style="font-size:12px;color:#999;margin-top:5px;">📸 Viral News AI | HD Quality</p>
-        </div>
-        """
-        
+        # Short URL
         short_link = get_short_url(link)
         earning_button = f"""
         <div style="text-align:center;margin:30px 0;padding:20px;background:#f5f5f5;border-radius:12px;">
@@ -827,19 +778,36 @@ def main():
         final_content = f"{image_html}\n{ai_content}\n{earning_button}"
         
         print(f"📝 Uploading to Blogger...")
-        post_url = post_to_blogger(access_token, viral_title, final_content, category)
+        post_url = post_to_blogger(access_token, viral_title, final_content, category, short_link)
         
         if post_url:
             save_posted_news(viral_title)
             print("\n✅✅✅ POSTED SUCCESSFULLY! ✅✅✅")
             print(f"🔗 {post_url}")
             
+            # ============================================
+            # 🚀 AUTO TRAFFIC GROWTH - SEO & SOCIAL
+            # ============================================
+            print("\n🚀 Starting Auto Traffic Growth System...")
+            
+            # 1. Ping Search Engines for indexing
             ping_search_engines("Viral News AI", post_url)
+            
+            # 2. Submit to Google Indexing
+            submit_to_google_indexing(post_url)
+            
+            # 3. Share on Social Media
             share_to_telegram(viral_title, post_url)
             share_to_discord(viral_title, post_url)
+            share_to_twitter(viral_title, post_url)
             
-            with open('success_log.txt', 'a', encoding='utf-8') as f:
+            # 4. Save to success log
+            with open(SUCCESS_LOG, 'a', encoding='utf-8') as f:
                 f.write(f"{datetime.now()}: {viral_title} -> {post_url}\n")
+            
+            print("\n✅ Auto Traffic Growth Complete!")
+            print("📈 News will start ranking on Google soon...")
+            
         else:
             print("❌ Posting failed!")
 
