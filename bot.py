@@ -12,6 +12,7 @@ import urllib3
 import urllib3.util.connection as urllib3_connection
 from google import genai
 from google.genai import types
+from urllib.parse import quote
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -68,63 +69,17 @@ RSS_FEEDS = [
     "https://economictimes.indiatimes.com/rssfeeds/13358356.cms"
 ]
 
-# --- SAFE AI IMAGE PROMPTS (NEW & SAFE) ---
-AI_SAFE_PROMPTS = {
-    "Technology": "high tech laboratory, software developers working on computers, modern artificial intelligence coding, professional technology news banner style",
-    "Gaming": "esports tournament arena, gaming setup with RGB lights, realistic professional gaming banner",
-    "Entertainment": "cinema hall screen, classic movie projector, golden trophy award night, entertainment news style",
-    "Space": "satellite orbiting earth, deep space exploration, galaxy, realistic scientific space news banner",
-    "Sports": "stadium lights, cricket pitch with wickets and bat, realistic sports news photography",
-    "Business": "financial district skyscrapers, corporate business meeting room, stock market charts, business news illustration",
-    "Politics": "government building assembly hall, national flag background, realistic political news banner",
-    "Health": "medical research laboratory, doctor checking reports, professional healthcare news banner style",
-    "Automobile": "modern electric car on road, futuristic luxury automobile design, realistic car news banner",
-    "News": "global news broadcasting studio room, camera and microphone, realistic world news banner style"
-}
-
-# --- MULTIPLE IMAGE SOURCES FOR VARIETY ---
+# --- IMAGE SOURCES ---
 UNSPLASH_IMAGES = {
-    "Technology": [
-        "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80"
-    ],
-    "Gaming": [
-        "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=1200&q=80"
-    ],
-    "Entertainment": [
-        "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&w=1200&q=80"
-    ],
-    "Space": [
-        "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1200&q=80"
-    ],
-    "Sports": [
-        "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1200&q=80"
-    ],
-    "Business": [
-        "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80"
-    ],
-    "Politics": [
-        "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1200&q=80"
-    ],
-    "Health": [
-        "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?auto=format&fit=crop&w=1200&q=80"
-    ],
-    "Automobile": [
-        "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80"
-    ],
-    "News": [
-        "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80",
-        "https://images.unsplash.com/photo-1495020689067-958852a6565d?auto=format&fit=crop&w=1200&q=80"
-    ]
+    "Technology": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
+    "Gaming": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80",
+    "Entertainment": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80",
+    "Space": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
+    "Sports": "https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&w=1200&q=80",
+    "Business": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80",
+    "Politics": "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=1200&q=80",
+    "Health": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1200&q=80",
+    "Automobile": "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=80",
 }
 
 POSTED_FILE = 'posted_news.txt'
@@ -198,45 +153,70 @@ def get_current_date():
     return ist_time.strftime("%B %d, %Y")
 
 # ============================================
-# 🛡️ ACTIVE IMAGE VALIDATOR
+# 🔥🔥🔥 SMART IMAGE MATCHING SYSTEM 🔥🔥🔥
 # ============================================
+
 def is_valid_image_url(url):
+    """Check if image URL is valid and accessible"""
     try:
-        res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, stream=True, timeout=3)
+        res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, stream=True, timeout=5)
         if res.status_code == 200:
             content_type = res.headers.get("Content-Type", "")
             if "image" in content_type:
                 content_length = int(res.headers.get("Content-Length", 0))
-                if content_length > 0 and content_length < 5000:
-                    return False
-                return True
+                if content_length > 5000:  # Minimum 5KB - valid image
+                    return True
     except:
         pass
     return False
 
-# ============================================
-# 🤖 SAFE AI IMAGE GENERATOR (NEW & SAFE)
-# ============================================
-def generate_hd_image_with_text(category):
-    print(f"🎨 Generating Safe AI Image for Category: {category}...")
+def get_google_images(query):
+    """Search Google Images for matching photos"""
+    print(f"🔍 Google Images par search kar raha hai: {query[:50]}...")
     try:
-        prompt = AI_SAFE_PROMPTS.get(category, AI_SAFE_PROMPTS["News"])
-        url = f"https://image.pollinations.ai/prompt/{prompt.replace(' ', '%20')}?width=1200&height=630&nologo=true&seed={random.randint(1, 99999)}"
-        if is_valid_image_url(url):
-            print("✅ Safe AI Image generated successfully!")
-            return url
+        # Google Images search URL
+        search_url = "https://www.google.com/search"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+        params = {
+            "q": query,
+            "tbm": "isch",
+            "tbs": "isz:l"  # Large images only
+        }
+        
+        response = requests.get(search_url, params=params, headers=headers, timeout=10)
+        
+        # Extract image URLs using regex
+        image_urls = re.findall(r'https?://[^"\']+\.(?:jpg|jpeg|png|webp)[^"\']*', response.text)
+        
+        # Filter and validate
+        valid_images = []
+        for url in image_urls:
+            if url and url.startswith('http'):
+                # Skip small/logo images
+                if not any(x in url.lower() for x in ['logo', 'icon', 'avatar', 'placeholder', 'gif', 'profile', '1x1', 'pixel']):
+                    # Add to list (limit to 5)
+                    if len(valid_images) < 5:
+                        valid_images.append(url)
+        
+        # Validate each image
+        for img_url in valid_images:
+            if is_valid_image_url(img_url):
+                print(f"✅ Google Images se matching photo mil gayi!")
+                return img_url
+                
     except Exception as e:
-        print(f"⚠️ Safe AI image generation failed: {e}")
+        print(f"⚠️ Google Images search error: {e}")
     return None
 
-# ============================================
-# 🔍 WEB IMAGE SEARCH FUNCTION
-# ============================================
-def search_web_image(query):
-    print(f"🔍 Internet par photo dhundh raha hai: {query[:50]}...")
+def get_duckduckgo_images(query):
+    """Search DuckDuckGo Images for matching photos"""
+    print(f"🔍 DuckDuckGo Images par search kar raha hai: {query[:50]}...")
     try:
+        # Get VQD token first
         search_url = "https://duckduckgo.com/"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        headers = {"User-Agent": "Mozilla/5.0"}
         params = {"q": query}
         res = requests.get(search_url, params=params, headers=headers, timeout=10)
         
@@ -247,7 +227,7 @@ def search_web_image(query):
         if vqd_match:
             vqd = vqd_match.group(1)
             headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "User-Agent": "Mozilla/5.0",
                 "Referer": "https://duckduckgo.com/"
             }
             params = {
@@ -255,7 +235,7 @@ def search_web_image(query):
                 "o": "json",
                 "q": query,
                 "vqd": vqd,
-                "f": ",,,",
+                "f": ",,,,",
                 "p": "1"
             }
             image_api_url = "https://duckduckgo.com/v.html"
@@ -268,11 +248,114 @@ def search_web_image(query):
                 if img_url and img_url.startswith("http"):
                     if not any(x in img_url.lower() for x in ["logo", "avatar", "icon", "placeholder", "gif", "profile"]):
                         if is_valid_image_url(img_url):
-                            print("✅ Real matching photo mil gayi aur verified hai!")
+                            print(f"✅ DuckDuckGo se matching photo mil gayi!")
                             return img_url
     except Exception as e:
-        print(f"⚠️ Image search failed: {e}")
+        print(f"⚠️ DuckDuckGo search error: {e}")
     return None
+
+def generate_ai_image_from_title(title, category):
+    """
+    Generate HD image using Pollinations AI based on title
+    This creates unique images matching the news content
+    """
+    print(f"🎨 AI se custom image bana raha hai for: {title[:50]}...")
+    
+    try:
+        # Clean title for prompt
+        clean_title = title.replace('"', '').replace("'", '').replace('&', 'and')[:100]
+        
+        # Category-specific style hints
+        style_hints = {
+            "Technology": "technology, futuristic, digital, modern",
+            "Gaming": "gaming, esports, cyberpunk, RGB",
+            "Entertainment": "cinema, hollywood, celebrity, red carpet",
+            "Space": "space, galaxy, planets, cosmos",
+            "Sports": "sports, stadium, action, victory",
+            "Business": "business, corporate, finance, success",
+            "Politics": "politics, government, leadership, assembly",
+            "Health": "healthcare, medical, hospital, wellness",
+            "Automobile": "automobile, luxury car, road, speed"
+        }
+        
+        style = style_hints.get(category, "news, vibrant, professional")
+        
+        # Create detailed prompt
+        prompt = f"{clean_title}, {style}, high quality, 4k, realistic, professional news photography, HD banner"
+        
+        # Generate image with Pollinations AI
+        url = f"https://image.pollinations.ai/prompt/{quote(prompt)}?width=1200&height=630&nologo=true&seed={random.randint(1, 99999)}"
+        
+        print(f"🎨 AI Image URL generated: {url[:100]}...")
+        
+        # Validate the image
+        if is_valid_image_url(url):
+            print("✅ AI ne HD custom image banayi hai!")
+            return url
+        else:
+            print("⚠️ AI image valid nahi hai, retry kar raha hai...")
+            # Try one more time with different seed
+            url2 = f"https://image.pollinations.ai/prompt/{quote(prompt)}?width=1200&height=630&nologo=true&seed={random.randint(1, 99999)}"
+            if is_valid_image_url(url2):
+                print("✅ AI ne HD custom image banayi hai (retry)!")
+                return url2
+                
+    except Exception as e:
+        print(f"⚠️ AI image generation error: {e}")
+    return None
+
+def get_smart_image(title, category, rss_image=None):
+    """
+    SMART IMAGE MATCHING SYSTEM:
+    1. Try to get image from RSS feed
+    2. If not found, search Google Images
+    3. If not found, search DuckDuckGo Images
+    4. If not found, generate AI image based on title
+    5. If all fail, use category image
+    """
+    print("\n🖼️ SMART IMAGE MATCHING SYSTEM STARTED...")
+    print(f"📝 Title: {title[:100]}")
+    print(f"📂 Category: {category}")
+    
+    # Clean title for search
+    search_title = clean_and_format_title(title)
+    search_query = search_title[:100]
+    
+    # === LEVEL 1: RSS Image ===
+    if rss_image and rss_image.startswith('http'):
+        print("📸 LEVEL 1: Checking RSS image...")
+        if is_valid_image_url(rss_image):
+            print("✅ RSS image is valid!")
+            return rss_image
+        else:
+            print("⚠️ RSS image is not valid!")
+    
+    # === LEVEL 2: Google Images ===
+    print("📸 LEVEL 2: Searching Google Images...")
+    google_img = get_google_images(search_query)
+    if google_img:
+        return google_img
+    
+    # === LEVEL 3: DuckDuckGo Images ===
+    print("📸 LEVEL 3: Searching DuckDuckGo Images...")
+    ddg_img = get_duckduckgo_images(search_query)
+    if ddg_img:
+        return ddg_img
+    
+    # === LEVEL 4: AI Generated Image ===
+    print("📸 LEVEL 4: Generating AI image from title...")
+    ai_img = generate_ai_image_from_title(search_title, category)
+    if ai_img:
+        return ai_img
+    
+    # === LEVEL 5: Category Fallback ===
+    print("📸 LEVEL 5: Using category fallback image...")
+    if category in UNSPLASH_IMAGES:
+        return UNSPLASH_IMAGES[category]
+    
+    # === LEVEL 6: Final Default ===
+    print("📸 LEVEL 6: Using default image...")
+    return "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80"
 
 # ============================================
 # 🔐 BLOGGER AUTHENTICATION
@@ -328,10 +411,8 @@ def is_duplicate_title(new_title, existing_titles):
                 return True
     return False
 
-# ============================================
-# 🧠 SMART KEYWORD OVERLAP CHECKER
-# ============================================
 def is_similar_to_existing(new_title, existing_titles):
+    """Check if title is similar to existing posts"""
     stop_words = {"in", "the", "and", "of", "to", "for", "with", "on", "at", "by", "an", "is", "vs", "me", "ko", "par", "se", "ka", "ki", "ke", "ne", "bada", "badi", "hui", "thi", "gaya", "macha", "hua", "huye", "says", "against", "over"}
     
     def get_keywords(text):
@@ -346,7 +427,7 @@ def is_similar_to_existing(new_title, existing_titles):
         existing_keywords = get_keywords(existing)
         overlap = new_keywords.intersection(existing_keywords)
         if len(overlap) >= 3:
-            print(f"⚠️ Skip! Similar news detected: keywords {overlap} with '{existing[:50]}...'")
+            print(f"⚠️ Similar news detected! Keywords: {overlap}")
             return True
     return False
 
@@ -370,6 +451,7 @@ def get_full_content(entry):
     return entry.get('summary', '')
 
 def get_entry_image(entry):
+    """Extract image from RSS feed entry"""
     try:
         media_content = entry.get('media_content')
         if media_content and isinstance(media_content, list):
@@ -398,34 +480,12 @@ def get_entry_image(entry):
     return None
 
 def get_hd_image_strict(entry, title, category):
-    print("📸 Getting HD image...")
+    """Get HD image using smart matching system"""
+    # Get RSS image if available
+    rss_image = get_entry_image(entry)
     
-    # 1. पहली प्राथमिकता: इंटरनेट से सीधे असली HD तस्वीर खोजें
-    clean_title = clean_and_format_title(title)
-    web_image = search_web_image(clean_title)
-    if web_image:
-        return web_image
-        
-    # 2. दूसरी प्राथमिकता: यदि सर्च विफल हो जाए, तो फ़ीड में दी गई तस्वीर का उपयोग करें (सत्यापित करके)
-    image = get_entry_image(entry)
-    if image and image.startswith('http') and 'logo' not in image.lower():
-        if is_valid_image_url(image):
-            print("✅ RSS image found and verified!")
-            return image
-            
-    # 3. तीसरी प्राथमिकता: सुरक्षित AI इमेज बनाएं (Safe AI category image)
-    ai_image = generate_hd_image_with_text(category)
-    if ai_image:
-        return ai_image
-            
-    # 4. चौथी प्राथमिकता: रैंडम Unsplash तस्वीर का उपयोग करें (Absolute Fallback)
-    if category in UNSPLASH_IMAGES:
-        fallback_list = UNSPLASH_IMAGES[category]
-        selected_fallback = random.choice(fallback_list)
-        print(f"✅ Fallback Category image used (Randomized)")
-        return selected_fallback
-        
-    return random.choice(UNSPLASH_IMAGES["News"])
+    # Use smart image matching
+    return get_smart_image(title, category, rss_image)
 
 def get_short_url(long_url):
     try:
@@ -478,7 +538,7 @@ def detect_category(feed_url, title):
     return "News"
 
 # ============================================
-# 🤖 GEMINI WITH QUOTA HANDLING & RETRY
+# 🤖 GEMINI WITH QUOTA HANDLING
 # ============================================
 def generate_super_detailed_content_gemini(title, full_content, category):
     if not GEMINI_API_KEY:
@@ -486,7 +546,6 @@ def generate_super_detailed_content_gemini(title, full_content, category):
         return None
 
     models_to_try = [
-        'gemini-3.6-flash',
         'gemini-2.0-flash',
         'gemini-1.5-flash'
     ]
@@ -505,7 +564,7 @@ def generate_super_detailed_content_gemini(title, full_content, category):
             
             Instructions:
             1. Create a viral Hinglish title inside [TITLE]...[/TITLE] tags
-            2. Write in professional Hindi (समाचार पोर्टल की भाषा)
+            2. Write in professional Hindi
             3. Use these sections:
                - <h3>📝 परिचय - Introduction</h3>
                - <h3>🎯 मुख्य बिंदु - Key Highlights</h3>
@@ -513,7 +572,6 @@ def generate_super_detailed_content_gemini(title, full_content, category):
                - <h3>🔮 आगे क्या? - What's Next?</h3>
                - <h3>✅ निष्कर्ष - Conclusion</h3>
             4. Minimum 500+ words
-            5. Include relevant facts and context
             """
 
             response = client.models.generate_content(
@@ -528,7 +586,7 @@ def generate_super_detailed_content_gemini(title, full_content, category):
             output_text = response.text
 
             if output_text and len(output_text) > 200:
-                print(f"✅ Article generated successfully with {model}!")
+                print(f"✅ Article generated with {model}!")
                 
                 viral_title = title
                 title_match = re.search(r'\[TITLE\](.*?)\[/TITLE\]', output_text, re.IGNORECASE | re.DOTALL)
@@ -541,21 +599,21 @@ def generate_super_detailed_content_gemini(title, full_content, category):
         except Exception as e:
             error_msg = str(e)
             if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-                print(f"⚠️ Quota exceeded for {model}, trying next model...")
+                print(f"⚠️ Quota exceeded for {model}, trying next...")
                 time.sleep(2)
                 continue
             else:
-                print(f"⚠️ Gemini API error with {model}: {e}")
+                print(f"⚠️ Gemini API error: {e}")
                 continue
     
     print("❌ All Gemini models failed! Using fallback...")
     return None
 
 # ============================================
-# 📝 ENHANCED FALLBACK CONTENT
+# 📝 FALLBACK CONTENT
 # ============================================
 def get_detailed_fallback_content(title, full_content, category):
-    print("🔄 Using enhanced fallback template...")
+    print("🔄 Using fallback content...")
     today = get_current_date()
     clean_title = clean_and_format_title(title)
     first_para = full_content[:800] if full_content else ""
@@ -583,58 +641,22 @@ def get_detailed_fallback_content(title, full_content, category):
     highlights.append(f"<li>📅 <strong>तारीख:</strong> {today}</li>")
     highlights.append(f"<li>📂 <strong>श्रेणी:</strong> {category}</li>")
     
-    intro = f"""
-    <h3>📝 परिचय - Introduction</h3>
-    <p>{category_emoji} <strong>{clean_title}</strong></p>
-    <p>{first_para}</p>
-    """
-    
-    analysis = f"""
-    <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
-    <p>{first_para}</p>
-    {f'<p>{more_content}</p>' if more_content else ''}
-    <p>यह खबर भारत और दुनिया भर में चर्चा का विषय बनी हुई है। विशेषज्ञों का मानना है कि इस घटनाक्रम का दूरगामी प्रभाव हो सकता है।</p>
-    """
-    
-    expert = f"""
-    <h3>💬 विशेषज्ञों की राय - Expert Opinions</h3>
-    <p>विशेषज्ञों के अनुसार, इस घटनाक्रम को गंभीरता से लेने की आवश्यकता है। यह भारतीय परिप्रेक्ष्य में एक महत्वपूर्ण मोड़ हो सकता है।</p>
-    <p>Experts believe this development requires serious attention and could be a significant turning point in the Indian context.</p>
-    """
-    
-    impact = f"""
-    <h3>🌍 प्रभाव और आगे क्या? - Impact & What's Next</h3>
-    <p>इस घटना के कई संभावित प्रभाव हो सकते हैं:</p>
-    <ul>
-        <li>🇮🇳 भारत में इसका सीधा प्रभाव देखने को मिलेगा</li>
-        <li>📈 सोशल मीडिया पर लोगों की प्रतिक्रियाएं आ रही हैं</li>
-        <li>🔮 आने वाले दिनों में और अपडेट की संभावना</li>
-    </ul>
-    """
-    
-    conclusion = f"""
-    <h3>✅ निष्कर्ष - Conclusion</h3>
-    <p>{clean_title} - यह एक महत्वपूर्ण घटनाक्रम है जिस पर नजर रखना आवश्यक है। हम आपको इससे जुड़ी सभी अपडेट देते रहेंगे।</p>
-    <p>Stay tuned for more updates on this developing story.</p>
-    """
-    
     return f"""
     <h2>🚨 {clean_title}</h2>
     <div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;">
         <p><strong>📅 Published: {today}</strong></p>
         <p><strong>📂 Category: {category}</strong></p>
     </div>
-    {intro}
+    <h3>📝 परिचय - Introduction</h3>
+    <p>{category_emoji} <strong>{clean_title}</strong></p>
+    <p>{first_para}</p>
     <h3>🎯 मुख्य बातें - Key Highlights</h3>
     <ul>{''.join(highlights)}</ul>
-    {analysis}
-    {expert}
-    {impact}
-    {conclusion}
-    <div style="background:#e8f5e9;padding:15px;border-radius:8px;margin:15px 0;text-align:center;">
-        <p>📱 <strong>इस खबर को सोशल मीडिया पर शेयर करें</strong></p>
-        <p style="font-size:14px;">#BreakingNews #India #{category}</p>
-    </div>
+    <h3>📊 विस्तृत विश्लेषण - Detailed Analysis</h3>
+    <p>{first_para}</p>
+    {f'<p>{more_content}</p>' if more_content else ''}
+    <h3>✅ निष्कर्ष - Conclusion</h3>
+    <p>{clean_title} - यह एक महत्वपूर्ण घटनाक्रम है।</p>
     """
 
 # ============================================
@@ -654,10 +676,10 @@ def post_to_blogger(access_token, title, content, category):
         if post_res.status_code in [200, 201]:
             return post_res.json().get("url")
         else:
-            print(f"⚠️ Blogger API Error: {post_res.status_code} - {post_res.text}")
+            print(f"⚠️ Blogger API Error: {post_res.status_code}")
             return None
     except Exception as e:
-        print(f"⚠️ Error posting to Blogger: {e}")
+        print(f"⚠️ Error posting: {e}")
         return None
 
 # ============================================
@@ -688,9 +710,9 @@ def fix_dns():
     print("✅ Testing connection...")
     try:
         res = requests.get("https://text.pollinations.ai", timeout=10)
-        print(f"✅ Connection check completed (Status Code: {res.status_code})")
+        print(f"✅ Connection OK (Status: {res.status_code})")
     except Exception as e:
-        print(f"⚠️ Connection check failed: {e}")
+        print(f"⚠️ Connection error: {e}")
 
 # ============================================
 # 🚀 MAIN FUNCTION
@@ -699,9 +721,6 @@ def main():
     print("\n🤖 Starting Viral News AI Blogger Bot...")
     print(f"📅 {get_current_date()}")
     print(f"🔑 Gemini API: {'✅ Set' if GEMINI_API_KEY else '❌ Not Set'}")
-    
-    if not check_bot_health():
-        print("⚠️ Health check failed! But continuing with available features...")
     
     try:
         fix_dns()
@@ -714,14 +733,14 @@ def main():
         MANUAL_URL = os.getenv('MANUAL_URL')
         
         if MANUAL_URL:
-            print(f"🎯 Manual mode active! Processing: {MANUAL_URL}")
+            print(f"🎯 Manual mode: {MANUAL_URL}")
             raw_title = "Trending News Update"
-            full_content = f"Please read and write about this URL: {MANUAL_URL}"
+            full_content = f"Read about: {MANUAL_URL}"
             category = "News"
             link = MANUAL_URL
-            image_url = search_web_image("Trending India News") or random.choice(UNSPLASH_IMAGES["News"])
+            image_url = get_smart_image(raw_title, category, None)
         else:
-            print("🔍 Normal mode: Searching RSS feeds...")
+            print("🔍 Searching RSS feeds...")
             existing_titles = get_all_blogger_titles(access_token)
             local_posted = load_posted_news()
             all_posted = existing_titles.union(local_posted)
@@ -736,7 +755,7 @@ def main():
             
             for feed_url in shuffled_feeds:
                 try:
-                    print(f"📡 Checking feed: {feed_url}")
+                    print(f"📡 Checking: {feed_url}")
                     response = requests.get(feed_url, timeout=15)
                     if response.status_code == 200:
                         feed = feedparser.parse(response.content)
@@ -744,26 +763,26 @@ def main():
                             temp_entry = feed.entries[i]
                             temp_title = temp_entry.title
                             
-                            # 1. एकदम डुप्लीकेट टाइटल रोकें
                             if is_duplicate_title(temp_title, all_posted):
                                 continue
-                                
-                            # 2. स्मार्ट चेक: एक ही टॉपिक पर मिलती-जुलती न्यूज को रोकें
+                            
                             if is_similar_to_existing(temp_title, all_posted):
                                 continue
                             
                             category = detect_category(feed_url, temp_title)
+                            # Get image using smart system
                             image_url = get_hd_image_strict(temp_entry, temp_title, category)
+                            
                             if image_url:
                                 entry = temp_entry
                                 selected_feed = feed_url
                                 found_news = True
-                                print(f"✅ Found news: {temp_title[:50]}...")
+                                print(f"✅ Found: {temp_title[:50]}...")
                                 break
                         if found_news:
                             break
                 except Exception as e:
-                    print(f"⚠️ Error with feed {feed_url}: {e}")
+                    print(f"⚠️ Feed error: {e}")
                     continue
                     
             if not found_news or not entry:
@@ -775,20 +794,20 @@ def main():
             full_content = get_full_content(entry)
             category = detect_category(selected_feed, raw_title)
         
+        # Generate content
         ai_result = generate_super_detailed_content_gemini(raw_title, full_content, category)
         
         if ai_result:
             viral_title, ai_content = ai_result
-            print("✅ Using Gemini-generated content")
+            print("✅ Using Gemini content")
         else:
-            print("⚠️ Using enhanced fallback content...")
+            print("⚠️ Using fallback content...")
             viral_title = raw_title
             ai_content = get_detailed_fallback_content(raw_title, full_content, category)
 
-        # HTML एट्रिब्यूट्स के लिए "Double Quotes" का उपयोग करें और सिंगल कोट्स को सुरक्षित HTML एंटिटी में बदलें
+        # Build final post
         safe_viral_title = viral_title.replace("'", "&#39;").replace('"', "&quot;")
         
-        # Build final post HTML
         image_html = f"""
         <div style="text-align:center;margin-bottom:25px;">
             <img src="{image_url}" alt="{safe_viral_title}" style="width:100%;max-width:800px;height:auto;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);">
@@ -825,10 +844,9 @@ def main():
             print("❌ Posting failed!")
 
     except Exception as e:
-        print(f"❌ Critical error in main: {e}")
+        print(f"❌ Critical error: {e}")
         with open('error_log.txt', 'a', encoding='utf-8') as f:
             f.write(f"{datetime.now()}: {str(e)}\n")
-        return
 
 # ============================================
 # 🚀 ENTRY POINT
